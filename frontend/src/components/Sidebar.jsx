@@ -16,7 +16,8 @@ import {
   FaSearch,
   FaFileAlt,
   FaChartBar,
-  FaCalendarAlt
+  FaCalendarAlt,
+  FaSignOutAlt
 } from "react-icons/fa";
 import { FaFileUpload } from "react-icons/fa";
 import { GoHomeFill } from "react-icons/go";
@@ -25,7 +26,7 @@ import "../styles/Sidebar.css";
 
 // Componente principal Sidebar
 // Recibe como props el estado actual de la página activa y la función que permite cambiarla.
-const Sidebar = ({ activePage, setActivePage }) => {
+const Sidebar = ({ activePage, setActivePage, onLogout }) => {
   // Estado local para controlar si la barra lateral está abierta o cerrada.
   const [isOpen, setIsOpen] = useState(false);
   // Función que alterna entre los estados abierto/cerrado del menú lateral.
@@ -128,12 +129,26 @@ const Sidebar = ({ activePage, setActivePage }) => {
         {!isOpen && <span className="tooltip">Hoja de vida</span>}
         </div>
 
-        {/* Opción: Login (gestión de acceso: mara que vean el login) */}
-        <div className="icon-content">
-          <button className={activePage === "login" ? "active" : ""} onClick={() => setActivePage("login")}>
-            <FaChartBar /> <span>Login</span>
+        {/* Opción: Cerrar sesión */}
+        <div className="icon-content" style={{ marginTop: "auto", paddingTop: "20px" }}>
+          <button 
+            onClick={onLogout}
+            style={{ 
+              color: "#dc3545",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              width: "100%",
+              padding: "10px"
+            }}
+          >
+            <FaSignOutAlt size={23} />
+            <span>Cerrar Sesión</span>
           </button>
-          {!isOpen && <span className="tooltip">Login</span>}
+          {!isOpen && <span className="tooltip">Cerrar Sesión</span>}
         </div>
 
       </div>

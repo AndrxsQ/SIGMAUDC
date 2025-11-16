@@ -1,0 +1,83 @@
+package main
+
+import (
+	"log"
+	"net/http"
+	"os"
+
+	"github.com/andrxsq/SIGMAUDC/internal/config"
+	"github.com/andrxsq/SIGMAUDC/internal/database"
+	"github.com/andrxsq/SIGMAUDC/internal/handlers"
+	"github.com/andrxsq/SIGMAUDC/internal/middleware"
+	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
+)
+
+func main() {
+	// Cargar variables de entorno
+	// Intenta cargar desde el directorio actual (raíz del proyecto)
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using environment variables")
+		log.Printf("Error: %v", err)
+	} else {
+		log.Println("Loaded .env file successfully")
+	}
+
+	// Cargar configuración
+	cfg := config.Load()
+
+	// Conectar a la base de datos
+	db, err := database.Connect(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatal("Error connecting to database:", err)
+	}
+	defer db.Close()
+
+	// Inicializar handlers
+	authHandler := handlers.NewAuthHandler(db, cfg.JWTSecret)
+	auditHandler := handlers.NewAuditHandler(db)
+
+	// Configurar router
+	r := mux.NewRouter()
+
+	// Rutas públicas
+	r.HandleFunc("/auth/login", authHandler.Login).Methods("POST")
+	r.HandleFunc("/auth/set-password", authHandler.SetPassword).Methods("POST")
+
+	// Rutas protegidas (requieren JWT)
+	protected := r.PathPrefix("/api").Subrouter()
+	protected.Use(middleware.JWTAuthMiddleware(cfg.JWTSecret))
+
+	// Ejemplo de ruta protegida
+	protected.HandleFunc("/me", authHandler.GetCurrentUser).Methods("GET")
+
+	// Ruta de auditoría (protegida)
+	protected.HandleFunc("/audit", auditHandler.GetAuditLogs).Methods("GET")
+
+	// CORS middleware
+	corsHandler := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	// Aplicar CORS
+	handler := corsHandler(r)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Server starting on port %s", port)
+	log.Fatal(http.ListenAndServe(":"+port, handler))
+}

@@ -1,123 +1,184 @@
-.Contenedor {
+/* Contenedor principal del login */
+.login-container {
   display: flex;
-  justify-content: center; 
-  align-items: center; 
-  height: 100%; 
-  background-color: #f5f5f5; 
-  border-radius: 20px;
-}
-
-/* Caja del formulario */
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  width: 100%; 
-  max-width: 350px;  
-  background-color: #fff;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
   padding: 20px;
-  border-radius: 20px;
-  position: relative;
 }
 
-.title {
-  font-size: 28px;
-  color: #000000;
-  font-weight: 600;
-  letter-spacing: -1px;
-  position: relative;
+/* Tarjeta del login */
+.login-card {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  padding: 40px;
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+
+/* Logo de la Universidad */
+.login-logo {
+  margin-bottom: 30px;
+}
+
+.logo-circle {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #C9A23F 0%, #FFD860 100%);
   display: flex;
   align-items: center;
-  padding-left: 30px;
+  justify-content: center;
+  margin: 0 auto;
+  box-shadow: 0 5px 15px rgba(201, 162, 63, 0.3);
 }
 
-.title::before,.title::after {
-  position: absolute;
-  content: "";
-  height: 16px;
-  width: 16px;
-  border-radius: 50%;
-  left: 0px;
-  background: #3c9ee4;
+.logo-text {
+  color: #000000;
+  font-size: 28px;
+  font-weight: bold;
+  letter-spacing: 2px;
 }
 
-.title::before {
-  width: 18px;
-  height: 18px;
-  background-color: #a4d0ff;
+/* Título */
+.login-title {
+  font-size: 36px;
+  font-weight: 700;
+  color: #000000;
+  margin: 0 0 10px 0;
+  letter-spacing: 2px;
 }
 
-.title::after {
-  width: 18px;
-  height: 18px;
-  animation: pulse 1s linear infinite;
+.login-subtitle {
+  font-size: 14px;
+  color: #666666;
+  margin: 0 0 30px 0;
 }
 
-
-.form label {
-  position: relative;
+/* Formulario */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.form label .input {
-  width: 100%;
-  padding: 10px 10px 20px 10px;
-  outline: 0;
-  border: 1px solid rgba(105, 105, 105, 0.397);
-  border-radius: 10px;
+.form-group {
+  text-align: left;
 }
 
-.form label .input + span {
-  position: absolute;
-  left: 10px;
-  top: 15px;
-  color: grey;
-  font-size: 0.9em;
-  cursor: text;
-  transition: 0.3s ease;
-}
-
-.form label .input:placeholder-shown + span {
-  top: 15px;
-  font-size: 0.9em;
-}
-
-.form label .input:focus + span,.form label .input:valid + span {
-  top: 32px;
-  font-size: 0.7em;
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #000000;
   font-weight: 600;
+  font-size: 14px;
 }
 
-.form label .input:valid + span {
-  color: #3c9ee4;
-}
-
-.submit {
-  border: none;
-  outline: none;
-  background: linear-gradient(
-    to top right,
-    #1e2a38,
-    #000000 100%
-  );
-  padding: 10px;
+.form-group input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
   border-radius: 10px;
-  color: #fff;
   font-size: 16px;
-  transform: .3s ease;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
 }
 
-.submit:hover {
-  background-color: rgb(56, 90, 194);
+.form-group input:focus {
+  outline: none;
+  border-color: #C9A23F;
+  box-shadow: 0 0 0 3px rgba(201, 162, 63, 0.1);
 }
 
-@keyframes pulse {
-  from {
-    transform: scale(0.9);
-    opacity: 1;
+.form-group input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+/* Botón de login */
+.login-button {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #C9A23F 0%, #FFD860 100%);
+  color: #000000;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+.login-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(201, 162, 63, 0.4);
+}
+
+.login-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.login-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Botón cancelar */
+.cancel-button {
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  color: #666666;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+.cancel-button:hover:not(:disabled) {
+  border-color: #C9A23F;
+  color: #C9A23F;
+}
+
+.cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Mensaje de error */
+.error-message {
+  background-color: #fee;
+  color: #c33;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  border: 1px solid #fcc;
+  text-align: left;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .login-card {
+    padding: 30px 20px;
   }
 
-  to {
-    transform: scale(1.8);
-    opacity: 0;
+  .login-title {
+    font-size: 28px;
+  }
+
+  .logo-circle {
+    width: 80px;
+    height: 80px;
+  }
+
+  .logo-text {
+    font-size: 24px;
   }
 }
