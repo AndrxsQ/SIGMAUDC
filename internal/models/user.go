@@ -26,6 +26,7 @@ type LoginResponse struct {
 	RequiresPasswordSetup bool   `json:"requiresPasswordSetup,omitempty"`
 	UserID               int    `json:"userId,omitempty"`
 	Message              string `json:"message,omitempty"`
+	ErrorType            string `json:"errorType,omitempty"` // "user_not_found", "wrong_password", "connection_error"
 }
 
 type SetPasswordRequest struct {

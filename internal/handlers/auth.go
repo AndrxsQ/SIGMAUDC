@@ -58,13 +58,22 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(models.LoginResponse{
-			Message: "Credenciales inválidas",
+			Message:   "El código de usuario no existe en el sistema",
+			ErrorType: "user_not_found",
 		})
 		return
 	}
 
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		// Error de base de datos
+		h.registrarAuditoria(0, "login_fallido", "Error de base de datos: "+err.Error(), ip, userAgent)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.LoginResponse{
+			Message:   "Error de conexión con el servidor. Por favor intenta más tarde",
+			ErrorType: "connection_error",
+		})
 		return
 	}
 
@@ -92,7 +101,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(models.LoginResponse{
-			Message: "Credenciales inválidas",
+			Message:   "La contraseña ingresada es incorrecta",
+			ErrorType: "wrong_password",
 		})
 		return
 	}

@@ -37,8 +37,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token inválido o expirado
+    // Solo redirigir si NO es una petición de login
+    // El login maneja sus propios errores 401
+    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
+      // Token inválido o expirado en otras rutas
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
