@@ -1,3 +1,10 @@
+# Environment variables - IMPORTANTE: No subir archivos .env al repositorio
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
 # Logs
 logs
 *.log

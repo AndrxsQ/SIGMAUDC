@@ -1,0 +1,1746 @@
+/* ============================================
+   LOGIN - Diseño Premium tipo Apple
+   ============================================ */
+
+/* Variables CSS */
+:root {
+  --primary-gold: #C9A23F;
+  --secondary-gold: #FFD860;
+  --gold-light: #E8D5A3;
+  --text-primary: #1d1d1f;
+  --text-secondary: #86868b;
+  --text-tertiary: #a1a1a6;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f7;
+  --bg-overlay: rgba(255, 255, 255, 0.8);
+  --border-color: #d2d2d7;
+  --border-focus: #C9A23F;
+  --error-color: #ff3b30;
+  --error-bg: #fff5f5;
+  --success-color: #34c759;
+  --success-bg: #f0fdf4;
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 16px 64px rgba(0, 0, 0, 0.16);
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Reset y base */
+* {
+  box-sizing: border-box;
+}
+
+/* Contenedor principal con fondo premium */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height para móviles */
+  padding: 24px;
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f7 50%, #f0f0f2 100%);
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling en iOS */
+}
+
+/* Fondo decorativo con patrones sutiles */
+.login-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 30%, rgba(201, 162, 63, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(255, 216, 96, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(201, 162, 63, 0.04) 0%, transparent 70%);
+  animation: backgroundShift 20s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes backgroundShift {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+/* Patrón de puntos sutiles */
+.login-container::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* Tarjeta del login - Premium Glassmorphism */
+.login-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: var(--radius-xl);
+  box-shadow: 
+    var(--shadow-xl),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset,
+    0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  padding: 56px 48px;
+  width: 100%;
+  max-width: 480px;
+  position: relative;
+  z-index: 1;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  animation: cardEntrance 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+@keyframes cardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Logo - Contenedor cuadrado para PNG */
+.login-logo {
+  margin-bottom: 40px;
+  display: flex;
+  justify-content: center;
+  animation: logoFloat 3s ease-in-out infinite;
+}
+
+@keyframes logoFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.logo-square {
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 
+    0 8px 32px rgba(201, 162, 63, 0.15),
+    0 0 0 1px rgba(201, 162, 63, 0.1) inset,
+    0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: var(--transition);
+  overflow: hidden;
+  position: relative;
+}
+
+.logo-square::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(201, 162, 63, 0.05) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.logo-square:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 
+    0 12px 40px rgba(201, 162, 63, 0.2),
+    0 0 0 1px rgba(201, 162, 63, 0.15) inset;
+}
+
+.logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  display: block;
+}
+
+.logo-image:not([src]),
+.logo-image[src=""],
+.logo-image[src="undefined"] {
+  display: none;
+}
+
+.logo-text-fallback {
+  color: var(--text-primary);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  position: absolute;
+  z-index: 1;
+  display: none;
+}
+
+.logo-square:has(.logo-image:not([src])),
+.logo-square:has(.logo-image[src=""]),
+.logo-square:has(.logo-image[src="undefined"]) {
+  /* Si no hay imagen, mostrar texto */
+}
+
+/* Fallback para cuando no hay imagen */
+.logo-square .logo-text-fallback {
+  display: none;
+  color: var(--text-primary);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  position: absolute;
+  z-index: 1;
+}
+
+/* Header */
+.login-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.login-title {
+  font-size: 36px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px 0;
+  letter-spacing: -1px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.login-subtitle {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin: 0;
+  font-weight: 400;
+  letter-spacing: -0.3px;
+  line-height: 1.5;
+}
+
+/* Formulario */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* Grupo de formulario */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Wrapper del input */
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Inputs - Premium Design */
+input[type="text"],
+input[type="password"],
+input[type="email"] {
+  width: 100%;
+  padding: 16px 18px;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 17px;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  transition: var(--transition);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.3px;
+  box-sizing: border-box;
+  box-shadow: var(--shadow-xs);
+}
+
+input[type="text"]:hover,
+input[type="password"]:hover,
+input[type="email"]:hover {
+  border-color: var(--gold-light);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: var(--shadow-sm);
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 
+    0 0 0 4px rgba(201, 162, 63, 0.12),
+    var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+input[type="text"]:disabled,
+input[type="password"]:disabled,
+input[type="email"]:disabled {
+  background: var(--bg-secondary);
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+}
+
+input[type="text"].input-error,
+input[type="password"].input-error,
+input[type="email"].input-error {
+  border-color: var(--error-color);
+  background: var(--error-bg);
+  animation: shake 0.4s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
+
+input[type="text"].input-error:focus,
+input[type="password"].input-error:focus,
+input[type="email"].input-error:focus {
+  box-shadow: 
+    0 0 0 4px rgba(255, 59, 48, 0.12),
+    var(--shadow-md);
+}
+
+/* Contador de caracteres */
+.input-counter {
+  position: absolute;
+  right: 14px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2px 8px;
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+}
+
+/* Mensajes de error y éxito - Premium Design */
+.error-message,
+.success-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  animation: messageSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: -0.2px;
+  word-wrap: break-word;
+  word-break: break-word;
+  line-height: 1.5;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-15px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.error-message {
+  background: linear-gradient(135deg, var(--error-bg) 0%, #fff8f8 100%);
+  color: var(--error-color);
+  border: 1.5px solid rgba(255, 59, 48, 0.2);
+  box-shadow: 
+    0 4px 12px rgba(255, 59, 48, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.error-message::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--error-color);
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.success-message {
+  background: linear-gradient(135deg, var(--success-bg) 0%, #f8fff9 100%);
+  color: var(--success-color);
+  border: 1.5px solid rgba(52, 199, 89, 0.2);
+  box-shadow: 
+    0 4px 12px rgba(52, 199, 89, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.success-message::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--success-color);
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.error-icon,
+.success-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  stroke-width: 2.5;
+  margin-top: 1px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.error-message span,
+.success-message span {
+  flex: 1;
+  padding-right: 4px;
+}
+
+/* Error de campo */
+.field-error {
+  font-size: 13px;
+  color: var(--error-color);
+  font-weight: 500;
+  margin-top: -2px;
+  animation: fadeIn 0.2s ease-out;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 4px;
+}
+
+.field-error::before {
+  content: "•";
+  font-size: 16px;
+  line-height: 1;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Botón de login - Premium */
+.login-button {
+  width: 100%;
+  padding: 18px;
+  background: linear-gradient(135deg, var(--primary-gold) 0%, var(--secondary-gold) 100%);
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.3px;
+  box-shadow: 
+    0 4px 16px rgba(201, 162, 63, 0.25),
+    0 0 0 1px rgba(201, 162, 63, 0.1) inset,
+    0 1px 0 rgba(255, 255, 255, 0.3) inset;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transition: left 0.6s;
+}
+
+.login-button:hover:not(:disabled)::before {
+  left: 100%;
+}
+
+.login-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 6px 24px rgba(201, 162, 63, 0.35),
+    0 0 0 1px rgba(201, 162, 63, 0.15) inset,
+    0 1px 0 rgba(255, 255, 255, 0.4) inset;
+  background: linear-gradient(135deg, #d4af37 0%, #ffd966 100%);
+}
+
+.login-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 
+    0 2px 8px rgba(201, 162, 63, 0.2),
+    0 0 0 1px rgba(201, 162, 63, 0.1) inset;
+}
+
+.login-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: var(--shadow-xs);
+}
+
+.login-button.loading {
+  background: linear-gradient(135deg, #d4af37 0%, #f4d03f 100%);
+  pointer-events: none;
+}
+
+.login-button.success {
+  background: linear-gradient(135deg, var(--success-color) 0%, #30d158 100%);
+  color: white;
+  box-shadow: 
+    0 4px 16px rgba(52, 199, 89, 0.3),
+    0 0 0 1px rgba(52, 199, 89, 0.2) inset;
+}
+
+/* Spinner */
+.spinner {
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.success-icon-small {
+  width: 20px;
+  height: 20px;
+  stroke-width: 3;
+}
+
+/* Footer */
+.login-footer {
+  margin-top: 40px;
+  text-align: center;
+  padding-top: 28px;
+  border-top: 1px solid rgba(210, 210, 215, 0.5);
+}
+
+.footer-text {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin: 0;
+  font-weight: 400;
+  letter-spacing: -0.1px;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN - Todos los dispositivos
+   ============================================ */
+
+/* Pantallas grandes (Desktop) - 1440px+ */
+@media (min-width: 1440px) {
+  .login-card {
+    max-width: 520px;
+    padding: 64px 56px;
+  }
+
+  .login-title {
+    font-size: 40px;
+  }
+
+  .logo-square {
+    width: 140px;
+    height: 140px;
+  }
+}
+
+/* Pantallas medianas-grandes (Laptop) - 1024px a 1439px */
+@media (max-width: 1439px) and (min-width: 1024px) {
+  .login-card {
+    max-width: 480px;
+    padding: 56px 48px;
+  }
+}
+
+/* Tablets (iPad, etc.) - 768px a 1023px */
+@media (max-width: 1023px) and (min-width: 768px) {
+  .login-container {
+    padding: 24px;
+  }
+
+  .login-card {
+    padding: 48px 40px;
+    border-radius: var(--radius-lg);
+    max-width: 460px;
+  }
+
+  .login-title {
+    font-size: 34px;
+  }
+
+  .logo-square {
+    width: 110px;
+    height: 110px;
+  }
+
+  .login-header {
+    margin-bottom: 40px;
+  }
+}
+
+/* Tablets pequeñas y móviles grandes - 481px a 767px */
+@media (max-width: 767px) and (min-width: 481px) {
+  .login-container {
+    padding: 20px;
+  }
+
+  .login-card {
+    padding: 44px 36px;
+    border-radius: var(--radius-lg);
+    max-width: 100%;
+  }
+
+  .login-title {
+    font-size: 32px;
+  }
+
+  .logo-square {
+    width: 100px;
+    height: 100px;
+  }
+
+  .login-header {
+    margin-bottom: 36px;
+  }
+
+  .login-form {
+    gap: 24px;
+  }
+}
+
+/* Móviles estándar - 375px a 480px (iPhone 12, 13, 14, etc.) */
+@media (max-width: 480px) and (min-width: 375px) {
+  .login-container {
+    padding: 16px;
+    min-height: 100vh;
+    align-items: flex-start;
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+
+  .login-card {
+    padding: 36px 28px;
+    border-radius: var(--radius-lg);
+    max-width: 100%;
+    backdrop-filter: blur(16px);
+    box-shadow: 
+      var(--shadow-lg),
+      0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  }
+
+  .login-title {
+    font-size: 28px;
+    letter-spacing: -0.8px;
+  }
+
+  .logo-square {
+    width: 90px;
+    height: 90px;
+  }
+
+  .login-header {
+    margin-bottom: 32px;
+  }
+
+  .login-form {
+    gap: 22px;
+  }
+
+  input[type="text"],
+  input[type="password"] {
+    font-size: 16px; /* Evita zoom en iOS */
+    padding: 14px 16px;
+  }
+
+  .login-button {
+    padding: 16px;
+    font-size: 16px;
+  }
+
+  .error-message,
+  .success-message {
+    padding: 14px 16px;
+    font-size: 13px;
+    gap: 10px;
+    min-height: 44px;
+  }
+
+  .form-label {
+    font-size: 13px;
+  }
+
+  .field-error {
+    font-size: 12px;
+  }
+
+  .login-footer {
+    margin-top: 28px;
+    padding-top: 20px;
+  }
+
+  .input-counter {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+}
+
+/* Móviles pequeños - 320px a 374px (iPhone SE, etc.) */
+@media (max-width: 374px) {
+  .login-container {
+    padding: 12px;
+    min-height: 100vh;
+    align-items: flex-start;
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+
+  .login-card {
+    padding: 32px 24px;
+    border-radius: var(--radius-md);
+    max-width: 100%;
+    backdrop-filter: blur(12px);
+  }
+
+  .login-title {
+    font-size: 26px;
+    letter-spacing: -0.6px;
+    margin-bottom: 8px;
+  }
+
+  .logo-square {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 32px;
+  }
+
+  .logo-image {
+    padding: 12px;
+  }
+
+  .login-header {
+    margin-bottom: 28px;
+  }
+
+  .login-form {
+    gap: 20px;
+  }
+
+  .form-group {
+    gap: 8px;
+  }
+
+  input[type="text"],
+  input[type="password"] {
+    font-size: 16px; /* Evita zoom en iOS */
+    padding: 13px 14px;
+    border-radius: var(--radius-sm);
+  }
+
+  .login-button {
+    padding: 15px;
+    font-size: 16px;
+    border-radius: var(--radius-sm);
+    margin-top: 8px;
+  }
+
+  .error-message,
+  .success-message {
+    padding: 12px 14px;
+    font-size: 12px;
+    gap: 8px;
+    min-height: 40px;
+    border-radius: var(--radius-sm);
+  }
+
+  .error-icon,
+  .success-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  .form-label {
+    font-size: 12px;
+    margin-bottom: 0;
+  }
+
+  .field-error {
+    font-size: 11px;
+    margin-top: -4px;
+  }
+
+  .login-footer {
+    margin-top: 24px;
+    padding-top: 18px;
+  }
+
+  .footer-text {
+    font-size: 12px;
+  }
+
+  .input-counter {
+    font-size: 10px;
+    padding: 1px 5px;
+    right: 12px;
+  }
+
+  /* Ajustar animaciones para dispositivos pequeños */
+  .login-logo {
+    animation: logoFloat 4s ease-in-out infinite;
+  }
+
+  @keyframes logoFloat {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+}
+
+/* Pantallas muy pequeñas - Menos de 320px */
+@media (max-width: 319px) {
+  .login-container {
+    padding: 10px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+
+  .login-card {
+    padding: 28px 20px;
+  }
+
+  .login-title {
+    font-size: 24px;
+  }
+
+  .logo-square {
+    width: 72px;
+    height: 72px;
+  }
+
+  .login-form {
+    gap: 18px;
+  }
+
+  input[type="text"],
+  input[type="password"] {
+    padding: 12px;
+  }
+
+  .login-button {
+    padding: 14px;
+  }
+}
+
+/* Orientación landscape en móviles */
+@media (max-width: 767px) and (orientation: landscape) {
+  .login-container {
+    padding-top: 16px;
+    padding-bottom: 16px;
+    align-items: center;
+  }
+
+  .login-card {
+    padding: 32px 28px;
+    max-width: 420px;
+  }
+
+  .login-logo {
+    margin-bottom: 24px;
+  }
+
+  .logo-square {
+    width: 80px;
+    height: 80px;
+  }
+
+  .login-header {
+    margin-bottom: 24px;
+  }
+
+  .login-title {
+    font-size: 26px;
+  }
+
+  .login-form {
+    gap: 18px;
+  }
+
+  .login-footer {
+    margin-top: 20px;
+    padding-top: 16px;
+  }
+}
+
+/* Ajustes para pantallas de alta densidad (Retina) */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .logo-square {
+    box-shadow: 
+      0 8px 32px rgba(201, 162, 63, 0.12),
+      0 0 0 0.5px rgba(201, 162, 63, 0.08) inset;
+  }
+
+  input[type="text"],
+  input[type="password"] {
+    border-width: 1px;
+  }
+}
+
+/* Ajustes para modo oscuro (si se implementa en el futuro) */
+@media (prefers-color-scheme: dark) {
+  /* Se puede agregar soporte para modo oscuro aquí si es necesario */
+}
+
+/* Prevenir zoom en iOS al hacer focus en inputs */
+@supports (-webkit-touch-callout: none) {
+  input[type="text"],
+  input[type="password"] {
+    font-size: 16px !important; /* Evita zoom automático en iOS */
+  }
+}
+
+/* Ajustes para dispositivos con teclado virtual */
+@media (max-height: 600px) and (orientation: portrait) {
+  .login-container {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .login-card {
+    padding: 28px 24px;
+  }
+
+  .login-logo {
+    margin-bottom: 20px;
+  }
+
+  .logo-square {
+    width: 70px;
+    height: 70px;
+  }
+
+  .login-header {
+    margin-bottom: 20px;
+  }
+
+  .login-title {
+    font-size: 24px;
+  }
+
+  .login-form {
+    gap: 16px;
+  }
+
+  .login-footer {
+    margin-top: 16px;
+    padding-top: 16px;
+  }
+}
+
+/* Ajustes para iPhone SE específicamente (375x667) */
+@media (max-width: 375px) and (max-height: 667px) {
+  .login-container {
+    padding: 12px;
+    padding-top: 16px;
+  }
+
+  .login-card {
+    padding: 32px 24px;
+  }
+}
+
+/* Mejoras de rendimiento en móviles */
+@media (max-width: 767px) {
+  .login-container::before,
+  .login-container::after {
+    animation: none; /* Desactivar animaciones pesadas en móviles */
+  }
+
+  .login-logo {
+    animation-duration: 5s; /* Animación más lenta en móviles */
+  }
+}
+
+/* Asegurar que el contenido no se desborde */
+.login-card {
+  overflow: hidden;
+}
+
+/* Mejorar el scroll en móviles */
+@media (max-width: 767px) {
+  .login-container {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+}
+
+/* Mejoras de accesibilidad */
+input[type="text"]:focus-visible,
+input[type="password"]:focus-visible,
+input[type="email"]:focus-visible,
+.login-button:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
+}
+
+/* Placeholder styling */
+input::placeholder {
+  color: var(--text-tertiary);
+  opacity: 0.7;
+  font-weight: 400;
+}
+
+/* ============================================
+   PASSWORD REQUIREMENTS - Indicadores de validación
+   ============================================ */
+.password-requirements {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 12px;
+  background: rgba(245, 245, 247, 0.6);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.requirement {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: var(--transition-fast);
+}
+
+.requirement.valid {
+  color: var(--success-color);
+}
+
+.requirement-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  stroke-width: 2.5;
+}
+
+.requirement.valid .requirement-icon {
+  color: var(--success-color);
+}
+
+.requirement:not(.valid) .requirement-icon {
+  color: var(--text-tertiary);
+}
+
+.requirement span {
+  font-weight: 500;
+  letter-spacing: -0.1px;
+}
+
+/* Responsive para password requirements */
+/* Tablets */
+@media (max-width: 1023px) and (min-width: 768px) {
+  .password-requirements {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .requirement {
+    font-size: 13px;
+    gap: 8px;
+  }
+
+  .requirement-icon {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* Móviles grandes */
+@media (max-width: 767px) and (min-width: 481px) {
+  .password-requirements {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .requirement {
+    font-size: 12px;
+    gap: 7px;
+  }
+
+  .requirement-icon {
+    width: 15px;
+    height: 15px;
+  }
+}
+
+/* Móviles estándar */
+@media (max-width: 480px) and (min-width: 375px) {
+  .password-requirements {
+    padding: 10px;
+    gap: 6px;
+  }
+
+  .requirement {
+    font-size: 11px;
+    gap: 6px;
+  }
+
+  .requirement-icon {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* Móviles pequeños */
+@media (max-width: 374px) {
+  .password-requirements {
+    padding: 8px;
+    gap: 5px;
+  }
+
+  .requirement {
+    font-size: 10px;
+    gap: 5px;
+  }
+
+  .requirement-icon {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+/* Pantallas muy pequeñas */
+@media (max-width: 319px) {
+  .password-requirements {
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .requirement {
+    font-size: 9px;
+    gap: 4px;
+  }
+
+  .requirement-icon {
+    width: 11px;
+    height: 11px;
+  }
+}
+
+/* Landscape en móviles */
+@media (max-width: 767px) and (orientation: landscape) {
+  .password-requirements {
+    padding: 8px;
+    gap: 5px;
+  }
+
+  .requirement {
+    font-size: 11px;
+  }
+}
+
+/* ============================================
+   SUCCESS MODAL - Modal de éxito elegante
+   ============================================ */
+.success-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 24px;
+  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.success-modal {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  max-width: 420px;
+  width: 100%;
+  overflow: hidden;
+  animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.success-modal-content {
+  padding: 40px 32px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.success-modal-icon-wrapper {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--success-color) 0%, #2dd4bf 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 
+    0 8px 24px rgba(52, 199, 89, 0.3),
+    0 0 0 1px rgba(52, 199, 89, 0.1) inset;
+  animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
+  position: relative;
+}
+
+.success-modal-icon-wrapper::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--success-color), #2dd4bf);
+  opacity: 0.2;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.success-modal-icon {
+  width: 48px;
+  height: 48px;
+  color: white;
+  stroke-width: 3;
+  position: relative;
+  z-index: 1;
+  animation: checkmark 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both;
+}
+
+.success-modal-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+  animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both;
+}
+
+.success-modal-message {
+  font-size: 15px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 320px;
+  animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both;
+}
+
+.success-modal-button {
+  width: 100%;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, var(--primary-gold) 0%, var(--secondary-gold) 100%);
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 
+    0 4px 12px rgba(201, 162, 63, 0.3),
+    0 0 0 1px rgba(201, 162, 63, 0.1) inset;
+  position: relative;
+  overflow: hidden;
+  animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both;
+}
+
+.success-modal-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.success-modal-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 6px 20px rgba(201, 162, 63, 0.4),
+    0 0 0 1px rgba(201, 162, 63, 0.2) inset;
+}
+
+.success-modal-button:hover::before {
+  left: 100%;
+}
+
+.success-modal-button:active {
+  transform: translateY(0);
+}
+
+/* Animaciones del modal */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes checkmark {
+  from {
+    opacity: 0;
+    transform: scale(0) rotate(-45deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(1.05);
+  }
+}
+
+/* Responsive para el modal */
+/* Tablets */
+@media (max-width: 1023px) and (min-width: 768px) {
+  .success-modal {
+    max-width: 400px;
+  }
+
+  .success-modal-content {
+    padding: 36px 28px;
+    gap: 22px;
+  }
+
+  .success-modal-icon-wrapper {
+    width: 75px;
+    height: 75px;
+  }
+
+  .success-modal-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .success-modal-title {
+    font-size: 22px;
+  }
+
+  .success-modal-message {
+    font-size: 15px;
+  }
+}
+
+/* Móviles grandes */
+@media (max-width: 767px) and (min-width: 481px) {
+  .success-modal-overlay {
+    padding: 20px;
+  }
+
+  .success-modal {
+    max-width: 380px;
+  }
+
+  .success-modal-content {
+    padding: 34px 26px;
+    gap: 20px;
+  }
+
+  .success-modal-icon-wrapper {
+    width: 72px;
+    height: 72px;
+  }
+
+  .success-modal-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .success-modal-title {
+    font-size: 21px;
+  }
+
+  .success-modal-message {
+    font-size: 14px;
+  }
+}
+
+/* Móviles estándar */
+@media (max-width: 480px) and (min-width: 375px) {
+  .success-modal-overlay {
+    padding: 16px;
+  }
+
+  .success-modal {
+    border-radius: var(--radius-md);
+    max-width: 100%;
+  }
+
+  .success-modal-content {
+    padding: 32px 24px;
+    gap: 20px;
+  }
+
+  .success-modal-icon-wrapper {
+    width: 70px;
+    height: 70px;
+  }
+
+  .success-modal-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .success-modal-title {
+    font-size: 20px;
+  }
+
+  .success-modal-message {
+    font-size: 14px;
+  }
+
+  .success-modal-button {
+    padding: 12px 20px;
+    font-size: 15px;
+  }
+}
+
+/* Móviles pequeños */
+@media (max-width: 374px) {
+  .success-modal-overlay {
+    padding: 12px;
+  }
+
+  .success-modal-content {
+    padding: 28px 20px;
+    gap: 16px;
+  }
+
+  .success-modal-icon-wrapper {
+    width: 60px;
+    height: 60px;
+  }
+
+  .success-modal-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .success-modal-title {
+    font-size: 18px;
+  }
+
+  .success-modal-message {
+    font-size: 13px;
+  }
+
+  .success-modal-button {
+    padding: 11px 18px;
+    font-size: 14px;
+  }
+}
+
+/* Pantallas muy pequeñas */
+@media (max-width: 319px) {
+  .success-modal-overlay {
+    padding: 8px;
+  }
+
+  .success-modal-content {
+    padding: 24px 16px;
+    gap: 14px;
+  }
+
+  .success-modal-icon-wrapper {
+    width: 55px;
+    height: 55px;
+  }
+
+  .success-modal-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .success-modal-title {
+    font-size: 16px;
+  }
+
+  .success-modal-message {
+    font-size: 12px;
+  }
+
+  .success-modal-button {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}
+
+/* Landscape en móviles */
+@media (max-width: 767px) and (orientation: landscape) {
+  .success-modal-overlay {
+    padding: 12px;
+    align-items: center;
+  }
+
+  .success-modal {
+    max-width: 400px;
+  }
+
+  .success-modal-content {
+    padding: 28px 24px;
+    gap: 16px;
+  }
+
+  .success-modal-icon-wrapper {
+    width: 65px;
+    height: 65px;
+  }
+
+  .success-modal-icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .success-modal-title {
+    font-size: 19px;
+  }
+
+  .success-modal-message {
+    font-size: 13px;
+  }
+}
+
+/* Dispositivos con teclado virtual */
+@media (max-height: 600px) and (orientation: portrait) {
+  .success-modal-content {
+    padding: 24px 20px;
+    gap: 14px;
+  }
+
+  .success-modal-icon-wrapper {
+    width: 60px;
+    height: 60px;
+  }
+
+  .success-modal-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .success-modal-title {
+    font-size: 18px;
+  }
+
+  .success-modal-message {
+    font-size: 13px;
+  }
+}
+
+/* ============================================
+   CANCEL BUTTON - Botón cancelar
+   ============================================ */
+.cancel-button {
+  width: 100%;
+  padding: 14px 24px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.3px;
+  margin-top: 8px;
+}
+
+.cancel-button:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  border-color: var(--text-tertiary);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.cancel-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.cancel-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancel-button:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
+}
+
+/* Responsive para botón cancelar */
+@media (max-width: 767px) and (min-width: 481px) {
+  .cancel-button {
+    padding: 13px 22px;
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) and (min-width: 375px) {
+  .cancel-button {
+    padding: 12px 20px;
+    font-size: 15px;
+    margin-top: 6px;
+  }
+}
+
+@media (max-width: 374px) {
+  .cancel-button {
+    padding: 11px 18px;
+    font-size: 14px;
+    margin-top: 4px;
+    border-radius: var(--radius-sm);
+  }
+}
+
+@media (max-width: 319px) {
+  .cancel-button {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 767px) and (orientation: landscape) {
+  .cancel-button {
+    padding: 11px 20px;
+    font-size: 14px;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Selección de texto */
+::selection {
+  background: rgba(201, 162, 63, 0.2);
+  color: var(--text-primary);
+}
