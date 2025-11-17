@@ -154,8 +154,8 @@ const PensumVisual = () => {
 
             {/*  Lista de materias dentro del semestre */}
             <div className="materias-list">
-              {semestre.materias.map((materia) => (
-                <div key={materia.codigo} className="materia-card">
+              {semestre.materias.map((materia, index) => (
+                <div key={`${semestre.numero}-${materia.codigo}-${index}`} className="materia-card">
                   <div className="materia-nombre">{materia.nombre}</div>
                   <div className="materia-info">
                     <span>{materia.codigo}</span>

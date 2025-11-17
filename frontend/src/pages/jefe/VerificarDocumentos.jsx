@@ -231,25 +231,20 @@ const DocumentoCard = ({ documento, onRevisar, revisando }) => {
         <div>
           <h4>{tipoNombre}</h4>
           <p className="documento-fecha">
-            Subido: {new Date(documento.fecha_subida).toLocaleDateString()}
+            Subido: {new Date(documento.fecha_subida).toLocaleDateString('es-ES', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            })}
           </p>
-          {documento.fecha_revision && (
-            <p className="documento-fecha">
-              Revisado:{" "}
-              {new Date(documento.fecha_revision).toLocaleDateString()}
-            </p>
-          )}
         </div>
         {getEstadoBadge()}
       </div>
 
-      {(documento.observacion || (typeof documento.observacion === 'object' && documento.observacion?.valid)) && (
+      {documento.estado === "rechazado" && documento.observacion && (
         <div className="observacion-box">
-          <strong>Observación previa:</strong> {
-            typeof documento.observacion === 'string' 
-              ? documento.observacion 
-              : documento.observacion?.string || ''
-          }
+          <strong>Observación:</strong>{" "}
+          {typeof documento.observacion === 'string' ? documento.observacion : ''}
         </div>
       )}
 

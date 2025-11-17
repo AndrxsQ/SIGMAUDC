@@ -1,5 +1,6 @@
 /* ============================================
    PLAZOS - Diseño Premium tipo Apple
+   Responsive desde iPhone SE hasta pantallas grandes
    ============================================ */
 
 /* Variables CSS */
@@ -20,12 +21,172 @@
   --plazos-shadow-gold: 0 8px 32px rgba(201, 162, 63, 0.25);
 }
 
+* {
+  box-sizing: border-box;
+}
+
 /* Contenedor Principal */
 .plazos-container {
   max-width: 1600px;
   margin: 0 auto;
-  padding: 32px 24px;
+  padding: 12px;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+  background: var(--plazos-bg-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+}
+
+/* iPhone SE y móviles pequeños (320px - 374px) */
+@media (max-width: 374px) {
+  .plazos-container {
+    padding: 10px;
+  }
+
+  .plazos-title {
+    font-size: 20px;
+  }
+
+  .plazos-subtitle {
+    font-size: 12px;
+  }
+
+  .panel-card {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .panel-header {
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .panel-header h2 {
+    font-size: 16px;
+  }
+
+  .panel-header p {
+    font-size: 12px;
+  }
+
+  .active-periodo-chip {
+    padding: 6px 12px;
+    font-size: 10px;
+  }
+
+  .active-periodo-chip strong {
+    font-size: 12px;
+  }
+
+  .periodo-info-banner {
+    padding: 12px;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .periodo-info-banner .info-label {
+    font-size: 9px;
+    margin-bottom: 3px;
+  }
+
+  .periodo-info-banner .info-value {
+    font-size: 14px;
+  }
+
+  .meta-status {
+    font-size: 11px;
+  }
+
+  .meta-status::before {
+    width: 6px;
+    height: 6px;
+  }
+
+  .plazos-list {
+    gap: 10px;
+  }
+
+  .plazo-item {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .plazo-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+
+  .plazo-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .plazo-label {
+    font-size: 13px;
+  }
+
+  .plazo-description {
+    font-size: 11px;
+  }
+
+  .plazo-toggle {
+    width: 40px;
+    height: 24px;
+  }
+
+  .plazo-toggle .toggle-slider {
+    width: 20px;
+    height: 20px;
+    top: 2px;
+    left: 2px;
+  }
+
+  .plazo-toggle.active .toggle-slider {
+    transform: translateX(16px);
+  }
+
+  .plazos-message {
+    padding: 10px 14px;
+    font-size: 12px;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .plazos-message svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .message-close {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+  }
+
+  .plazos-empty {
+    padding: 32px 16px;
+    border-radius: 16px;
+  }
+
+  .plazos-empty svg {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 16px;
+  }
+
+  .plazos-empty h3 {
+    font-size: 16px;
+  }
+
+  .plazos-empty p {
+    font-size: 12px;
+  }
+
+  .plazos-empty.compact,
+  .plazos-empty.secondary {
+    padding: 24px 16px;
+  }
 }
 
 /* Loading State */
@@ -34,161 +195,159 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  min-height: 100vh;
   gap: 20px;
+  padding: 40px 20px;
 }
 
 .plazos-loading .loading-spinner {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   color: var(--plazos-primary-gold);
 }
 
 .plazos-loading p {
-  font-size: 16px;
+  font-size: 15px;
   color: var(--plazos-text-secondary);
   font-weight: 500;
+  text-align: center;
+  word-wrap: break-word;
+  margin: 0;
 }
 
 /* Header */
 .plazos-header {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
+  width: 100%;
 }
 
 .plazos-panels {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  gap: 32px;
+  grid-template-columns: 1fr;
+  gap: 20px;
   align-items: stretch;
+  width: 100%;
 }
 
 .panel-card {
   background: var(--plazos-bg-card);
-  border-radius: 32px;
-  padding: 32px;
-  box-shadow:
-    var(--plazos-shadow-md),
-    0 0 0 1px rgba(0, 0, 0, 0.04) inset;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--plazos-shadow-md), 0 0 0 1px rgba(0, 0, 0, 0.04) inset;
   border: 1px solid rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
   min-height: 100%;
+  width: 100%;
+  overflow: hidden;
 }
 
 .panel-card.single {
-  max-width: 960px;
+  max-width: 100%;
   margin: 0 auto;
 }
 
 .panel-header {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  gap: 12px;
   align-items: flex-start;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  width: 100%;
 }
 
 .panel-header h2 {
   margin: 0 0 4px 0;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--plazos-text-primary);
-  letter-spacing: -0.5px;
+  letter-spacing: -0.4px;
+  word-wrap: break-word;
+  width: 100%;
 }
 
 .panel-header p {
   margin: 0;
-  font-size: 15px;
+  font-size: 13px;
   color: var(--plazos-text-secondary);
+  word-wrap: break-word;
+  width: 100%;
 }
 
 .active-periodo-chip {
   background: rgba(201, 162, 63, 0.12);
   border: 1px solid rgba(201, 162, 63, 0.25);
-  padding: 10px 16px;
-  border-radius: 14px;
+  padding: 8px 14px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 13px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
   color: var(--plazos-text-primary);
+  width: 100%;
 }
 
 .active-periodo-chip strong {
-  font-size: 15px;
+  font-size: 13px;
   letter-spacing: -0.2px;
 }
 
 .header-content {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 16px;
   align-items: flex-start;
-  gap: 24px;
-  flex-wrap: wrap;
+  width: 100%;
 }
 
 .plazos-title {
-  font-size: 36px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--plazos-text-primary);
-  margin: 0 0 8px 0;
-  letter-spacing: -1px;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.6px;
+  line-height: 1.2;
+  word-wrap: break-word;
+  width: 100%;
 }
 
 .plazos-subtitle {
-  font-size: 17px;
+  font-size: 13px;
   color: var(--plazos-text-secondary);
   margin: 0;
   font-weight: 400;
-  letter-spacing: -0.3px;
-}
-
-/* Botón Crear Periodo */
-.create-periodo-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: linear-gradient(135deg, var(--plazos-primary-gold) 0%, var(--plazos-secondary-gold) 100%);
-  color: var(--plazos-black);
-  border: none;
-  border-radius: 12px;
-  padding: 12px 24px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(201, 162, 63, 0.25);
-  letter-spacing: -0.2px;
-}
-
-.create-periodo-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(201, 162, 63, 0.35);
-}
-
-.create-periodo-btn:active {
-  transform: translateY(0);
-}
-
-.create-periodo-btn svg {
-  width: 20px;
-  height: 20px;
+  letter-spacing: -0.1px;
+  line-height: 1.4;
+  word-wrap: break-word;
+  width: 100%;
 }
 
 /* Mensajes */
 .plazos-message {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
+  gap: 10px;
+  padding: 12px 16px;
   border-radius: 12px;
-  margin-bottom: 24px;
-  font-size: 15px;
+  margin-bottom: 20px;
+  font-size: 13px;
   font-weight: 500;
   animation: slideDown 0.3s ease-out;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .plazos-message.error {
@@ -204,9 +363,15 @@
 }
 
 .plazos-message svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
+}
+
+.plazos-message span {
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
 }
 
 .message-close {
@@ -214,7 +379,7 @@
   background: none;
   border: none;
   color: inherit;
-  font-size: 24px;
+  font-size: 22px;
   cursor: pointer;
   padding: 0;
   width: 24px;
@@ -224,10 +389,7 @@
   justify-content: center;
   opacity: 0.6;
   transition: opacity 0.2s;
-}
-
-.message-close:hover {
-  opacity: 1;
+  flex-shrink: 0;
 }
 
 /* Empty State */
@@ -236,143 +398,72 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 80px 24px;
+  padding: 48px 20px;
   text-align: center;
   background: var(--plazos-bg-card);
-  border-radius: 24px;
+  border-radius: 20px;
   box-shadow: var(--plazos-shadow-md);
+  width: 100%;
 }
 
 .plazos-empty svg {
-  width: 64px;
-  height: 64px;
+  width: 48px;
+  height: 48px;
   color: var(--plazos-text-secondary);
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   opacity: 0.5;
 }
 
 .plazos-empty h3 {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--plazos-text-primary);
   margin: 0 0 8px 0;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.4px;
+  word-wrap: break-word;
+  width: 100%;
 }
 
 .plazos-empty p {
-  font-size: 17px;
+  font-size: 14px;
   color: var(--plazos-text-secondary);
-  margin: 0 0 32px 0;
+  margin: 0;
+  word-wrap: break-word;
+  width: 100%;
 }
 
 .plazos-empty.compact {
-  padding: 48px 24px;
+  padding: 32px 20px;
   box-shadow: none;
-  border-radius: 20px;
+  border-radius: 18px;
   border: 1px dashed rgba(0, 0, 0, 0.08);
   background: rgba(245, 245, 247, 0.65);
 }
 
 .plazos-empty.secondary {
-  padding: 48px 24px;
-  border-radius: 20px;
+  padding: 32px 20px;
+  border-radius: 18px;
   box-shadow: none;
   background: rgba(245, 245, 247, 0.8);
   border: 1px dashed rgba(0, 0, 0, 0.08);
 }
 
-/* Grid de Periodos */
-.periodos-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: 24px;
-}
-
-/* Card de Periodo */
-.periodo-card {
-  background: var(--plazos-bg-card);
-  border-radius: 24px;
-  padding: 32px;
-  box-shadow: 
-    var(--plazos-shadow-md),
-    0 0 0 1px rgba(0, 0, 0, 0.04) inset;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  position: relative;
-  overflow: hidden;
-}
-
-.periodos-panel .periodos-grid {
-  margin-top: 8px;
-}
-
-.periodo-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--plazos-primary-gold) 0%, var(--plazos-secondary-gold) 100%);
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.periodo-card.activo::before {
-  opacity: 1;
-}
-
-.periodo-card.archivado {
-  opacity: 0.85;
-  border-color: rgba(0, 0, 0, 0.08);
-  background: rgba(245, 245, 247, 0.78);
-}
-
-.periodo-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 
-    var(--plazos-shadow-lg),
-    0 0 0 1px rgba(201, 162, 63, 0.15) inset;
-  border-color: rgba(201, 162, 63, 0.3);
-}
-
-.periodo-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-.periodo-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-}
-
-.periodo-meta {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
+/* Periodo Info Banner */
 .periodo-info-banner {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 16px;
-  padding: 20px;
-  border-radius: 18px;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
   background: rgba(245, 245, 247, 0.85);
   border: 1px solid rgba(0, 0, 0, 0.04);
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  width: 100%;
 }
 
 .periodo-info-banner .info-label {
   display: block;
-  font-size: 12px;
+  font-size: 10px;
   text-transform: uppercase;
   color: var(--plazos-text-secondary);
   letter-spacing: 0.5px;
@@ -380,31 +471,18 @@
 }
 
 .periodo-info-banner .info-value {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--plazos-text-primary);
-  letter-spacing: -0.5px;
-}
-
-.meta-label {
-  font-size: 12px;
-  text-transform: uppercase;
-  color: var(--plazos-text-secondary);
-  letter-spacing: 0.5px;
-}
-
-.meta-value {
-  display: block;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--plazos-text-primary);
+  letter-spacing: -0.3px;
+  word-wrap: break-word;
 }
 
 .meta-status {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--plazos-text-secondary);
 }
@@ -433,184 +511,29 @@
   background: rgba(0, 0, 0, 0.6);
 }
 
-.plazo-chip-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: auto;
-}
-
-.plazo-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--plazos-text-secondary);
-  background: rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.plazo-chip.active {
-  color: var(--plazos-text-primary);
-  border-color: rgba(201, 162, 63, 0.35);
-  background: rgba(201, 162, 63, 0.15);
-}
-
-.plazo-chip .chip-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.plazo-chip strong {
-  font-weight: 600;
-  letter-spacing: -0.2px;
-}
-
-.periodo-nombre {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--plazos-text-primary);
-  margin: 0;
-  letter-spacing: -0.8px;
-}
-
-.periodo-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.activo-badge {
-  background: rgba(52, 199, 89, 0.15);
-  color: var(--plazos-success);
-  border: 1px solid rgba(52, 199, 89, 0.3);
-}
-
-.activo-badge svg {
-  width: 14px;
-  height: 14px;
-}
-
-.archivado-badge {
-  background: rgba(0, 0, 0, 0.08);
-  color: var(--plazos-text-primary);
-  border: 1px solid rgba(0, 0, 0, 0.15);
-}
-
-.archivado-badge svg {
-  width: 14px;
-  height: 14px;
-}
-
-.periodo-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-/* Toggle Activo */
-.toggle-activo-btn {
-  position: relative;
-  width: 52px;
-  height: 32px;
-  background: rgba(0, 0, 0, 0.1);
-  border: none;
-  border-radius: 16px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  padding: 0;
-}
-
-.toggle-activo-btn.active {
-  background: linear-gradient(135deg, var(--plazos-primary-gold) 0%, var(--plazos-secondary-gold) 100%);
-}
-
-.toggle-slider {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 26px;
-  height: 26px;
-  background: var(--plazos-white);
-  border-radius: 50%;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.toggle-activo-btn.active .toggle-slider {
-  transform: translateX(20px);
-}
-
-/* Botón Archivar */
-.archive-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: rgba(0, 0, 0, 0.04);
-  color: var(--plazos-text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.archive-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-.archive-btn:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.08);
-  transform: translateY(-1px);
-}
-
-.archive-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.archived-pill {
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.08);
-  color: var(--plazos-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-}
-
 /* Sección de Plazos */
 .plazos-section {
-  margin-top: 24px;
+  margin-top: 20px;
+  width: 100%;
 }
 
 .plazos-section-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--plazos-text-primary);
-  margin: 0 0 16px 0;
+  margin: 0 0 14px 0;
   letter-spacing: -0.2px;
+}
+
+.plazos-section.standalone {
+  margin-top: 8px;
 }
 
 .plazos-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  width: 100%;
 }
 
 /* Item de Plazo */
@@ -618,20 +541,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
+  padding: 14px;
   background: rgba(245, 245, 247, 0.6);
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.04);
   transition: all 0.2s;
-}
-
-.plazo-item:hover {
-  background: rgba(201, 162, 63, 0.08);
-  border-color: rgba(201, 162, 63, 0.2);
-}
-
-.plazos-section.standalone {
-  margin-top: 8px;
+  width: 100%;
+  gap: 12px;
+  min-width: 0;
 }
 
 .plazo-info {
@@ -639,11 +556,12 @@
   align-items: center;
   gap: 12px;
   flex: 1;
+  min-width: 0;
 }
 
 .plazo-icon {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -667,36 +585,41 @@
 }
 
 .plazo-icon svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 
 .plazo-content {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
+  min-width: 0;
 }
 
 .plazo-label {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--plazos-text-primary);
   letter-spacing: -0.2px;
+  word-wrap: break-word;
 }
 
 .plazo-description {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--plazos-text-secondary);
+  word-wrap: break-word;
+  line-height: 1.4;
 }
 
 /* Toggle de Plazo */
 .plazo-toggle {
   position: relative;
-  width: 48px;
-  height: 28px;
+  width: 44px;
+  height: 26px;
   background: rgba(0, 0, 0, 0.1);
   border: none;
-  border-radius: 14px;
+  border-radius: 13px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0;
@@ -711,8 +634,8 @@
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   background: var(--plazos-white);
   border-radius: 50%;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -720,7 +643,7 @@
 }
 
 .plazo-toggle.active .toggle-slider {
-  transform: translateX(20px);
+  transform: translateX(18px);
 }
 
 /* Modal */
@@ -739,9 +662,9 @@
 
 .modal-content {
   background: var(--plazos-bg-card);
-  border-radius: 24px;
+  border-radius: 20px;
   width: 100%;
-  max-width: 480px;
+  max-width: 100%;
   box-shadow: var(--plazos-shadow-lg);
   animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
@@ -751,16 +674,19 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 32px;
+  padding: 20px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .modal-header h2 {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--plazos-text-primary);
   margin: 0;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.4px;
+  word-wrap: break-word;
+  flex: 1;
+  min-width: 0;
 }
 
 .modal-close {
@@ -775,11 +701,8 @@
   justify-content: center;
   transition: all 0.2s;
   padding: 0;
-}
-
-.modal-close:hover {
-  background: rgba(0, 0, 0, 0.1);
-  transform: scale(1.05);
+  flex-shrink: 0;
+  margin-left: 12px;
 }
 
 .modal-close svg {
@@ -789,27 +712,27 @@
 }
 
 .modal-form {
-  padding: 32px;
+  padding: 20px;
 }
 
 .form-group {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .form-group label {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--plazos-text-primary);
   margin-bottom: 8px;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.1px;
 }
 
 .form-group input,
 .form-group select {
   width: 100%;
   padding: 12px 16px;
-  font-size: 15px;
+  font-size: 14px;
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 10px;
   background: var(--plazos-bg-primary);
@@ -828,21 +751,23 @@
 
 .modal-actions {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   justify-content: flex-end;
-  margin-top: 32px;
+  margin-top: 24px;
 }
 
 .btn-secondary,
 .btn-primary {
   padding: 12px 24px;
   border-radius: 10px;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
   border: none;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.1px;
+  width: 100%;
 }
 
 .btn-secondary {
@@ -850,19 +775,10 @@
   color: var(--plazos-text-primary);
 }
 
-.btn-secondary:hover {
-  background: rgba(0, 0, 0, 0.1);
-}
-
 .btn-primary {
   background: linear-gradient(135deg, var(--plazos-primary-gold) 0%, var(--plazos-secondary-gold) 100%);
   color: var(--plazos-black);
   box-shadow: 0 4px 12px rgba(201, 162, 63, 0.25);
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(201, 162, 63, 0.35);
 }
 
 /* Animaciones */
@@ -886,36 +802,106 @@
   }
 }
 
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* ============================================
+   RESPONSIVE - Mobile First Approach
+   ============================================ */
 
-/* Responsive */
-@media (max-width: 1024px) {
-  .periodos-grid {
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 20px;
+/* iPhone SE y móviles pequeños (320px - 374px) - Base styles arriba */
+
+/* Móviles medianos (375px - 479px) */
+@media (min-width: 375px) {
+  .plazos-container {
+    padding: 16px;
   }
 
-  .plazos-panels {
-    grid-template-columns: 1fr;
+  .plazos-title {
+    font-size: 24px;
+  }
+
+  .plazos-subtitle {
+    font-size: 14px;
   }
 
   .panel-card {
-    padding: 28px;
+    padding: 24px;
+  }
+
+  .panel-header h2 {
+    font-size: 19px;
+  }
+
+  .panel-header p {
+    font-size: 14px;
+  }
+
+  .active-periodo-chip {
+    padding: 10px 16px;
+    font-size: 12px;
+  }
+
+  .active-periodo-chip strong {
+    font-size: 14px;
+  }
+
+  .periodo-info-banner {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    padding: 18px;
+  }
+
+  .periodo-info-banner .info-label {
+    font-size: 11px;
+  }
+
+  .periodo-info-banner .info-value {
+    font-size: 18px;
+  }
+
+  .plazo-item {
+    padding: 16px;
+  }
+
+  .plazo-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .plazo-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .plazo-label {
+    font-size: 15px;
+  }
+
+  .plazo-description {
+    font-size: 13px;
+  }
+
+  .plazo-toggle {
+    width: 48px;
+    height: 28px;
+  }
+
+  .plazo-toggle .toggle-slider {
+    width: 24px;
+    height: 24px;
+  }
+
+  .plazo-toggle.active .toggle-slider {
+    transform: translateX(20px);
   }
 }
 
-@media (max-width: 768px) {
+/* Móviles grandes (480px - 767px) */
+@media (min-width: 480px) {
   .plazos-container {
-    padding: 24px 16px;
+    padding: 20px;
+  }
+
+  .plazos-header {
+    margin-bottom: 28px;
   }
 
   .plazos-title {
@@ -926,63 +912,192 @@
     font-size: 15px;
   }
 
-  .header-content {
-    flex-direction: column;
+  .panel-card {
+    padding: 28px;
+    border-radius: 24px;
   }
 
-  .plazos-panels {
-    gap: 20px;
+  .panel-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
   }
 
-  .create-periodo-btn {
-    width: 100%;
-    justify-content: center;
+  .panel-header h2 {
+    font-size: 22px;
   }
 
-  .periodos-grid {
-    grid-template-columns: 1fr;
-    gap: 20px;
+  .panel-header p {
+    font-size: 15px;
   }
 
-  .periodo-card {
-    padding: 24px;
+  .active-periodo-chip {
+    width: auto;
   }
 
-  .periodo-nombre {
-    font-size: 24px;
+  .periodo-info-banner {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .plazos-list {
+    gap: 16px;
+  }
+
+  .plazo-item {
+    padding: 18px;
   }
 
   .modal-content {
-    max-width: 100%;
+    max-width: 480px;
   }
 
   .modal-header,
   .modal-form {
-    padding: 20px;
+    padding: 24px;
   }
 
-  .panel-header {
-    flex-direction: column;
+  .modal-actions {
+    flex-direction: row;
+  }
+
+  .btn-secondary,
+  .btn-primary {
+    width: auto;
+    flex: 1;
+  }
+}
+
+/* Tablets (768px - 1024px) */
+@media (min-width: 768px) {
+  .plazos-container {
+    padding: 32px 28px;
+  }
+
+  .plazos-header {
+    margin-bottom: 32px;
+  }
+
+  .header-content {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+  }
+
+  .plazos-title {
+    font-size: 36px;
+  }
+
+  .plazos-subtitle {
+    font-size: 17px;
+  }
+
+  .plazos-panels {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: 32px;
+  }
+
+  .panel-card {
+    padding: 32px;
+    border-radius: 32px;
+  }
+
+  .panel-header h2 {
+    font-size: 24px;
+  }
+
+  .panel-header p {
+    font-size: 15px;
   }
 
   .active-periodo-chip {
-    width: 100%;
+    font-size: 13px;
+  }
+
+  .active-periodo-chip strong {
+    font-size: 15px;
+  }
+
+  .plazos-empty {
+    padding: 80px 24px;
+  }
+
+  .plazos-empty svg {
+    width: 64px;
+    height: 64px;
+  }
+
+  .plazos-empty h3 {
+    font-size: 24px;
+  }
+
+  .plazos-empty p {
+    font-size: 17px;
+  }
+
+  .periodo-info-banner {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .plazo-item {
+    padding: 20px;
+  }
+
+  .modal-content {
+    max-width: 480px;
   }
 }
 
-@media (max-width: 480px) {
+/* Desktop pequeño (1025px - 1440px) */
+@media (min-width: 1025px) {
   .plazos-container {
-    padding: 20px 12px;
+    padding: 40px 32px;
   }
 
-  .periodo-card-header {
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .periodo-actions {
-    width: 100%;
-    justify-content: space-between;
+  .plazos-panels {
+    gap: 32px;
   }
 }
 
+/* Desktop grande (1441px - 1920px) */
+@media (min-width: 1441px) {
+  .plazos-container {
+    padding: 48px 40px;
+  }
+}
+
+/* Pantallas extra grandes (1921px+) */
+@media (min-width: 1921px) {
+  .plazos-container {
+    padding: 64px 56px;
+  }
+}
+
+/* Hover effects - solo en dispositivos con hover */
+@media (hover: hover) {
+  .plazo-item:hover {
+    background: rgba(201, 162, 63, 0.08);
+    border-color: rgba(201, 162, 63, 0.2);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(0, 0, 0, 0.1);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(201, 162, 63, 0.35);
+  }
+
+  .modal-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+    transform: scale(1.05);
+  }
+
+  .message-close:hover {
+    opacity: 1;
+  }
+}

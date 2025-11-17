@@ -1,22 +1,97 @@
-/* Configuración base del contenedor principal */
-.sidebar {
-  height: 100vh;
-  background: linear-gradient(
-    to top right,
-    #1e2a38,
-    #000000 100%
-  );
-  color: white;
-  width: 230px;
-  transition: width 0.3s ease;
-  overflow: visible;
-  display: flex;
-  flex-direction: column;
+/* ============================================
+   SIDEBAR - Diseño Premium tipo Apple
+   Overlay elegante que se superpone sin desplazar
+   ============================================ */
+
+/* Variables CSS */
+:root {
+  --sidebar-bg: rgba(30, 30, 30, 0.95);
+  --sidebar-bg-dark: rgba(20, 20, 20, 0.98);
+  --sidebar-text: #ffffff;
+  --sidebar-text-secondary: rgba(255, 255, 255, 0.7);
+  --sidebar-accent: #3c9ee4;
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-active: rgba(60, 158, 228, 0.15);
+  --backdrop-bg: rgba(0, 0, 0, 0.4);
+  --sidebar-width: 280px;
+  --sidebar-width-collapsed: 70px;
+  --sidebar-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-/* Estado colapsado: ancho reducido */
+* {
+  box-sizing: border-box;
+}
+
+/* Backdrop overlay cuando sidebar está abierto en móviles */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--backdrop-bg);
+  backdrop-filter: blur(8px);
+  z-index: 998;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              visibility 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.sidebar-backdrop.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: all;
+}
+
+/* Sidebar principal - Fixed position overlay */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  background: linear-gradient(180deg, var(--sidebar-bg-dark) 0%, var(--sidebar-bg) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  color: var(--sidebar-text);
+  width: var(--sidebar-width);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  z-index: 999;
+  box-shadow: var(--sidebar-shadow);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Sidebar cerrado */
 .sidebar.closed {
-  width: 70px;
+  width: var(--sidebar-width-collapsed);
+}
+
+/* Sidebar en móviles - siempre oculto inicialmente */
+@media (max-width: 1024px) {
+  .sidebar {
+    transform: translateX(-100%);
+    width: var(--sidebar-width);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar.closed {
+    transform: translateX(-100%);
+  }
+}
+
+/* Desktop - Sidebar siempre visible pero puede colapsar */
+@media (min-width: 1025px) {
+  .sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar.closed {
+    transform: translateX(0);
+  }
 }
 
 /* --- Sección superior --- */
@@ -24,27 +99,50 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 15px;
+  padding: 20px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 64px;
 }
 
 .logo {
-  font-size: 1.4rem;
-  font-weight: bold;
-  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--sidebar-text);
   margin: 0;
   opacity: 1;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: -0.5px;
 }
 
 .sidebar.closed .logo {
   opacity: 0;
   pointer-events: none;
+  transform: translateX(-10px);
 }
 
 .toggle-btn {
-  font-size: 1.8rem;
+  font-size: 20px;
   cursor: pointer;
-  color: #fff;
+  color: var(--sidebar-text);
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.toggle-btn:hover {
+  background: var(--sidebar-hover);
+  transform: scale(1.05);
+}
+
+.toggle-btn:active {
+  transform: scale(0.95);
 }
 
 /* --- Menú principal --- */
@@ -52,76 +150,141 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 10px;
+  padding: 12px 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .menu-title {
-  font-size: 0.75rem;
+  font-size: 11px;
   text-transform: uppercase;
-  color: #aaa;
-  margin-top: 15px;
-  margin-bottom: 5px;
+  color: var(--sidebar-text-secondary);
+  margin-top: 16px;
+  margin-bottom: 8px;
+  padding: 0 12px;
   overflow: hidden;
   white-space: nowrap;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.8px;
+  font-weight: 600;
 }
 
-/* Oculta títulos cuando está cerrada */
 .sidebar.closed .menu-title {
   opacity: 0;
   width: 0;
   margin: 0;
   padding: 0;
+  height: 0;
 }
 
 /* --- Botones del menú --- */
+.icon-content {
+  position: relative;
+  margin-bottom: 4px;
+}
+
 .menu button {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #ffffff;
+  color: var(--sidebar-text);
   background: none;
   border: none;
   text-align: left;
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   cursor: pointer;
-  border-radius: 8px;
-  transition: background 0.2s, padding 0.3s ease;
-  font-size: 0.9rem;
+  border-radius: 12px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.2px;
+  position: relative;
+  overflow: hidden;
 }
 
+.menu button::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--sidebar-accent);
+  transform: scaleY(0);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
+.menu button:hover {
+  background: var(--sidebar-hover);
+  transform: translateX(2px);
+}
+
+.menu button:hover::before {
+  transform: scaleY(1);
+}
+
+.menu button.active {
+  color: var(--sidebar-accent);
+  background: var(--sidebar-active);
+}
+
+.menu button.active::before {
+  transform: scaleY(1);
+}
+
+.menu button.active svg {
+  color: var(--sidebar-accent);
+}
 
 /* Íconos dentro de los botones */
 .menu button svg {
-  font-size: 1.2rem;
-  min-width: 25px;
+  font-size: 20px;
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
   text-align: center;
-  transition: all 0.3s ease-in-out;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.menu button:hover svg {
+  color: var(--sidebar-accent);
+  transform: scale(1.1);
 }
 
 /* Texto de los botones */
 .menu button span {
   overflow: hidden;
   white-space: nowrap;
-  transition: all 0.3s ease-in-out;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   opacity: 1;
   width: auto;
+  flex: 1;
+  min-width: 0;
 }
-.menu button:hover svg {
-  color: #3c9ee4; /* ícono azul */
-}
+
 .menu button:hover span {
-  color: #3c9ee4; /* ícono azul */
-}
-
-.menu button.active {
-  color: #3c9ee4;
-}
-
-.menu button.active svg {
-  color: #3c9ee4;
+  color: var(--sidebar-accent);
 }
 
 /* Oculta texto completamente cuando está cerrada */
@@ -129,42 +292,222 @@
   opacity: 0;
   width: 0;
   pointer-events: none;
+  margin: 0;
 }
 
-
-/* --- Tooltip personalizado para sidebar cerrado --- */
 .sidebar.closed .icon-content {
-  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
-  margin: 0px 0;
 }
 
-
+/* --- Tooltip personalizado para sidebar cerrado --- */
 .sidebar.closed .icon-content .tooltip {
   position: absolute;
   top: 50%;
-  left: 100%;
+  left: calc(100% + 12px);
   transform: translateY(-50%);
-  padding: 6px 10px;
+  padding: 8px 12px;
   opacity: 0;
   pointer-events: none;
   z-index: 1000;
-  border-radius: 7px;
-  transition: all 0.4s cubic-bezier(0.07, 1.17, 0.44, 1.41);
-  background: #3c9ee4;
-  color: #ffffff;
-
+  border-radius: 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(20px);
+  color: var(--sidebar-text);
   visibility: hidden;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
-  margin-left: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sidebar.closed .icon-content:hover .tooltip {
   opacity: 1;
   visibility: visible;
-  left: calc(100% + 8px);
+  transform: translateY(-50%) translateX(4px);
+}
+
+/* Flecha del tooltip */
+.sidebar.closed .icon-content .tooltip::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: rgba(30, 30, 30, 0.95);
+}
+
+/* Botón de logout especial */
+.menu button[style*="color: #dc3545"] {
+  color: #ff6b6b !important;
+}
+
+.menu button[style*="color: #dc3545"]:hover {
+  background: rgba(255, 107, 107, 0.15) !important;
+  color: #ff5252 !important;
+}
+
+.menu button[style*="color: #dc3545"]:hover svg {
+  color: #ff5252 !important;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+/* iPhone SE y móviles pequeños (320px - 374px) */
+@media (max-width: 374px) {
+  .sidebar {
+    width: 260px;
+  }
+
+  .top-section {
+    padding: 16px 12px;
+    min-height: 56px;
+  }
+
+  .logo {
+    font-size: 18px;
+  }
+
+  .toggle-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+  }
+
+  .menu {
+    padding: 10px 6px;
+  }
+
+  .menu button {
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  .menu button svg {
+    font-size: 18px;
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+  }
+
+  .menu-title {
+    font-size: 10px;
+    padding: 0 10px;
+  }
+}
+
+/* Móviles medianos (375px - 767px) */
+@media (min-width: 375px) and (max-width: 767px) {
+  .sidebar {
+    width: 280px;
+  }
+}
+
+/* Tablets (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .sidebar {
+    width: 280px;
+  }
+
+  .sidebar-backdrop.active {
+    opacity: 1;
+  }
+}
+
+/* Desktop (1025px+) - Sidebar siempre visible */
+@media (min-width: 1025px) {
+  .sidebar-backdrop {
+    display: none;
+  }
+
+  .mobile-menu-button {
+    display: none !important;
+  }
+
+  .sidebar {
+    width: var(--sidebar-width);
+    transform: translateX(0);
+  }
+
+  .sidebar.closed {
+    width: var(--sidebar-width-collapsed);
+    transform: translateX(0);
+  }
+
+  /* En desktop, el contenido ocupa todo el ancho, el padding se maneja en los componentes internos */
+  .main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding: 0 !important;
+  }
+}
+
+/* Botón hamburguesa para móviles */
+.mobile-menu-button {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--sidebar-bg-dark) 0%, var(--sidebar-bg) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--sidebar-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--sidebar-shadow);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-menu-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.mobile-menu-button:active {
+  transform: scale(0.95);
+}
+
+/* Ocultar botón cuando sidebar está abierto en móviles */
+@media (max-width: 1024px) {
+  .sidebar.open ~ .main-content .mobile-menu-button,
+  .sidebar.open ~ * .mobile-menu-button {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+/* Mejoras de accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebar-backdrop,
+  .menu button,
+  .logo,
+  .menu-title {
+    transition: none;
+  }
+}
+
+/* Fix para que el contenido no se desplace */
+.main-content {
+  width: 100%;
+  min-height: 100vh;
+  transition: none;
+}
+
+@media (min-width: 1025px) {
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+  }
 }
