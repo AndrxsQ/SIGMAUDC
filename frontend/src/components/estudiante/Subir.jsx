@@ -3,7 +3,7 @@ Por el momento los datos (archivos cargados) se manejan solo en el estado local 
 Cuando exista backend, los archivos seleccionados se para almacenaran y validaran en la base de datos.
 */
 import React, { useState } from "react";
-import "../styles/Subir.css";
+import "../../styles/Subir.css";
 import { FaUpload, FaFileAlt } from "react-icons/fa";
 import { FaFileUpload } from "react-icons/fa";
 

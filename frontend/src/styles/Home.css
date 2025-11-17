@@ -54,3 +54,629 @@
   transform: translateY(-2px);
   opacity: 0.9;
 }
+
+/* ============================================
+   HOME JEFE - Diseño Premium tipo Apple
+   ============================================ */
+
+/* Variables CSS para HomeJefe */
+:root {
+  --jefe-primary-gold: #C9A23F;
+  --jefe-secondary-gold: #FFD860;
+  --jefe-gold-light: #E8D5A3;
+  --jefe-black: #000000;
+  --jefe-white: #ffffff;
+  --jefe-text-primary: #1d1d1f;
+  --jefe-text-secondary: #86868b;
+  --jefe-bg-primary: #f5f5f7;
+  --jefe-bg-card: #ffffff;
+  --jefe-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --jefe-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --jefe-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.15);
+  --jefe-shadow-gold: 0 8px 32px rgba(201, 162, 63, 0.25);
+}
+
+/* Loading State */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  gap: 20px;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  color: var(--jefe-primary-gold);
+}
+
+.loading-container p {
+  font-size: 16px;
+  color: var(--jefe-text-secondary);
+  font-weight: 500;
+}
+
+/* Contenedor Principal */
+.home-jefe {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  min-height: 100vh;
+}
+
+/* Hero Section */
+.jefe-hero {
+  margin-bottom: 48px;
+}
+
+.hero-content {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+/* Logo Container */
+.jefe-logo-container {
+  flex-shrink: 0;
+}
+
+.jefe-logo-square {
+  width: 140px;
+  height: 140px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--jefe-primary-gold) 0%, var(--jefe-secondary-gold) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 
+    0 12px 40px rgba(201, 162, 63, 0.3),
+    0 0 0 1px rgba(201, 162, 63, 0.15) inset;
+  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.jefe-logo-square::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.jefe-logo-square:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 
+    0 16px 50px rgba(201, 162, 63, 0.4),
+    0 0 0 1px rgba(201, 162, 63, 0.2) inset;
+}
+
+.jefe-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 20px;
+  border-radius: 12px;
+  display: block;
+  position: relative;
+  z-index: 1;
+}
+
+.jefe-logo-text-fallback {
+  display: none;
+  color: var(--jefe-black);
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  position: absolute;
+  z-index: 1;
+}
+
+/* Welcome Section */
+.jefe-welcome-section {
+  flex: 1;
+  min-width: 300px;
+}
+
+.welcome-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(201, 162, 63, 0.15);
+  border: 1px solid rgba(201, 162, 63, 0.3);
+  border-radius: 20px;
+  padding: 8px 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--jefe-primary-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.welcome-badge svg {
+  width: 16px;
+  height: 16px;
+}
+
+.jefe-welcome-title {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--jefe-text-primary);
+  margin: 0 0 12px 0;
+  letter-spacing: -1.5px;
+  line-height: 1.1;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+}
+
+.jefe-welcome-title .highlight {
+  background: linear-gradient(135deg, var(--jefe-primary-gold) 0%, var(--jefe-secondary-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.jefe-welcome-subtitle {
+  font-size: 18px;
+  color: var(--jefe-text-secondary);
+  margin: 0;
+  font-weight: 400;
+  letter-spacing: -0.3px;
+}
+
+/* Info Card */
+.jefe-info-card {
+  background: var(--jefe-bg-card);
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 
+    var(--jefe-shadow-md),
+    0 0 0 1px rgba(0, 0, 0, 0.04) inset;
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.jefe-info-card:hover {
+  box-shadow: 
+    var(--jefe-shadow-lg),
+    0 0 0 1px rgba(201, 162, 63, 0.1) inset;
+  transform: translateY(-2px);
+}
+
+.info-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.info-card-header svg {
+  width: 24px;
+  height: 24px;
+  color: var(--jefe-primary-gold);
+}
+
+.info-card-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--jefe-text-primary);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.info-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+}
+
+.info-card-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px;
+  background: rgba(245, 245, 247, 0.6);
+  border-radius: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.info-card-item:hover {
+  background: rgba(201, 162, 63, 0.08);
+  border-color: rgba(201, 162, 63, 0.2);
+  transform: translateY(-2px);
+}
+
+.info-item-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, var(--jefe-primary-gold) 0%, var(--jefe-secondary-gold) 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--jefe-black);
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(201, 162, 63, 0.25);
+}
+
+.info-item-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.info-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.info-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--jefe-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.info-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--jefe-text-primary);
+  letter-spacing: -0.2px;
+}
+
+/* Dashboard Section */
+.jefe-dashboard {
+  margin-top: 48px;
+}
+
+.dashboard-header {
+  margin-bottom: 32px;
+}
+
+.section-title {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--jefe-text-primary);
+  margin: 0 0 8px 0;
+  letter-spacing: -1px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+}
+
+.section-subtitle {
+  font-size: 17px;
+  color: var(--jefe-text-secondary);
+  margin: 0;
+  font-weight: 400;
+  letter-spacing: -0.3px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+
+/* Dashboard Cards - Premium Design */
+.dashboard-card {
+  background: var(--jefe-bg-card);
+  border-radius: 24px;
+  padding: 0;
+  box-shadow: 
+    var(--jefe-shadow-md),
+    0 0 0 1px rgba(0, 0, 0, 0.04) inset;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--jefe-primary-gold) 0%, var(--jefe-secondary-gold) 100%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 
+    var(--jefe-shadow-lg),
+    0 0 0 1px rgba(201, 162, 63, 0.15) inset,
+    var(--jefe-shadow-gold);
+  border-color: rgba(201, 162, 63, 0.3);
+}
+
+.dashboard-card:hover::before {
+  opacity: 1;
+}
+
+.card-gradient-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(201, 162, 63, 0.03) 0%, rgba(255, 216, 96, 0.03) 100%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.dashboard-card:hover .card-gradient-overlay {
+  opacity: 1;
+}
+
+.card-content {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+  z-index: 1;
+  flex: 1;
+}
+
+.card-icon-wrapper {
+  margin-bottom: 8px;
+}
+
+.card-icon {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, var(--jefe-primary-gold) 0%, var(--jefe-secondary-gold) 100%);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--jefe-black);
+  box-shadow: 
+    0 8px 24px rgba(201, 162, 63, 0.25),
+    0 0 0 1px rgba(201, 162, 63, 0.1) inset;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dashboard-card:hover .card-icon {
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: 
+    0 12px 32px rgba(201, 162, 63, 0.35),
+    0 0 0 1px rgba(201, 162, 63, 0.2) inset;
+}
+
+.card-icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.dashboard-card h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--jefe-text-primary);
+  margin: 0;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+
+.dashboard-card p {
+  font-size: 15px;
+  color: var(--jefe-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+  flex-grow: 1;
+  letter-spacing: -0.2px;
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.card-link {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--jefe-primary-gold);
+  letter-spacing: -0.2px;
+  transition: all 0.2s;
+}
+
+.dashboard-card:hover .card-link {
+  color: var(--jefe-secondary-gold);
+  transform: translateX(4px);
+}
+
+.card-footer svg {
+  width: 20px;
+  height: 20px;
+  color: var(--jefe-primary-gold);
+  transition: all 0.3s;
+}
+
+.dashboard-card:hover .card-footer svg {
+  transform: translateX(4px);
+  color: var(--jefe-secondary-gold);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .home-jefe {
+    padding: 24px 20px;
+  }
+
+  .hero-content {
+    gap: 32px;
+  }
+
+  .jefe-logo-square {
+    width: 120px;
+    height: 120px;
+  }
+
+  .jefe-welcome-title {
+    font-size: 40px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .home-jefe {
+    padding: 20px 16px;
+  }
+
+  .hero-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 24px;
+  }
+
+  .jefe-logo-square {
+    width: 100px;
+    height: 100px;
+  }
+
+  .jefe-welcome-title {
+    font-size: 32px;
+  }
+
+  .jefe-welcome-subtitle {
+    font-size: 16px;
+  }
+
+  .jefe-info-card {
+    padding: 24px;
+  }
+
+  .info-card-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .dashboard-header {
+    margin-bottom: 24px;
+  }
+
+  .section-title {
+    font-size: 28px;
+  }
+
+  .section-subtitle {
+    font-size: 15px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .card-content {
+    padding: 24px;
+  }
+
+  .card-icon {
+    width: 56px;
+    height: 56px;
+  }
+
+  .card-icon svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .dashboard-card h3 {
+    font-size: 20px;
+  }
+
+  .dashboard-card p {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-jefe {
+    padding: 16px 12px;
+  }
+
+  .jefe-logo-square {
+    width: 90px;
+    height: 90px;
+  }
+
+  .jefe-welcome-title {
+    font-size: 28px;
+  }
+
+  .jefe-info-card {
+    padding: 20px;
+  }
+
+  .info-card-item {
+    padding: 16px;
+  }
+
+  .section-title {
+    font-size: 24px;
+  }
+
+  .card-content {
+    padding: 20px;
+  }
+}
+
+/* Animaciones */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dashboard-card {
+  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+.dashboard-card:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.dashboard-card:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dashboard-card:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.dashboard-card:nth-child(4) {
+  animation-delay: 0.4s;
+}
