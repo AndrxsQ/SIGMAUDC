@@ -42,6 +42,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(db, cfg.JWTSecret)
 	auditHandler := handlers.NewAuditHandler(db)
 	plazosHandler := handlers.NewPlazosHandler(db)
+	documentosHandler := handlers.NewDocumentosHandler(db)
 
 	// Configurar router
 	r := mux.NewRouter()
@@ -72,6 +73,15 @@ func main() {
 	// Rutas de plazos
 	protected.HandleFunc("/periodos/{periodo_id}/plazos", plazosHandler.GetPlazos).Methods("GET")
 	protected.HandleFunc("/periodos/{periodo_id}/plazos", plazosHandler.UpdatePlazos).Methods("PUT")
+
+	// Rutas de documentos (protegidas)
+	protected.HandleFunc("/documentos", documentosHandler.GetDocumentosEstudiante).Methods("GET")           // Para estudiantes
+	protected.HandleFunc("/documentos", documentosHandler.SubirDocumento).Methods("POST")                  // Para estudiantes
+	protected.HandleFunc("/documentos/programa", documentosHandler.GetDocumentosPorPrograma).Methods("GET") // Para jefatura
+	protected.HandleFunc("/documentos/{id}/revisar", documentosHandler.RevisarDocumento).Methods("PUT")     // Para jefatura
+
+	// Servir archivos estáticos (uploads) - soporta estructura de carpetas periodo/programa/
+	r.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads/"))))
 
 	// CORS middleware
 	corsHandler := func(next http.Handler) http.Handler {
