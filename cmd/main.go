@@ -33,6 +33,11 @@ func main() {
 	}
 	defer db.Close()
 
+	// Ejecutar migraciones mínimas para periodo/plazos
+	if err := database.RunMigrations(db); err != nil {
+		log.Fatal("Error running migrations:", err)
+	}
+
 	// Inicializar handlers
 	authHandler := handlers.NewAuthHandler(db, cfg.JWTSecret)
 	auditHandler := handlers.NewAuditHandler(db)

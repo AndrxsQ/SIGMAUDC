@@ -55,6 +55,67 @@
   margin-bottom: 32px;
 }
 
+.plazos-panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 32px;
+  align-items: stretch;
+}
+
+.panel-card {
+  background: var(--plazos-bg-card);
+  border-radius: 32px;
+  padding: 32px;
+  box-shadow:
+    var(--plazos-shadow-md),
+    0 0 0 1px rgba(0, 0, 0, 0.04) inset;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.panel-header h2 {
+  margin: 0 0 4px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--plazos-text-primary);
+  letter-spacing: -0.5px;
+}
+
+.panel-header p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--plazos-text-secondary);
+}
+
+.active-periodo-chip {
+  background: rgba(201, 162, 63, 0.12);
+  border: 1px solid rgba(201, 162, 63, 0.25);
+  padding: 10px 16px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--plazos-text-primary);
+}
+
+.active-periodo-chip strong {
+  font-size: 15px;
+  letter-spacing: -0.2px;
+}
+
 .header-content {
   display: flex;
   justify-content: space-between;
@@ -199,6 +260,22 @@
   margin: 0 0 32px 0;
 }
 
+.plazos-empty.compact {
+  padding: 48px 24px;
+  box-shadow: none;
+  border-radius: 20px;
+  border: 1px dashed rgba(0, 0, 0, 0.08);
+  background: rgba(245, 245, 247, 0.65);
+}
+
+.plazos-empty.secondary {
+  padding: 48px 24px;
+  border-radius: 20px;
+  box-shadow: none;
+  background: rgba(245, 245, 247, 0.8);
+  border: 1px dashed rgba(0, 0, 0, 0.08);
+}
+
 /* Grid de Periodos */
 .periodos-grid {
   display: grid;
@@ -218,6 +295,10 @@
   border: 1px solid rgba(0, 0, 0, 0.06);
   position: relative;
   overflow: hidden;
+}
+
+.periodos-panel .periodos-grid {
+  margin-top: 8px;
 }
 
 .periodo-card::before {
@@ -258,6 +339,90 @@
   align-items: center;
   gap: 12px;
   flex: 1;
+}
+
+.periodo-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.meta-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--plazos-text-secondary);
+  letter-spacing: 0.5px;
+}
+
+.meta-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--plazos-text-primary);
+}
+
+.meta-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--plazos-text-secondary);
+}
+
+.meta-status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--plazos-text-secondary);
+}
+
+.meta-status.active {
+  color: var(--plazos-success);
+}
+
+.meta-status.active::before {
+  background: var(--plazos-success);
+}
+
+.plazo-chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: auto;
+}
+
+.plazo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--plazos-text-secondary);
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.plazo-chip.active {
+  color: var(--plazos-text-primary);
+  border-color: rgba(201, 162, 63, 0.35);
+  background: rgba(201, 162, 63, 0.15);
+}
+
+.plazo-chip .chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.plazo-chip strong {
+  font-weight: 600;
+  letter-spacing: -0.2px;
 }
 
 .periodo-nombre {
@@ -395,6 +560,10 @@
 .plazo-item:hover {
   background: rgba(201, 162, 63, 0.08);
   border-color: rgba(201, 162, 63, 0.2);
+}
+
+.plazos-section.standalone {
+  margin-top: 8px;
 }
 
 .plazo-info {
@@ -666,6 +835,14 @@
     grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: 20px;
   }
+
+  .plazos-panels {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-card {
+    padding: 28px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -683,6 +860,10 @@
 
   .header-content {
     flex-direction: column;
+  }
+
+  .plazos-panels {
+    gap: 20px;
   }
 
   .create-periodo-btn {
@@ -710,6 +891,14 @@
   .modal-header,
   .modal-form {
     padding: 20px;
+  }
+
+  .panel-header {
+    flex-direction: column;
+  }
+
+  .active-periodo-chip {
+    width: 100%;
   }
 }
 
