@@ -33,9 +33,15 @@ func main() {
 	}
 	defer db.Close()
 
+	// Ejecutar migraciones mínimas para periodo/plazos
+	if err := database.RunMigrations(db); err != nil {
+		log.Fatal("Error running migrations:", err)
+	}
+
 	// Inicializar handlers
 	authHandler := handlers.NewAuthHandler(db, cfg.JWTSecret)
 	auditHandler := handlers.NewAuditHandler(db)
+	plazosHandler := handlers.NewPlazosHandler(db)
 
 	// Configurar router
 	r := mux.NewRouter()
@@ -53,6 +59,19 @@ func main() {
 
 	// Ruta de auditoría (protegida)
 	protected.HandleFunc("/audit", auditHandler.GetAuditLogs).Methods("GET")
+
+	// Rutas de periodos académicos y plazos (protegidas)
+	protected.HandleFunc("/periodos", plazosHandler.GetPeriodos).Methods("GET")
+	protected.HandleFunc("/periodos/activo", plazosHandler.GetPeriodoActivo).Methods("GET")
+	protected.HandleFunc("/periodos", plazosHandler.CreatePeriodo).Methods("POST")
+	protected.HandleFunc("/periodos/{id}", plazosHandler.UpdatePeriodo).Methods("PUT")
+	protected.HandleFunc("/periodos/{id}", plazosHandler.DeletePeriodo).Methods("DELETE")
+	protected.HandleFunc("/periodos-con-plazos", plazosHandler.GetPeriodosConPlazos).Methods("GET")
+	protected.HandleFunc("/plazos/activo", plazosHandler.GetActivePeriodoPlazos).Methods("GET")
+	
+	// Rutas de plazos
+	protected.HandleFunc("/periodos/{periodo_id}/plazos", plazosHandler.GetPlazos).Methods("GET")
+	protected.HandleFunc("/periodos/{periodo_id}/plazos", plazosHandler.UpdatePlazos).Methods("PUT")
 
 	// CORS middleware
 	corsHandler := func(next http.Handler) http.Handler {

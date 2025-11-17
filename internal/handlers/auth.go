@@ -303,19 +303,47 @@ func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Obtener información completa del usuario
+	// Obtener información completa del usuario con el nombre del programa y nombre/apellido según el rol
 	var usuario models.Usuario
-	query := `SELECT id, codigo, email, rol, programa_id FROM usuario WHERE id = $1`
+	var nombre, apellido sql.NullString
+	
+	// Query dinámico según el rol para obtener nombre y apellido
+	query := `
+		SELECT 
+			u.id, 
+			u.codigo, 
+			u.email, 
+			u.rol, 
+			u.programa_id, 
+			p.nombre as programa_nombre,
+			COALESCE(jd.nombre, e.nombre) as nombre,
+			COALESCE(jd.apellido, e.apellido) as apellido
+		FROM usuario u 
+		INNER JOIN programa p ON u.programa_id = p.id 
+		LEFT JOIN jefe_departamental jd ON u.id = jd.usuario_id
+		LEFT JOIN estudiante e ON u.id = e.usuario_id
+		WHERE u.id = $1
+	`
 	err := h.db.QueryRow(query, claims.Sub).Scan(
 		&usuario.ID,
 		&usuario.Codigo,
 		&usuario.Email,
 		&usuario.Rol,
 		&usuario.ProgramaID,
+		&usuario.ProgramaNombre,
+		&nombre,
+		&apellido,
 	)
 	if err != nil {
 		http.Error(w, "Error fetching user", http.StatusInternalServerError)
 		return
+	}
+	
+	if nombre.Valid {
+		usuario.Nombre = nombre.String
+	}
+	if apellido.Valid {
+		usuario.Apellido = apellido.String
 	}
 
 	w.Header().Set("Content-Type", "application/json")

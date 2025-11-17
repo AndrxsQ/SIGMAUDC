@@ -17,7 +17,7 @@
 
 import React, { useState } from "react";
 import PensumVisual from "./PensumVisual";
-import "../styles/HojaDeVida.css";
+import "../../styles/HojaDeVida.css";
 import {FaCalendarAlt
 } from "react-icons/fa";
 

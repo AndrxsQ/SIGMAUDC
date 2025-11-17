@@ -8,12 +8,15 @@ import (
 )
 
 type Usuario struct {
-	ID          int            `json:"id"`
-	Codigo      string         `json:"codigo"`
-	Email       string         `json:"email"`
-	PasswordHash sql.NullString `json:"-"`
-	Rol         string         `json:"rol"`
-	ProgramaID  int            `json:"programa_id"`
+	ID             int            `json:"id"`
+	Codigo         string         `json:"codigo"`
+	Email          string         `json:"email"`
+	PasswordHash   sql.NullString `json:"-"`
+	Rol            string         `json:"rol"`
+	ProgramaID     int            `json:"programa_id"`
+	ProgramaNombre string         `json:"programa_nombre,omitempty"`
+	Nombre         string         `json:"nombre,omitempty"`
+	Apellido       string         `json:"apellido,omitempty"`
 }
 
 type LoginRequest struct {

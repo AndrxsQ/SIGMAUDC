@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { authService } from "../services/auth";
-import "../styles/Login.css";
+import { authService } from "../../services/auth";
+import "../../styles/Login.css";
 
 const Login = () => {
   const [codigo, setCodigo] = useState("");

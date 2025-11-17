@@ -1,5 +1,5 @@
 import React from "react";
-import "../styles/PensumVisual.css"; // archivo de estilos
+import "../../styles/PensumVisual.css"; // archivo de estilos
 import { FaCalendarAlt } from "react-icons/fa";
 
 // ==========================================================

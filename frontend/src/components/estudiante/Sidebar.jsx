@@ -22,7 +22,7 @@ import {
 import { FaFileUpload } from "react-icons/fa";
 import { GoHomeFill } from "react-icons/go";
 import { MdOutlineUploadFile } from "react-icons/md";
-import "../styles/Sidebar.css";
+import "../../styles/Sidebar.css";
 
 // Componente principal Sidebar
 // Recibe como props el estado actual de la página activa y la función que permite cambiarla.
