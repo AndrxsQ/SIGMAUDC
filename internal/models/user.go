@@ -31,6 +31,8 @@ type LoginResponse struct {
 
 type SetPasswordRequest struct {
 	UserID      int    `json:"userId"`
+	Codigo      string `json:"codigo"`
+	Email       string `json:"email"`
 	NewPassword string `json:"newPassword"`
 }
 

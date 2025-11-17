@@ -81,7 +81,7 @@ const Login = () => {
 
       // Si requiere configuración de contraseña
       if (response.requiresPasswordSetup) {
-        navigate("/set-password", { state: { userId: response.userId } });
+        navigate("/set-password", { state: { userId: response.userId, codigo: codigo } });
         return;
       }
 

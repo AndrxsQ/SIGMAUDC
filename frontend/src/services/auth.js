@@ -37,9 +37,11 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Solo redirigir si NO es una petición de login
-    // El login maneja sus propios errores 401
-    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
+    // Solo redirigir si NO es una petición de login o set-password
+    // El login y set-password manejan sus propios errores 401
+    if (error.response?.status === 401 && 
+        !error.config?.url?.includes('/auth/login') && 
+        !error.config?.url?.includes('/auth/set-password')) {
       // Token inválido o expirado en otras rutas
       localStorage.removeItem('token');
       localStorage.removeItem('user');
@@ -57,9 +59,11 @@ export const authService = {
   },
 
   // Establecer contraseña (primer inicio)
-  async setPassword(userId, newPassword) {
+  async setPassword(userId, codigo, email, newPassword) {
     const response = await api.post('/auth/set-password', {
       userId,
+      codigo,
+      email,
       newPassword,
     });
     return response.data;

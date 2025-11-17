@@ -4,8 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/andrxsq/SIGMAUDC/internal/models"
@@ -130,13 +133,130 @@ func (h *AuthHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validar que la contraseña tenga al menos 6 caracteres
-	if len(req.NewPassword) < 6 {
+	// Obtener información del usuario para validar código, correo y que tenga password_hash NULL
+	var usuario models.Usuario
+	var passwordHash sql.NullString
+	query := `SELECT id, codigo, email, password_hash, rol, programa_id FROM usuario WHERE id = $1`
+	err := h.db.QueryRow(query, req.UserID).Scan(
+		&usuario.ID,
+		&usuario.Codigo,
+		&usuario.Email,
+		&passwordHash,
+		&usuario.Rol,
+		&usuario.ProgramaID,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(models.SetPasswordResponse{
+				Success: false,
+				Message: "Usuario no encontrado",
+			})
+			return
+		}
+		http.Error(w, "Error fetching user", http.StatusInternalServerError)
+		return
+	}
+
+	// Validar que el código ingresado coincida con el código del usuario
+	if strings.TrimSpace(req.Codigo) != strings.TrimSpace(usuario.Codigo) {
+		// Registrar intento fallido de verificación de código
+		ip := utils.GetIPAddress(r)
+		userAgent := r.UserAgent()
+		h.registrarAuditoria(req.UserID, "verificacion_codigo_fallida", "Código no coincide al crear contraseña", ip, userAgent)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(models.SetPasswordResponse{
+			Success: false,
+			Message: "El código ingresado no coincide con el código del usuario",
+		})
+		return
+	}
+
+	// Validar que el usuario tenga password_hash NULL (debe ser primer inicio de sesión)
+	if passwordHash.Valid && passwordHash.String != "" {
+		// El usuario ya tiene contraseña - no debería estar aquí
+		ip := utils.GetIPAddress(r)
+		userAgent := r.UserAgent()
+		h.registrarAuditoria(req.UserID, "intento_crear_contraseña_existente", "Intento de crear contraseña cuando ya existe", ip, userAgent)
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(models.SetPasswordResponse{
 			Success: false,
-			Message: "La contraseña debe tener al menos 6 caracteres",
+			Message: "Este usuario ya tiene una contraseña configurada",
+		})
+		return
+	}
+
+	// Validar que el correo no esté vacío
+	if strings.TrimSpace(req.Email) == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(models.SetPasswordResponse{
+			Success: false,
+			Message: "El correo electrónico es requerido",
+		})
+		return
+	}
+
+	// Normalizar correos: convertir a minúsculas, eliminar espacios al inicio y final
+	emailIngresado := strings.ToLower(strings.TrimSpace(req.Email))
+	emailBD := strings.ToLower(strings.TrimSpace(usuario.Email))
+
+	// Validar que el email de la BD no esté vacío (por si acaso)
+	if emailBD == "" {
+		log.Printf("[SetPassword] ERROR CRÍTICO: Email en BD está vacío para UserID: %d", req.UserID)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.SetPasswordResponse{
+			Success: false,
+			Message: "Error interno: correo del usuario no encontrado en la base de datos",
+		})
+		return
+	}
+
+	// Log para debugging
+	log.Printf("[SetPassword] Validando correo - UserID: %d, Codigo: %s", req.UserID, req.Codigo)
+	log.Printf("[SetPassword] Email ingresado (normalizado): '%s' (longitud: %d)", emailIngresado, len(emailIngresado))
+	log.Printf("[SetPassword] Email BD (normalizado): '%s' (longitud: %d)", emailBD, len(emailBD))
+
+	// Validar que el correo ingresado coincida EXACTAMENTE con el correo del usuario
+	// Comparación estricta byte por byte después de normalización
+	if emailIngresado != emailBD {
+		// Registrar intento fallido de verificación de correo con detalles completos
+		ip := utils.GetIPAddress(r)
+		userAgent := r.UserAgent()
+		descripcion := fmt.Sprintf("Correo no coincide: ingresado='%s' (len=%d), esperado='%s' (len=%d), usuario_id=%d, codigo=%s", 
+			emailIngresado, len(emailIngresado), emailBD, len(emailBD), req.UserID, req.Codigo)
+		h.registrarAuditoria(req.UserID, "verificacion_correo_fallida", descripcion, ip, userAgent)
+
+		log.Printf("[SetPassword] ERROR: Correo no coincide")
+		log.Printf("[SetPassword]   - Email ingresado: '%s' (longitud: %d)", emailIngresado, len(emailIngresado))
+		log.Printf("[SetPassword]   - Email BD: '%s' (longitud: %d)", emailBD, len(emailBD))
+		log.Printf("[SetPassword]   - Son iguales?: %v", emailIngresado == emailBD)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(models.SetPasswordResponse{
+			Success: false,
+			Message: "El correo electrónico no coincide con el registrado para este código",
+		})
+		return
+	}
+
+	log.Printf("[SetPassword] ✓ Correo validado correctamente para UserID: %d", req.UserID)
+
+	// Validar que la contraseña cumpla con los requisitos (alfanumérica, mínimo 8 caracteres)
+	valid, message := utils.ValidatePassword(req.NewPassword)
+	if !valid {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(models.SetPasswordResponse{
+			Success: false,
+			Message: message,
 		})
 		return
 	}
@@ -153,21 +273,6 @@ func (h *AuthHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	_, err = h.db.Exec(updateQuery, string(hashedPassword), req.UserID)
 	if err != nil {
 		http.Error(w, "Error updating password", http.StatusInternalServerError)
-		return
-	}
-
-	// Obtener información del usuario para generar JWT
-	var usuario models.Usuario
-	query := `SELECT id, codigo, email, rol, programa_id FROM usuario WHERE id = $1`
-	err = h.db.QueryRow(query, req.UserID).Scan(
-		&usuario.ID,
-		&usuario.Codigo,
-		&usuario.Email,
-		&usuario.Rol,
-		&usuario.ProgramaID,
-	)
-	if err != nil {
-		http.Error(w, "Error fetching user", http.StatusInternalServerError)
 		return
 	}
 
