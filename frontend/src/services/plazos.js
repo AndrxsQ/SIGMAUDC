@@ -13,6 +13,12 @@ export const plazosService = {
     return response.data;
   },
 
+  // Obtener el periodo activo junto con los plazos del programa del usuario
+  async getPlazosPeriodoActivo() {
+    const response = await api.get('/api/plazos/activo');
+    return response.data;
+  },
+
   // Obtener todos los periodos con sus plazos
   async getPeriodosConPlazos() {
     const response = await api.get('/api/periodos-con-plazos');
@@ -29,16 +35,9 @@ export const plazosService = {
   },
 
   // Actualizar un periodo académico
-  async updatePeriodo(periodoId, activo) {
-    const response = await api.put(`/api/periodos/${periodoId}`, {
-      activo,
-    });
+  async updatePeriodo(periodoId, data) {
+    const response = await api.put(`/api/periodos/${periodoId}`, data);
     return response.data;
-  },
-
-  // Eliminar un periodo académico
-  async deletePeriodo(periodoId) {
-    await api.delete(`/api/periodos/${periodoId}`);
   },
 
   // Obtener los plazos de un periodo

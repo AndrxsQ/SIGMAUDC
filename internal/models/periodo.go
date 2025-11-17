@@ -2,10 +2,11 @@ package models
 
 // PeriodoAcademico representa un periodo académico (semestre)
 type PeriodoAcademico struct {
-	ID       int  `json:"id"`
-	Year     int  `json:"year"`
-	Semestre int  `json:"semestre"`
-	Activo   bool `json:"activo"`
+	ID        int  `json:"id"`
+	Year      int  `json:"year"`
+	Semestre  int  `json:"semestre"`
+	Activo    bool `json:"activo"`
+	Archivado bool `json:"archivado"`
 }
 
 // CreatePeriodoRequest representa la solicitud para crear un periodo
@@ -16,15 +17,17 @@ type CreatePeriodoRequest struct {
 
 // UpdatePeriodoRequest representa la solicitud para actualizar un periodo
 type UpdatePeriodoRequest struct {
-	Activo *bool `json:"activo,omitempty"` // Puntero para permitir nil (no actualizar)
+	Activo    *bool `json:"activo,omitempty"`    // Puntero para permitir nil (no actualizar)
+	Archivado *bool `json:"archivado,omitempty"` // Permite archivar/desarchivar
 }
 
 // Plazos representa los plazos de un periodo académico
 type Plazos struct {
-	ID            int  `json:"id"`
-	PeriodoID     int  `json:"periodo_id"`
-	Documentos    bool `json:"documentos"`
-	Inscripcion   bool `json:"inscripcion"`
+	ID             int  `json:"id"`
+	PeriodoID      int  `json:"periodo_id"`
+	ProgramaID     int  `json:"programa_id"`
+	Documentos     bool `json:"documentos"`
+	Inscripcion    bool `json:"inscripcion"`
 	Modificaciones bool `json:"modificaciones"`
 }
 
@@ -41,3 +44,8 @@ type PeriodoConPlazos struct {
 	Plazos *Plazos `json:"plazos,omitempty"`
 }
 
+// ActivePlazosResponse representa el periodo activo y los plazos del programa
+type ActivePlazosResponse struct {
+	Periodo *PeriodoAcademico `json:"periodo"`
+	Plazos  *Plazos           `json:"plazos,omitempty"`
+}

@@ -67,6 +67,7 @@ func main() {
 	protected.HandleFunc("/periodos/{id}", plazosHandler.UpdatePeriodo).Methods("PUT")
 	protected.HandleFunc("/periodos/{id}", plazosHandler.DeletePeriodo).Methods("DELETE")
 	protected.HandleFunc("/periodos-con-plazos", plazosHandler.GetPeriodosConPlazos).Methods("GET")
+	protected.HandleFunc("/plazos/activo", plazosHandler.GetActivePeriodoPlazos).Methods("GET")
 	
 	// Rutas de plazos
 	protected.HandleFunc("/periodos/{periodo_id}/plazos", plazosHandler.GetPlazos).Methods("GET")

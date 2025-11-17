@@ -75,6 +75,11 @@
   min-height: 100%;
 }
 
+.panel-card.single {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
 .panel-header {
   display: flex;
   justify-content: space-between;
@@ -317,6 +322,12 @@
   opacity: 1;
 }
 
+.periodo-card.archivado {
+  opacity: 0.85;
+  border-color: rgba(0, 0, 0, 0.08);
+  background: rgba(245, 245, 247, 0.78);
+}
+
 .periodo-card:hover {
   transform: translateY(-4px);
   box-shadow: 
@@ -346,6 +357,33 @@
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.periodo-info-banner {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  padding: 20px;
+  border-radius: 18px;
+  background: rgba(245, 245, 247, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  margin-bottom: 24px;
+}
+
+.periodo-info-banner .info-label {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--plazos-text-secondary);
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.periodo-info-banner .info-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--plazos-text-primary);
+  letter-spacing: -0.5px;
 }
 
 .meta-label {
@@ -385,6 +423,14 @@
 
 .meta-status.active::before {
   background: var(--plazos-success);
+}
+
+.meta-status.archived {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.meta-status.archived::before {
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .plazo-chip-group {
@@ -456,6 +502,17 @@
   height: 14px;
 }
 
+.archivado-badge {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--plazos-text-primary);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.archivado-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
 .periodo-actions {
   display: flex;
   align-items: center;
@@ -495,35 +552,46 @@
   transform: translateX(20px);
 }
 
-/* Botón Eliminar */
-.delete-btn {
-  width: 36px;
-  height: 36px;
-  background: rgba(255, 59, 48, 0.1);
-  border: 1px solid rgba(255, 59, 48, 0.2);
-  border-radius: 8px;
-  color: var(--plazos-error);
-  cursor: pointer;
-  display: flex;
+/* Botón Archivar */
+.archive-btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--plazos-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
   transition: all 0.2s;
-  padding: 0;
 }
 
-.delete-btn:hover:not(:disabled) {
-  background: rgba(255, 59, 48, 0.2);
-  transform: scale(1.05);
+.archive-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
-.delete-btn:disabled {
+.archive-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.archive-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.delete-btn svg {
-  width: 18px;
-  height: 18px;
+.archived-pill {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--plazos-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
 }
 
 /* Sección de Plazos */
