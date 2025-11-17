@@ -36,35 +36,46 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const [activePage, setActivePage] = useState("home");
   const [userRole, setUserRole] = useState(null);
+  const [roleLoading, setRoleLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Cargar rol del usuario al montar el componente
+  // Cargar rol del usuario (al montar y cuando cambia la ruta)
   useEffect(() => {
     const loadUserRole = async () => {
       try {
-        // Siempre obtener del servidor para asegurar datos actualizados
-        if (authService.isAuthenticated()) {
-          const user = await authService.getCurrentUser();
-          if (user) {
-            authService.saveUser(user);
-            setUserRole(user.rol || null);
-          }
+        if (!authService.isAuthenticated()) {
+          setUserRole(null);
+          return;
+        }
+
+        setRoleLoading(true);
+
+        // Primero intentar con el usuario en localStorage para evitar parpadeos
+        const cachedUser = authService.getUser();
+        if (cachedUser?.rol) {
+          setUserRole(cachedUser.rol);
+        }
+
+        // Luego refrescar desde el servidor para asegurar datos actualizados
+        const user = await authService.getCurrentUser();
+        if (user) {
+          authService.saveUser(user);
+          setUserRole(user.rol || null);
         }
       } catch (error) {
         console.error("Error loading user role:", error);
-        // Si falla, intentar usar el de localStorage como fallback
         const cachedUser = authService.getUser();
-        if (cachedUser) {
+        if (cachedUser?.rol) {
           setUserRole(cachedUser.rol || null);
         }
+      } finally {
+        setRoleLoading(false);
       }
     };
 
-    if (authService.isAuthenticated()) {
-      loadUserRole();
-    }
-  }, []);
+    loadUserRole();
+  }, [location.pathname]);
 
   // Sincronizar activePage con la ruta actual
   React.useEffect(() => {
@@ -116,6 +127,18 @@ function AppContent() {
         path="/*"
         element={
           <ProtectedRoute>
+            {roleLoading && authService.isAuthenticated() ? (
+              <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", background: "#e2e8f0" }}>
+                <div className="loading-spinner">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 40, height: 40 }}>
+                    <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="32">
+                      <animate attributeName="stroke-dasharray" dur="2s" values="0 32;16 16;0 32;0 32" repeatCount="indefinite" />
+                      <animate attributeName="stroke-dashoffset" dur="2s" values="0;-16;-32;-32" repeatCount="indefinite" />
+                    </circle>
+                  </svg>
+                </div>
+              </div>
+            ) : (
             <div style={{ display: "flex", height: "100vh", background: "#e2e8f0" }}>
               {/* Mostrar Sidebar según el rol */}
               {userRole === "jefe_departamental" ? (
@@ -161,6 +184,7 @@ function AppContent() {
                 </Routes>
               </div>
             </div>
+            )}
           </ProtectedRoute>
         }
       />
