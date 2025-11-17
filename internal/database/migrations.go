@@ -73,6 +73,73 @@ func RunMigrations(db *sql.DB) error {
 			END IF;
 		END $$;
 		`,
+		`
+		CREATE TABLE IF NOT EXISTS documentos_estudiante (
+			id SERIAL PRIMARY KEY,
+			estudiante_id INT NOT NULL,
+			programa_id INT NOT NULL,
+			periodo_id INT NOT NULL,
+			tipo_documento VARCHAR(100) NOT NULL CHECK (tipo_documento IN ('certificado_eps', 'comprobante_matricula')),
+			archivo_url TEXT NOT NULL,
+			estado VARCHAR(20) DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'aprobado', 'rechazado')),
+			observacion TEXT DEFAULT NULL,
+			revisado_por INT DEFAULT NULL,
+			fecha_subida TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			fecha_revision TIMESTAMP DEFAULT NULL
+		)
+		`,
+		`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint 
+				WHERE conname = 'fk_doc_estudiante' 
+				AND conrelid = 'documentos_estudiante'::regclass
+			) THEN
+				ALTER TABLE documentos_estudiante
+				ADD CONSTRAINT fk_doc_estudiante FOREIGN KEY (estudiante_id) REFERENCES estudiante(id) ON DELETE CASCADE;
+			END IF;
+		END $$;
+		`,
+		`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint 
+				WHERE conname = 'fk_doc_programa' 
+				AND conrelid = 'documentos_estudiante'::regclass
+			) THEN
+				ALTER TABLE documentos_estudiante
+				ADD CONSTRAINT fk_doc_programa FOREIGN KEY (programa_id) REFERENCES programa(id);
+			END IF;
+		END $$;
+		`,
+		`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint 
+				WHERE conname = 'fk_doc_periodo' 
+				AND conrelid = 'documentos_estudiante'::regclass
+			) THEN
+				ALTER TABLE documentos_estudiante
+				ADD CONSTRAINT fk_doc_periodo FOREIGN KEY (periodo_id) REFERENCES periodo_academico(id);
+			END IF;
+		END $$;
+		`,
+		`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint 
+				WHERE conname = 'fk_doc_revisor' 
+				AND conrelid = 'documentos_estudiante'::regclass
+			) THEN
+				ALTER TABLE documentos_estudiante
+				ADD CONSTRAINT fk_doc_revisor FOREIGN KEY (revisado_por) REFERENCES jefe_departamental(id);
+			END IF;
+		END $$;
+		`,
 	}
 
 	for _, stmt := range statements {

@@ -19,6 +19,7 @@ import Home from "./pages/estudiante/Home";
 // Páginas de jefes
 import HomeJefe from "./pages/jefe/HomeJefe";
 import Plazos from "./pages/jefe/Plazos";
+import VerificarDocumentos from "./pages/jefe/VerificarDocumentos";
 import { authService } from "./services/auth";
 
 // Componente para proteger rutas
@@ -173,7 +174,7 @@ function AppContent() {
                       <Route path="/" element={<HomeJefe />} />
                       <Route path="/home" element={<HomeJefe />} />
                       <Route path="/plazos" element={<Plazos />} />
-                      <Route path="/verificar-documentos" element={<div>Verificar Documentos (En desarrollo)</div>} />
+                      <Route path="/verificar-documentos" element={<VerificarDocumentos />} />
                       <Route path="/modificaciones" element={<div>Modificaciones (En desarrollo)</div>} />
                       <Route path="/plan-estudio" element={<div>Modificar Plan de Estudio (En desarrollo)</div>} />
                       <Route path="/perfil" element={<div>Mi Información (En desarrollo)</div>} />
