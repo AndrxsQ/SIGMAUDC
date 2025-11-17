@@ -108,17 +108,11 @@ const Login = () => {
         setLoading(false);
       }
     } catch (err) {
-      console.log("Error completo:", err);
-      console.log("Error response:", err.response);
-      console.log("Error data:", err.response?.data);
-      
       // Manejar diferentes tipos de errores
       if (err.response) {
         // Error de respuesta del servidor
         const errorData = err.response.data || {};
         const status = err.response.status;
-        
-        console.log("Status:", status, "ErrorData:", errorData);
         
         // Manejar según el tipo de error
         if (errorData.errorType === "user_not_found") {
@@ -138,11 +132,9 @@ const Login = () => {
         }
       } else if (err.request) {
         // Error de conexión (sin respuesta del servidor)
-        console.log("Error de conexión - no hay respuesta del servidor");
         setError("Error de conexión. Verifica que el servidor esté funcionando");
       } else {
         // Otro error
-        console.log("Error inesperado:", err.message);
         setError("Ocurrió un error inesperado. Por favor intenta nuevamente");
       }
       setLoading(false);

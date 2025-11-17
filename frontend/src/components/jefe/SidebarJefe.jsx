@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FaBars,
   FaSignOutAlt,
@@ -13,7 +13,59 @@ import "../../styles/Sidebar.css";
 
 const SidebarJefe = ({ activePage, setActivePage, onLogout }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const toggleSidebar = () => setIsOpen(!isOpen);
+  const toggleSidebar = () => {
+    const newState = !isOpen;
+    setIsOpen(newState);
+    
+    // Controlar backdrop
+    const backdrop = document.querySelector('.sidebar-backdrop');
+    const sidebar = document.querySelector('.sidebar');
+    
+    // Actualizar clase en el documento para CSS
+    if (newState) {
+      document.documentElement.classList.remove('sidebar-closed');
+      document.documentElement.classList.add('sidebar-open');
+      if (backdrop) backdrop.classList.add('active');
+    } else {
+      document.documentElement.classList.remove('sidebar-open');
+      document.documentElement.classList.add('sidebar-closed');
+      if (backdrop) backdrop.classList.remove('active');
+    }
+  };
+
+  // Cerrar sidebar al hacer click en backdrop
+  useEffect(() => {
+    const backdrop = document.querySelector('.sidebar-backdrop');
+    const handleBackdropClick = () => {
+      if (isOpen) {
+        setIsOpen(false);
+        document.documentElement.classList.remove('sidebar-open');
+        document.documentElement.classList.add('sidebar-closed');
+        if (backdrop) backdrop.classList.remove('active');
+      }
+    };
+    
+    if (backdrop) {
+      backdrop.addEventListener('click', handleBackdropClick);
+      return () => backdrop.removeEventListener('click', handleBackdropClick);
+    }
+  }, [isOpen]);
+
+  // Inicializar estado del sidebar en desktop
+  useEffect(() => {
+    const sidebar = document.querySelector('.sidebar');
+    if (window.innerWidth >= 1025) {
+      // En desktop, sidebar abierto por defecto
+      document.documentElement.classList.remove('sidebar-closed');
+      document.documentElement.classList.add('sidebar-open');
+      setIsOpen(true);
+    } else {
+      // En móviles, sidebar cerrado por defecto
+      document.documentElement.classList.remove('sidebar-open');
+      document.documentElement.classList.add('sidebar-closed');
+      setIsOpen(false);
+    }
+  }, []);
 
   return (
     <div className={`sidebar ${isOpen ? "open" : "closed"}`}>

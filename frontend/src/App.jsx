@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { FaBars } from "react-icons/fa";
 // Componentes comunes
 import Login from "./components/common/Login";
 import SetPassword from "./components/common/SetPassword";
@@ -21,6 +22,19 @@ import HomeJefe from "./pages/jefe/HomeJefe";
 import Plazos from "./pages/jefe/Plazos";
 import VerificarDocumentos from "./pages/jefe/VerificarDocumentos";
 import { authService } from "./services/auth";
+
+// Botón hamburguesa para móviles
+const MobileMenuButton = ({ userRole, onToggle }) => {
+  return (
+    <button
+      className="mobile-menu-button"
+      onClick={onToggle}
+      aria-label="Abrir menú"
+    >
+      <FaBars size={20} />
+    </button>
+  );
+};
 
 // Componente para proteger rutas
 const ProtectedRoute = ({ children }) => {
@@ -140,7 +154,31 @@ function AppContent() {
                 </div>
               </div>
             ) : (
-            <div style={{ display: "flex", height: "100vh", background: "#e2e8f0" }}>
+            <div style={{ display: "flex", height: "100vh", background: "#e2e8f0", position: "relative", width: "100%" }}>
+              {/* Backdrop overlay para sidebar en móviles */}
+              <div className="sidebar-backdrop"></div>
+              
+              {/* Botón hamburguesa para móviles */}
+              <MobileMenuButton 
+                userRole={userRole}
+                onToggle={() => {
+                  const sidebar = document.querySelector('.sidebar');
+                  const backdrop = document.querySelector('.sidebar-backdrop');
+                  if (sidebar) {
+                    const isOpen = sidebar.classList.contains('open');
+                    if (isOpen) {
+                      sidebar.classList.remove('open');
+                      sidebar.classList.add('closed');
+                      if (backdrop) backdrop.classList.remove('active');
+                    } else {
+                      sidebar.classList.remove('closed');
+                      sidebar.classList.add('open');
+                      if (backdrop) backdrop.classList.add('active');
+                    }
+                  }
+                }}
+              />
+              
               {/* Mostrar Sidebar según el rol */}
               {userRole === "jefe_departamental" ? (
                 <SidebarJefe 
@@ -155,7 +193,7 @@ function AppContent() {
                   onLogout={handleLogout}
                 />
               )}
-              <div style={{ flex: 1, padding: "20px", overflowY: "auto" }}>
+              <div className="main-content" style={{ width: "100%", padding: 0, overflowY: "auto", minHeight: "100vh", marginLeft: 0 }}>
                 <Routes>
                   {/* Rutas para estudiantes */}
                   {userRole !== "jefe_departamental" && (
