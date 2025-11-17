@@ -152,16 +152,25 @@ const Login = () => {
   return (
     <div className="login-container">
       <div className="login-card">
-        {/* Logo de la Universidad */}
+        {/* Logo de la Universidad - Escudo PNG */}
         <div className="login-logo">
-          <div className="logo-circle">
-            <span className="logo-text">UDC</span>
+          <div className="logo-square">
+            <img 
+              src="/logo-udc.png" 
+              alt="Escudo Universidad de Cartagena"
+              className="logo-image"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                const fallback = e.target.nextElementSibling;
+                if (fallback) fallback.style.display = 'block';
+              }}
+            />
+            <span className="logo-text-fallback">UDC</span>
           </div>
         </div>
 
         <div className="login-header">
-          <h1 className="login-title">SIGMA</h1>
-          <p className="login-subtitle">Sistema de Gestión de Matrícula</p>
+          <h1 className="login-title">SIGMA-UDC</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
