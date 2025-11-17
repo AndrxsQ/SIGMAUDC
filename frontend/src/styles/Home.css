@@ -1,4 +1,4 @@
-/* Layaut general */
+/* Landing antiguo (mantenido solo por compatibilidad) */
 .landing {
   display: flex;
   justify-content: space-around;
@@ -10,10 +10,8 @@
   border-radius: 20px;
 }
 
-
 .landing__text {
   max-width: 460px;
-  
 }
 
 .landing__text h1 {
@@ -36,11 +34,7 @@
 }
 
 .landing__btn {
-    background: linear-gradient(
-    to top right,
-    #1a1a28,
-    #000000 100%
-  );
+  background: linear-gradient(to top right, #1a1a28, #000000 100%);
   color: #fff;
   border: none;
   padding: 12px 26px;
@@ -104,6 +98,144 @@
   margin: 0 auto;
   padding: 32px 24px;
   min-height: 100vh;
+}
+
+/* ============================================
+   HOME ESTUDIANTE - Diseño Premium tipo Apple
+   ============================================ */
+
+.home-estudiante {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  min-height: 100vh;
+}
+
+.est-hero {
+  margin-bottom: 40px;
+}
+
+.est-hero-content {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.est-logo-container {
+  flex-shrink: 0;
+}
+
+.est-logo-square {
+  width: 120px;
+  height: 120px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--jefe-primary-gold) 0%, var(--jefe-secondary-gold) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 10px 34px rgba(201, 162, 63, 0.3),
+    0 0 0 1px rgba(201, 162, 63, 0.15) inset;
+  position: relative;
+  overflow: hidden;
+}
+
+.est-logo-square::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.est-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 18px;
+  border-radius: 12px;
+  display: block;
+  position: relative;
+  z-index: 1;
+}
+
+.est-logo-text-fallback {
+  display: none;
+  color: var(--jefe-black);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  position: absolute;
+  z-index: 1;
+}
+
+.est-welcome-section {
+  flex: 1;
+  min-width: 280px;
+}
+
+.est-welcome-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(201, 162, 63, 0.14);
+  border: 1px solid rgba(201, 162, 63, 0.28);
+  border-radius: 18px;
+  padding: 6px 14px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--jefe-primary-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.est-welcome-badge svg {
+  width: 16px;
+  height: 16px;
+}
+
+.est-welcome-title {
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--jefe-text-primary);
+  margin: 0 0 10px 0;
+  letter-spacing: -1.2px;
+  line-height: 1.1;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+}
+
+.est-highlight {
+  background: linear-gradient(135deg, var(--jefe-primary-gold) 0%, var(--jefe-secondary-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.est-welcome-subtitle {
+  font-size: 17px;
+  color: var(--jefe-text-secondary);
+  margin: 0;
+  font-weight: 400;
+  letter-spacing: -0.3px;
+}
+
+.est-info-card {
+  background: var(--jefe-bg-card);
+  border-radius: 24px;
+  padding: 28px;
+  box-shadow:
+    var(--jefe-shadow-md),
+    0 0 0 1px rgba(0, 0, 0, 0.04) inset;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+  margin-top: 8px;
+}
+
+.est-dashboard {
+  margin-top: 40px;
 }
 
 /* Hero Section */

@@ -25,14 +25,7 @@ func RunMigrations(db *sql.DB) error {
 			programa_id INT NOT NULL,
 			documentos BOOLEAN NOT NULL DEFAULT FALSE,
 			inscripcion BOOLEAN NOT NULL DEFAULT FALSE,
-			modificaciones BOOLEAN NOT NULL DEFAULT FALSE,
-			CONSTRAINT fk_plazos_periodo
-				FOREIGN KEY (periodo_id) REFERENCES periodo_academico(id)
-				ON DELETE CASCADE,
-			CONSTRAINT fk_plazos_programa
-				FOREIGN KEY (programa_id) REFERENCES programa(id)
-				ON DELETE CASCADE,
-			CONSTRAINT plazos_periodo_programa_unique UNIQUE (periodo_id, programa_id)
+			modificaciones BOOLEAN NOT NULL DEFAULT FALSE
 		)
 		`,
 		`ALTER TABLE periodo_academico ADD COLUMN IF NOT EXISTS archivado BOOLEAN NOT NULL DEFAULT FALSE`,
@@ -44,19 +37,40 @@ func RunMigrations(db *sql.DB) error {
 		`
 		DO $$
 		BEGIN
-			ALTER TABLE plazos
-			ADD CONSTRAINT fk_plazos_programa FOREIGN KEY (programa_id) REFERENCES programa(id) ON DELETE CASCADE;
-		EXCEPTION
-			WHEN duplicate_object THEN NULL;
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint 
+				WHERE conname = 'fk_plazos_periodo' 
+				AND conrelid = 'plazos'::regclass
+			) THEN
+				ALTER TABLE plazos
+				ADD CONSTRAINT fk_plazos_periodo FOREIGN KEY (periodo_id) REFERENCES periodo_academico(id) ON DELETE CASCADE;
+			END IF;
 		END $$;
 		`,
 		`
 		DO $$
 		BEGIN
-			ALTER TABLE plazos
-			ADD CONSTRAINT plazos_periodo_programa_unique UNIQUE (periodo_id, programa_id);
-		EXCEPTION
-			WHEN duplicate_object THEN NULL;
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint 
+				WHERE conname = 'fk_plazos_programa' 
+				AND conrelid = 'plazos'::regclass
+			) THEN
+				ALTER TABLE plazos
+				ADD CONSTRAINT fk_plazos_programa FOREIGN KEY (programa_id) REFERENCES programa(id) ON DELETE CASCADE;
+			END IF;
+		END $$;
+		`,
+		`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint 
+				WHERE conname = 'plazos_periodo_programa_unique' 
+				AND conrelid = 'plazos'::regclass
+			) THEN
+				ALTER TABLE plazos
+				ADD CONSTRAINT plazos_periodo_programa_unique UNIQUE (periodo_id, programa_id);
+			END IF;
 		END $$;
 		`,
 	}
