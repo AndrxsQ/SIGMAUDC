@@ -199,9 +199,10 @@ const SubirDocumentos = () => {
               Sube tu comprobante de matrícula en formato PDF o imagen.
             </p>
 
-            {docPago?.observacion?.valid && docPago.observacion.string && (
+            {docPago && docPago.estado === "rechazado" && docPago.observacion && (
               <div className="observacion-box">
-                <strong>Observación:</strong> {docPago.observacion.string}
+                <strong>Observación:</strong>{" "}
+                {typeof docPago.observacion === "string" ? docPago.observacion : ""}
               </div>
             )}
 
@@ -278,9 +279,10 @@ const SubirDocumentos = () => {
               Sube tu certificado de EPS en formato PDF o imagen.
             </p>
 
-            {docEPS?.observacion?.valid && docEPS.observacion.string && (
+            {docEPS && docEPS.estado === "rechazado" && docEPS.observacion && (
               <div className="observacion-box">
-                <strong>Observación:</strong> {docEPS.observacion.string}
+                <strong>Observación:</strong>{" "}
+                {typeof docEPS.observacion === "string" ? docEPS.observacion : ""}
               </div>
             )}
 

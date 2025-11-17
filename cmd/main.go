@@ -80,7 +80,7 @@ func main() {
 	protected.HandleFunc("/documentos/programa", documentosHandler.GetDocumentosPorPrograma).Methods("GET") // Para jefatura
 	protected.HandleFunc("/documentos/{id}/revisar", documentosHandler.RevisarDocumento).Methods("PUT")     // Para jefatura
 
-	// Servir archivos estáticos (uploads)
+	// Servir archivos estáticos (uploads) - soporta estructura de carpetas periodo/programa/
 	r.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads/"))))
 
 	// CORS middleware

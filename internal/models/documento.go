@@ -2,8 +2,37 @@ package models
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 )
+
+// NullStringJSON es un tipo que serializa sql.NullString como string o null en JSON
+type NullStringJSON struct {
+	sql.NullString
+}
+
+// MarshalJSON implementa la serialización JSON personalizada
+func (n NullStringJSON) MarshalJSON() ([]byte, error) {
+	if n.Valid {
+		return json.Marshal(n.String)
+	}
+	return json.Marshal(nil)
+}
+
+// UnmarshalJSON implementa la deserialización JSON personalizada
+func (n *NullStringJSON) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		n.Valid = false
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	n.String = s
+	n.Valid = true
+	return nil
+}
 
 // DocumentoEstudiante representa un documento subido por un estudiante
 type DocumentoEstudiante struct {
@@ -14,7 +43,7 @@ type DocumentoEstudiante struct {
 	TipoDocumento string         `json:"tipo_documento"` // "certificado_eps" o "comprobante_matricula"
 	ArchivoURL    string         `json:"archivo_url"`
 	Estado        string         `json:"estado"` // "pendiente", "aprobado", "rechazado"
-	Observacion   sql.NullString `json:"observacion,omitempty"`
+	Observacion   NullStringJSON `json:"observacion,omitempty"`
 	RevisadoPor   sql.NullInt64  `json:"revisado_por,omitempty"`
 	FechaSubida   time.Time      `json:"fecha_subida"`
 	FechaRevision sql.NullTime   `json:"fecha_revision,omitempty"`

@@ -173,7 +173,9 @@ func (h *DocumentosHandler) GetDocumentosEstudiante(w http.ResponseWriter, r *ht
 			}
 
 			if observacion.Valid {
-				doc.Observacion = observacion
+				doc.Observacion = models.NullStringJSON{NullString: observacion}
+			} else {
+				doc.Observacion = models.NullStringJSON{NullString: sql.NullString{Valid: false}}
 			}
 			if revisadoPor.Valid {
 				doc.RevisadoPor = revisadoPor
@@ -252,8 +254,8 @@ func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Parsear multipart form (máximo 10MB)
-	r.ParseMultipartForm(10 << 20)
+	// Parsear multipart form (máximo 5MB)
+	r.ParseMultipartForm(5 << 20)
 
 	tipoDocumento := r.FormValue("tipo_documento")
 	if tipoDocumento != "certificado_eps" && tipoDocumento != "comprobante_matricula" {
@@ -272,6 +274,14 @@ func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Reques
 	}
 	defer file.Close()
 
+	// Validar tamaño del archivo (máximo 5MB)
+	if handler.Size > 5*1024*1024 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "El archivo excede el tamaño máximo de 5MB"})
+		return
+	}
+
 	// Validar extensión
 	ext := strings.ToLower(filepath.Ext(handler.Filename))
 	allowedExts := []string{".pdf", ".png", ".jpg", ".jpeg"}
@@ -288,6 +298,9 @@ func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Reques
 		json.NewEncoder(w).Encode(map[string]string{"error": "formato de archivo no permitido. Solo PDF, PNG, JPG, JPEG"})
 		return
 	}
+
+	// Obtener nombre del archivo sin extensión
+	filenameWithoutExt := strings.TrimSuffix(handler.Filename, ext)
 
 	// Verificar si ya existe un documento de este tipo para este estudiante y periodo
 	var docExistente models.DocumentoEstudiante
@@ -316,10 +329,43 @@ func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Reques
 		// Si es rechazado, permitir resubida (actualizar registro existente)
 	}
 
-	// Generar nombre único para el archivo
+	// Obtener información del programa para crear la estructura de carpetas
+	var programaNombre string
+	queryPrograma := `SELECT nombre FROM programa WHERE id = $1`
+	err = h.db.QueryRow(queryPrograma, claims.ProgramaID).Scan(&programaNombre)
+	if err != nil {
+		log.Printf("Error getting programa: %v", err)
+		programaNombre = fmt.Sprintf("programa_%d", claims.ProgramaID)
+	}
+
+	// Obtener código del estudiante para la carpeta
+	var estudianteCodigo string
+	queryCodigo := `SELECT codigo FROM usuario WHERE id = $1`
+	err = h.db.QueryRow(queryCodigo, claims.Sub).Scan(&estudianteCodigo)
+	if err != nil {
+		log.Printf("Error getting codigo: %v", err)
+		estudianteCodigo = fmt.Sprintf("estudiante_%d", estudianteID)
+	}
+
+	// Crear estructura de carpetas: periodo/programa/estudiante/
+	periodoFolder := fmt.Sprintf("%d-%d", periodo.Year, periodo.Semestre)
+	programaFolder := strings.ReplaceAll(strings.ToLower(programaNombre), " ", "_")
+	programaFolder = fmt.Sprintf("%d_%s", claims.ProgramaID, programaFolder)
+	estudianteFolder := fmt.Sprintf("%d_%s", estudianteID, estudianteCodigo)
+	
+	uploadPath := filepath.Join(h.uploadDirectory, periodoFolder, programaFolder, estudianteFolder)
+	
+	// Crear directorios si no existen
+	if err := os.MkdirAll(uploadPath, 0755); err != nil {
+		log.Printf("Error creating directories: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Generar nombre único para el archivo (sin duplicar extensión)
 	timestamp := time.Now().Unix()
-	filename := fmt.Sprintf("%d_%d_%s_%s%s", estudianteID, timestamp, tipoDocumento, handler.Filename, ext)
-	filePath := filepath.Join(h.uploadDirectory, filename)
+	filename := fmt.Sprintf("%d_%d_%s_%s%s", estudianteID, timestamp, tipoDocumento, filenameWithoutExt, ext)
+	filePath := filepath.Join(uploadPath, filename)
 
 	// Crear archivo en el servidor
 	dst, err := os.Create(filePath)
@@ -339,8 +385,8 @@ func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// URL relativa del archivo
-	archivoURL := fmt.Sprintf("/uploads/%s", filename)
+	// URL relativa del archivo (mantener estructura de carpetas)
+	archivoURL := fmt.Sprintf("/uploads/%s/%s/%s/%s", periodoFolder, programaFolder, estudianteFolder, filename)
 
 	// Insertar o actualizar en la base de datos
 	if err == sql.ErrNoRows || docExistente.ID == 0 {
@@ -377,8 +423,12 @@ func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Reques
 		queryAnterior := `SELECT archivo_url FROM documentos_estudiante WHERE id = $1`
 		h.db.QueryRow(queryAnterior, docExistente.ID).Scan(&archivoAnterior)
 		if archivoAnterior != "" && strings.HasPrefix(archivoAnterior, "/uploads/") {
-			oldPath := filepath.Join(h.uploadDirectory, strings.TrimPrefix(archivoAnterior, "/uploads/"))
-			os.Remove(oldPath) // Ignorar error si no existe
+			// Remover el prefijo /uploads/ y construir la ruta completa
+			relativePath := strings.TrimPrefix(archivoAnterior, "/uploads/")
+			oldPath := filepath.Join(h.uploadDirectory, relativePath)
+			if err := os.Remove(oldPath); err != nil {
+				log.Printf("Warning: could not remove old file %s: %v", oldPath, err)
+			}
 		}
 
 		update := `UPDATE documentos_estudiante 
@@ -490,7 +540,9 @@ func (h *DocumentosHandler) GetDocumentosPorPrograma(w http.ResponseWriter, r *h
 		}
 
 		if observacion.Valid {
-			doc.Observacion = observacion
+			doc.Observacion = models.NullStringJSON{NullString: observacion}
+		} else {
+			doc.Observacion = models.NullStringJSON{NullString: sql.NullString{Valid: false}}
 		}
 		if revisadoPor.Valid {
 			doc.RevisadoPor = revisadoPor
@@ -581,7 +633,7 @@ func (h *DocumentosHandler) RevisarDocumento(w http.ResponseWriter, r *http.Requ
 
 	// Actualizar documento
 	var observacionVal sql.NullString
-	if req.Estado == "rechazado" {
+	if req.Estado == "rechazado" && strings.TrimSpace(req.Observacion) != "" {
 		observacionVal = sql.NullString{String: req.Observacion, Valid: true}
 	} else {
 		observacionVal = sql.NullString{Valid: false}
