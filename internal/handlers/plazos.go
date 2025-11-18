@@ -4,11 +4,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/andrxsq/SIGMAUDC/internal/models"
+	"github.com/andrxsq/SIGMAUDC/internal/utils"
 	"github.com/gorilla/mux"
 )
 
@@ -372,6 +375,50 @@ func (h *PlazosHandler) UpdatePlazos(w http.ResponseWriter, r *http.Request) {
 		modificaciones = *req.Modificaciones
 	}
 
+	// Obtener información del periodo y programa para la auditoría
+	var periodoYear, periodoSemestre int
+	var programaNombre string
+	queryInfo := `SELECT p.year, p.semestre, pr.nombre
+				  FROM periodo_academico p
+				  CROSS JOIN programa pr
+				  WHERE pr.id = $1 AND p.id = $2`
+	err = h.db.QueryRow(queryInfo, claims.ProgramaID, periodoID).Scan(&periodoYear, &periodoSemestre, &programaNombre)
+	if err != nil {
+		log.Printf("Error getting periodo/programa info for audit: %v", err)
+		programaNombre = fmt.Sprintf("Programa ID: %d", claims.ProgramaID)
+		// Intentar obtener al menos el periodo
+		errPeriodo := h.db.QueryRow(`SELECT year, semestre FROM periodo_academico WHERE id = $1`, periodoID).
+			Scan(&periodoYear, &periodoSemestre)
+		if errPeriodo != nil {
+			periodoYear = 0
+			periodoSemestre = 0
+		}
+	}
+
+	// Construir descripción de cambios para auditoría
+	var cambios []string
+	if req.Documentos != nil && *req.Documentos != plazos.Documentos {
+		estado := "activado"
+		if !*req.Documentos {
+			estado = "desactivado"
+		}
+		cambios = append(cambios, fmt.Sprintf("documentos: %s", estado))
+	}
+	if req.Inscripcion != nil && *req.Inscripcion != plazos.Inscripcion {
+		estado := "activado"
+		if !*req.Inscripcion {
+			estado = "desactivado"
+		}
+		cambios = append(cambios, fmt.Sprintf("inscripcion: %s", estado))
+	}
+	if req.Modificaciones != nil && *req.Modificaciones != plazos.Modificaciones {
+		estado := "activado"
+		if !*req.Modificaciones {
+			estado = "desactivado"
+		}
+		cambios = append(cambios, fmt.Sprintf("modificaciones: %s", estado))
+	}
+
 	// Actualizar
 	updateQuery := `UPDATE plazos SET documentos = $1, inscripcion = $2, modificaciones = $3 
 					WHERE periodo_id = $4 AND programa_id = $5
@@ -384,8 +431,33 @@ func (h *PlazosHandler) UpdatePlazos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Registrar auditoría: actualización de plazos
+	if len(cambios) > 0 {
+		ip := utils.GetIPAddress(r)
+		userAgent := r.UserAgent()
+		descripcion := fmt.Sprintf("Actualización de plazos - Periodo: %d-%d, Programa: %s, Cambios: %s", 
+			periodoYear, periodoSemestre, programaNombre, strings.Join(cambios, ", "))
+		h.registrarAuditoria(claims.Sub, "actualizacion_plazos", descripcion, ip, userAgent)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(plazos)
+}
+
+// registrarAuditoria registra un evento en la tabla de auditoría
+func (h *PlazosHandler) registrarAuditoria(usuarioID int, accion, descripcion, ip, userAgent string) {
+	var userID sql.NullInt64
+	if usuarioID > 0 {
+		userID = sql.NullInt64{Int64: int64(usuarioID), Valid: true}
+	}
+
+	query := `INSERT INTO auditoria (usuario_id, accion, descripcion, ip, user_agent) 
+			  VALUES ($1, $2, $3, $4, $5)`
+	_, err := h.db.Exec(query, userID, accion, descripcion, ip, userAgent)
+	if err != nil {
+		// Log error pero no fallar la operación principal
+		log.Printf("Error registering audit: %v", err)
+	}
 }
 
 // GetPeriodosConPlazos obtiene todos los periodos con sus plazos asociados

@@ -1,30 +1,25 @@
-import axios from "axios";
+import api from './auth';
 
-// Usar la misma configuración que auth.js
+// Obtener la URL base desde la instancia de api configurada
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 const documentosService = {
   // Obtener documentos del estudiante actual
-  getDocumentosEstudiante: async () => {
-    const token = localStorage.getItem("token");
-    const response = await axios.get(`${API_URL}/api/documentos`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+  async getDocumentosEstudiante() {
+    const response = await api.get('/api/documentos');
     return response.data;
   },
 
   // Subir un documento
-  subirDocumento: async (tipoDocumento, archivo) => {
-    const token = localStorage.getItem("token");
+  async subirDocumento(tipoDocumento, archivo) {
     const formData = new FormData();
     formData.append("tipo_documento", tipoDocumento);
     formData.append("archivo", archivo);
 
-    const response = await axios.post(`${API_URL}/api/documentos`, formData, {
+    // Para FormData, axios automáticamente establece Content-Type: multipart/form-data
+    // El interceptor de api ya agrega el Authorization header
+    const response = await api.post('/api/documentos', formData, {
       headers: {
-        Authorization: `Bearer ${token}`,
         "Content-Type": "multipart/form-data",
       },
     });
@@ -32,30 +27,18 @@ const documentosService = {
   },
 
   // Obtener documentos por programa (para jefatura)
-  getDocumentosPorPrograma: async () => {
-    const token = localStorage.getItem("token");
-    const response = await axios.get(`${API_URL}/api/documentos/programa`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+  async getDocumentosPorPrograma() {
+    const response = await api.get('/api/documentos/programa');
     return response.data;
   },
 
   // Revisar documento (aprobado/rechazado) - para jefatura
-  revisarDocumento: async (documentoId, estado, observacion) => {
-    const token = localStorage.getItem("token");
-    const response = await axios.put(
-      `${API_URL}/api/documentos/${documentoId}/revisar`,
+  async revisarDocumento(documentoId, estado, observacion) {
+    const response = await api.put(
+      `/api/documentos/${documentoId}/revisar`,
       {
         estado,
         observacion,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
       }
     );
     return response.data;

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/andrxsq/SIGMAUDC/internal/models"
+	"github.com/andrxsq/SIGMAUDC/internal/utils"
 	"github.com/gorilla/mux"
 )
 
@@ -407,6 +408,12 @@ func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
+		// Registrar auditoría: estudiante sube documento
+		ip := utils.GetIPAddress(r)
+		userAgent := r.UserAgent()
+		descripcion := fmt.Sprintf("Documento subido: %s, Periodo: %d-%d", tipoDocumento, periodo.Year, periodo.Semestre)
+		h.registrarAuditoria(claims.Sub, "subida_documento", descripcion, ip, userAgent)
+
 		response := map[string]interface{}{
 			"id":             docID,
 			"tipo_documento": tipoDocumento,
@@ -444,6 +451,12 @@ func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Reques
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
+
+		// Registrar auditoría: estudiante resube documento rechazado
+		ip := utils.GetIPAddress(r)
+		userAgent := r.UserAgent()
+		descripcion := fmt.Sprintf("Documento resubido: %s, Periodo: %d-%d (anteriormente rechazado)", tipoDocumento, periodo.Year, periodo.Semestre)
+		h.registrarAuditoria(claims.Sub, "resubida_documento", descripcion, ip, userAgent)
 
 		response := map[string]interface{}{
 			"id":             docExistente.ID,
@@ -651,6 +664,35 @@ func (h *DocumentosHandler) RevisarDocumento(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Registrar auditoría: jefatura revisa documento
+	ip := utils.GetIPAddress(r)
+	userAgent := r.UserAgent()
+	
+	// Obtener información del documento y estudiante para la descripción
+	var estudianteCodigo, tipoDocumento string
+	var periodoYear, periodoSemestre int
+	queryInfo := `SELECT u.codigo, d.tipo_documento, p.year, p.semestre
+				  FROM documentos_estudiante d
+				  JOIN estudiante e ON d.estudiante_id = e.id
+				  JOIN usuario u ON e.usuario_id = u.id
+				  JOIN periodo_academico p ON d.periodo_id = p.id
+				  WHERE d.id = $1`
+	err = h.db.QueryRow(queryInfo, docID).Scan(&estudianteCodigo, &tipoDocumento, &periodoYear, &periodoSemestre)
+	if err != nil {
+		log.Printf("Error getting documento info for audit: %v", err)
+	} else {
+		accion := "revision_documento_aprobado"
+		if req.Estado == "rechazado" {
+			accion = "revision_documento_rechazado"
+		}
+		descripcion := fmt.Sprintf("Documento %s: %s - Estudiante: %s, Periodo: %d-%d", 
+			req.Estado, tipoDocumento, estudianteCodigo, periodoYear, periodoSemestre)
+		if req.Estado == "rechazado" && strings.TrimSpace(req.Observacion) != "" {
+			descripcion += fmt.Sprintf(", Observación: %s", req.Observacion)
+		}
+		h.registrarAuditoria(claims.Sub, accion, descripcion, ip, userAgent)
+	}
+
 	response := map[string]interface{}{
 		"id":              docID,
 		"estado":          req.Estado,
@@ -660,5 +702,21 @@ func (h *DocumentosHandler) RevisarDocumento(w http.ResponseWriter, r *http.Requ
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// registrarAuditoria registra un evento en la tabla de auditoría
+func (h *DocumentosHandler) registrarAuditoria(usuarioID int, accion, descripcion, ip, userAgent string) {
+	var userID sql.NullInt64
+	if usuarioID > 0 {
+		userID = sql.NullInt64{Int64: int64(usuarioID), Valid: true}
+	}
+
+	query := `INSERT INTO auditoria (usuario_id, accion, descripcion, ip, user_agent) 
+			  VALUES ($1, $2, $3, $4, $5)`
+	_, err := h.db.Exec(query, userID, accion, descripcion, ip, userAgent)
+	if err != nil {
+		// Log error pero no fallar la operación principal
+		log.Printf("Error registering audit: %v", err)
+	}
 }
 
