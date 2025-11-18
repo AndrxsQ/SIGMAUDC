@@ -1,176 +1,1264 @@
-.pensum-container {
-  padding: 10px 30px;
-  background: #f5f5f5;
-  min-height: 100%;
-  border-radius: 20px;
-  justify-content: center;
+/* ============================================
+   PENSUM VISUAL - Paleta Universidad
+   Responsive desde iPhone SE hasta pantallas grandes
+   ============================================ */
+
+/* Variables CSS - Paleta Universidad */
+:root {
+  --pensum-primary-gold: #C9A23F;
+  --pensum-secondary-gold: #FFD860;
+  --pensum-gold-light: #E8D5A3;
+  --pensum-black: #000000;
+  --pensum-white: #ffffff;
+  --pensum-text-primary: #1d1d1f;
+  --pensum-text-secondary: #86868b;
+  --pensum-bg-primary: #f5f5f7;
+  --pensum-bg-card: #ffffff;
+  --pensum-success: #34c759;
+  --pensum-warning: #ff9500;
+  --pensum-danger: #ff3b30;
+  --pensum-info: #af52de;
+  --pensum-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --pensum-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --pensum-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.15);
+  --pensum-shadow-gold: 0 8px 32px rgba(201, 162, 63, 0.25);
 }
 
+/* Fuente base estilo Apple */
+* {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  box-sizing: border-box;
+}
 
+/* ============================================
+   CONTENEDOR PRINCIPAL
+   ============================================ */
+.pensum-container {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 12px;
+  min-height: 100vh;
+  background: var(--pensum-bg-primary);
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
 
+/* ============================================
+   LOADING & ERROR STATES
+   ============================================ */
+.loading-container,
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  min-height: 400px;
+  text-align: center;
+}
 
-/* Contenedor de columnas */
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(201, 162, 63, 0.2);
+  border-top-color: var(--pensum-primary-gold);
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-container p {
+  font-size: 15px;
+  color: var(--pensum-text-secondary);
+  font-weight: 500;
+  letter-spacing: -0.2px;
+  margin: 20px 0 0 0;
+  text-align: center;
+  word-wrap: break-word;
+}
+
+.error-container {
+  color: var(--pensum-danger);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* ============================================
+   HEADER
+   ============================================ */
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 0;
+  margin-bottom: 24px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.logo-circle {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--pensum-primary-gold) 0%, var(--pensum-secondary-gold) 100%);
+  color: var(--pensum-black);
+  box-shadow: var(--pensum-shadow-gold), 0 0 0 1px rgba(201, 162, 63, 0.15) inset;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.logo-circle:hover {
+  transform: translateY(-2px) scale(1.02);
+}
+
+.header-info h3 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--pensum-text-primary);
+  letter-spacing: -0.6px;
+  line-height: 1.3;
+  word-wrap: break-word;
+}
+
+.pensum-name {
+  margin: 6px 0 0 0;
+  font-size: 13px;
+  color: var(--pensum-text-secondary);
+  font-weight: 400;
+  letter-spacing: -0.1px;
+  line-height: 1.5;
+}
+
+/* ============================================
+   FLOW CONTAINER & GRID
+   ============================================ */
+.pensum-flow-container {
+  position: relative;
+  min-height: 500px;
+  margin-bottom: 24px;
+  width: 100%;
+  overflow: visible;
+}
+
 .pensum-grid {
   display: flex;
   flex-wrap: nowrap;
-  gap: 10px;
-  justify-content: center; /* centra las columnas */
+  gap: 16px;
+  justify-content: flex-start;
   overflow-x: auto;
-  padding-bottom: 10px;
+  overflow-y: visible;
+  padding: 12px 8px;
+  position: relative;
+  z-index: 2;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(201, 162, 63, 0.3) transparent;
+  width: 100%;
+  min-height: 100%;
 }
 
-/* Columna de semestre */
+.pensum-grid::-webkit-scrollbar {
+  height: 8px;
+}
+
+.pensum-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pensum-grid::-webkit-scrollbar-thumb {
+  background: rgba(201, 162, 63, 0.3);
+  border-radius: 9999px;
+}
+
+.pensum-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 162, 63, 0.5);
+}
+
+/* ============================================
+   SEMESTRE COLUMN
+   ============================================ */
 .semestre-column {
   flex: 0 0 auto;
-  width: 100px;
-  background: #ffffff00;
-  border-radius: 8px;
-  padding: 6px;
-  text-align: center;
-}
-.pensum-container .modal-logo h3 {
-  font-size: 20px;       /* más pequeño que el tamaño normal */
-  margin-top: 8px;
+  width: 160px;
+  min-width: 160px;
+  background: transparent;
+  border-radius: 18px;
+  padding: 8px;
 }
 
-/* Título de semestre */
 .semestre-title {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: #1c81c9;
-  margin-bottom: 5px;
-  border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 3px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pensum-primary-gold);
+  margin: 0 0 12px 0;
+  padding: 8px 12px;
+  background: var(--pensum-bg-card);
+  border-radius: 12px;
+  border: 1px solid rgba(201, 162, 63, 0.2);
+  text-align: center;
+  letter-spacing: -0.1px;
+  box-shadow: var(--pensum-shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 
-/* Lista de materias */
 .materias-list {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 10px;
 }
 
-/* Tarjeta de materia compacta */
+/* ============================================
+   MATERIA CARD
+   ============================================ */
 .materia-card {
-  border: 1px dashed #c3c3c3;
-  border-radius: 12px;
-  background: #fafafa;
-  border-radius: 5px;
-  font-size: 0.65rem;
-  transition: transform 0.2s ease, background 0.2s ease;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 18px;
+  background: var(--pensum-bg-card);
+  font-size: 12px;
+  transition: box-shadow 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              border-color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  height: 50px;
-  padding: 3px 4px;
+  padding: 14px;
+  min-height: 100px;
+  cursor: pointer;
+  position: relative;
+  box-shadow: var(--pensum-shadow-sm);
   overflow: hidden;
+  box-sizing: border-box;
+}
+
+.materia-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--pensum-primary-gold) 0%, var(--pensum-secondary-gold) 100%);
+  opacity: 0;
+  transition: opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  z-index: 1;
 }
 
 .materia-card:hover {
-  transform: scale(1.03);
-  background: #e2e8f0;
+  border-color: rgba(201, 162, 63, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08),
+              0 2px 8px rgba(201, 162, 63, 0.12);
 }
 
-/* Nombre de la materia */
+.materia-card:hover::before {
+  opacity: 1;
+}
+
+/* Estados de asignatura - Colores con paleta universidad */
+.materia-card.activa {
+  background: linear-gradient(135deg, rgba(255, 149, 0, 0.08) 0%, rgba(255, 149, 0, 0.04) 100%);
+  border: 1px solid var(--pensum-warning);
+  color: #8B4513;
+}
+
+.materia-card.matriculada {
+  background: linear-gradient(135deg, rgba(201, 162, 63, 0.1) 0%, rgba(255, 216, 96, 0.05) 100%);
+  border: 1px solid var(--pensum-primary-gold);
+  color: #5C4A1F;
+}
+
+.materia-card.cursada {
+  background: linear-gradient(135deg, rgba(52, 199, 89, 0.1) 0%, rgba(52, 199, 89, 0.05) 100%);
+  border: 1px solid var(--pensum-success);
+  color: #1B5E20;
+}
+
+.materia-card.en-espera {
+  background: linear-gradient(135deg, rgba(175, 82, 222, 0.1) 0%, rgba(175, 82, 222, 0.05) 100%);
+  border: 1px solid var(--pensum-info);
+  color: #4A148C;
+}
+
+.materia-card.pendiente-repeticion {
+  background: linear-gradient(135deg, rgba(255, 59, 48, 0.1) 0%, rgba(255, 59, 48, 0.05) 100%);
+  border: 1px solid var(--pensum-danger);
+  color: #B71C1C;
+}
+
+.materia-card.obligatoria-repeticion {
+  background: linear-gradient(135deg, rgba(255, 59, 48, 0.15) 0%, rgba(255, 59, 48, 0.08) 100%);
+  border: 1px solid var(--pensum-danger);
+  color: #B71C1C;
+  box-shadow: 0 0 0 2px rgba(255, 59, 48, 0.1);
+}
+
+/* ============================================
+   RESALTADO CON HOVER - Efecto elegante tipo Apple
+   Solo en PC con mouse (hover: hover) and (pointer: fine)
+   Sin scale, solo sombras elegantes que rodean el cuadro
+   ============================================ */
+@media (hover: hover) and (pointer: fine) {
+  /* Prerrequisitos resaltados: sombra más pronunciada */
+  .materia-card.resaltada:not(:hover) {
+    /* SOLO sombras externas alrededor de la caja */
+    box-shadow: 0 12px 32px rgba(201, 162, 63, 0.25),
+                0 6px 16px rgba(201, 162, 63, 0.15),
+                0 4px 12px rgba(0, 0, 0, 0.1),
+                0 4px 12px rgba(201, 162, 63, 0.12),
+                0 -2px 8px rgba(201, 162, 63, 0.08);
+    border-color: rgba(201, 162, 63, 0.4) !important;
+    z-index: 9 !important;
+    transition: box-shadow 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                border-color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    /* NO TOCAR NADA MÁS - las dimensiones se mantienen iguales */
+  }
+  
+  .materia-card.resaltada:not(:hover)::before {
+    opacity: 0.7;
+    height: 3px;
+    box-shadow: 0 1px 4px rgba(201, 162, 63, 0.25);
+  }
+  
+  /* Caja principal con hover: mismo sombreado que prerrequisitos */
+  .materia-card.resaltada:hover {
+    /* Mismo sombreado que los prerrequisitos */
+    box-shadow: 0 12px 32px rgba(201, 162, 63, 0.25),
+                0 6px 16px rgba(201, 162, 63, 0.15),
+                0 4px 12px rgba(0, 0, 0, 0.1),
+                0 4px 12px rgba(201, 162, 63, 0.12),
+                0 -2px 8px rgba(201, 162, 63, 0.08);
+    z-index: 10 !important;
+    transition: box-shadow 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                border-color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    border-color: rgba(201, 162, 63, 0.4) !important;
+    /* NO TOCAR NADA MÁS - las dimensiones se mantienen iguales */
+  }
+  
+  .materia-card.resaltada:hover::before {
+    opacity: 0.7;
+    height: 3px;
+    box-shadow: 0 1px 4px rgba(201, 162, 63, 0.25);
+  }
+  
+  
+  /* Mejorar el ícono de estado cuando está resaltada - sin scale excesivo */
+  .materia-card.resaltada .estado-icon {
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                filter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                opacity 0.4s ease;
+  }
+  
+  .materia-card.resaltada .estado-icon {
+    transform: scale(1.05);
+    filter: drop-shadow(0 1px 3px rgba(201, 162, 63, 0.2));
+    opacity: 0.95;
+  }
+}
+
+/* En dispositivos táctiles, deshabilitar el efecto de resaltado */
+@media (hover: none) or (pointer: coarse) {
+  .materia-card.resaltada {
+    transform: none;
+    box-shadow: none;
+    border-color: inherit !important;
+    border-width: inherit !important;
+  }
+  
+  .materia-card.resaltada::before,
+  .materia-card.resaltada::after {
+    display: none;
+  }
+}
+
+/* Header de materia */
+.materia-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  gap: 8px;
+  position: relative;
+  z-index: 2;
+}
+
 .materia-nombre {
   font-weight: 600;
-  color: #1e293b;
-  font-size: 0.58rem;
-  line-height: 1.9rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--pensum-text-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  flex: 1;
   overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  letter-spacing: -0.1px;
+  transition: color 0.3s ease, font-weight 0.3s ease;
 }
 
-/* Línea inferior (código - créditos) */
+@media (hover: hover) and (pointer: fine) {
+  .materia-card:hover .materia-nombre {
+    color: var(--pensum-text-primary);
+  }
+}
+
+.estado-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  opacity: 0.85;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .materia-card:hover .estado-icon {
+    transform: scale(1.12) rotate(2deg);
+    opacity: 1;
+  }
+}
+
+.materia-card.cursada .estado-icon {
+  color: var(--pensum-success);
+}
+
+.materia-card.matriculada .estado-icon {
+  color: var(--pensum-primary-gold);
+}
+
+.materia-card.en-espera .estado-icon {
+  color: var(--pensum-info);
+}
+
+.materia-card.pendiente-repeticion .estado-icon,
+.materia-card.obligatoria-repeticion .estado-icon {
+  color: var(--pensum-danger);
+}
+
+/* Información de materia */
 .materia-info {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.55rem;
-  color: #475569;
-  border-top: 1px solid #cbd5e1;
-  padding-top: 2px;
+  font-size: 10px;
+  color: var(--pensum-text-secondary);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  padding-top: 8px;
+  margin-top: 6px;
+  position: relative;
+  z-index: 2;
 }
 
+.materia-codigo {
+  font-weight: 600;
+  color: var(--pensum-primary-gold);
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  letter-spacing: 0.02em;
+  transition: color 0.3s ease, font-weight 0.3s ease;
+}
 
-/* === LEYENDA DE ESTADOS === */
+@media (hover: hover) and (pointer: fine) {
+  .materia-card:hover .materia-codigo {
+    color: var(--pensum-primary-gold);
+    font-weight: 700;
+  }
+}
+
+.materia-creditos {
+  color: var(--pensum-text-secondary);
+  font-weight: 500;
+}
+
+/* Información extra */
+.materia-extra {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9px;
+  color: var(--pensum-text-secondary);
+  margin-top: 4px;
+  position: relative;
+  z-index: 2;
+}
+
+.materia-tipo {
+  font-style: italic;
+  font-weight: 400;
+}
+
+.laboratorio-badge {
+  background: var(--pensum-primary-gold);
+  color: var(--pensum-black);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.materia-nota {
+  font-size: 10px;
+  color: var(--pensum-success);
+  font-weight: 600;
+  margin-top: 4px;
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+}
+
+.materia-repeticiones {
+  font-size: 9px;
+  color: var(--pensum-danger);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.prerequisitos-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: var(--pensum-info);
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+/* ============================================
+   ARROWS (Líneas de prerrequisitos)
+   ============================================ */
+.prerequisitos-arrows {
+  overflow: visible;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  transform: translateZ(0);
+  /* Sin will-change para evitar optimizaciones que puedan causar movimiento */
+  will-change: auto;
+}
+
+/* Asegurar que el SVG completo no tenga efectos de hover */
+.prerequisitos-arrows:hover,
+.prerequisitos-arrows *:hover {
+  transform: none !important;
+  opacity: inherit !important;
+}
+
+.prerequisitos-arrows polyline {
+  vector-effect: non-scaling-stroke;
+  /* Sin transiciones para evitar movimiento al hacer hover */
+  transition: none;
+}
+
+/* Estilos para líneas completadas - Sin efectos de hover */
+.prerequisitos-arrows .linea-completada {
+  filter: drop-shadow(0 0 1.5px rgba(201, 162, 63, 0.4));
+}
+
+/* Estilos para líneas pendientes - Sin efectos de hover */
+.prerequisitos-arrows .linea-pendiente {
+  filter: drop-shadow(0 0 1.5px rgba(255, 59, 48, 0.3));
+}
+
+/* Asegurar que las líneas no cambien con hover */
+.prerequisitos-arrows polyline:hover {
+  opacity: inherit !important;
+  stroke-width: inherit !important;
+  filter: inherit !important;
+  transform: none !important;
+}
+
+/* Ajustes responsive para líneas - Grosor adaptativo */
+@media (max-width: 374px) {
+  .prerequisitos-arrows polyline {
+    stroke-width: 2px !important;
+  }
+}
+
+@media (min-width: 375px) and (max-width: 479px) {
+  .prerequisitos-arrows polyline {
+    stroke-width: 2.5px !important;
+  }
+}
+
+@media (min-width: 480px) and (max-width: 767px) {
+  .prerequisitos-arrows polyline {
+    stroke-width: 3px !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  .prerequisitos-arrows polyline {
+    stroke-width: 3.2px !important;
+  }
+}
+
+@media (min-width: 1025px) {
+  .prerequisitos-arrows polyline {
+    stroke-width: 3.5px !important;
+  }
+}
+
+@media (min-width: 1441px) {
+  .prerequisitos-arrows polyline {
+    stroke-width: 4px !important;
+  }
+}
+
+/* ============================================
+   LEYENDA
+   ============================================ */
 .pensum-legend {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
-  margin-top: 15px;
+  gap: 10px;
+  margin-top: 24px;
   flex-wrap: wrap;
+  padding: 16px;
+  background: var(--pensum-bg-card);
+  border-radius: 18px;
+  box-shadow: var(--pensum-shadow-sm), 0 0 0 1px rgba(0, 0, 0, 0.04) inset;
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .legend-item {
-
-  padding: 5px 8px;
-  font-size: 0.6rem;
+  padding: 8px 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: #222;
+  color: var(--pensum-text-primary);
   text-align: center;
-  min-width: 70px;
+  min-width: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 12px;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: -0.1px;
 }
 
-/* Colores personalizados */
+.legend-item:hover {
+  transform: translateY(-2px);
+}
+
 .legend-item.activa {
-  background: linear-gradient(
-    to top right,
-    #fffaa3,
-    #b63131 100%
-  );
-  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(255, 149, 0, 0.08) 0%, rgba(255, 149, 0, 0.04) 100%);
+  border: 1.5px solid var(--pensum-warning);
+  color: #8B4513;
 }
 
 .legend-item.matriculada {
-  background: linear-gradient(
-    to top right,
-    #a3ceff,
-    #4231b6 100%
-  );
-  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(201, 162, 63, 0.1) 0%, rgba(255, 216, 96, 0.05) 100%);
+  border: 1.5px solid var(--pensum-primary-gold);
+  color: #5C4A1F;
 }
 
 .legend-item.cursada {
-  background: linear-gradient(
-    to top right,
-    #ececec,
-    #a2a2a2 100%
-  );
-  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(52, 199, 89, 0.1) 0%, rgba(52, 199, 89, 0.05) 100%);
+  border: 1.5px solid var(--pensum-success);
+  color: #1B5E20;
 }
 
+.legend-item.en-espera {
+  background: linear-gradient(135deg, rgba(175, 82, 222, 0.1) 0%, rgba(175, 82, 222, 0.05) 100%);
+  border: 1.5px solid var(--pensum-info);
+  color: #4A148C;
+}
 
+.legend-item.pendiente-repeticion {
+  background: linear-gradient(135deg, rgba(255, 59, 48, 0.1) 0%, rgba(255, 59, 48, 0.05) 100%);
+  border: 1.5px solid var(--pensum-danger);
+  color: #B71C1C;
+}
+
+.legend-item.obligatoria-repeticion {
+  background: linear-gradient(135deg, rgba(255, 59, 48, 0.15) 0%, rgba(255, 59, 48, 0.08) 100%);
+  border: 2px solid var(--pensum-danger);
+  color: #B71C1C;
+}
 
 .legend-item.descripcion {
-  background: linear-gradient(
-    to top right,
-    #1e2a38,
-    #000000 100%
-  );
-  color: #fff;
+  background: linear-gradient(135deg, var(--pensum-primary-gold) 0%, var(--pensum-secondary-gold) 100%);
+  color: var(--pensum-black);
   text-align: center;
-  min-width: 110px;
-  border-radius: 8px;
+  min-width: 140px;
+  border: none;
+  font-weight: 600;
 }
 
-.modal-header {
+.legend-item.descripcion strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.legend-item.descripcion small {
+  font-size: 9px;
+  opacity: 0.9;
+  font-weight: 400;
+}
+
+/* ============================================
+   MODAL DE DETALLES
+   ============================================ */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0.5rem 1.5rem 0.5rem;
-  border-bottom: 1px solid #eee;
-}
-
-.logo-circle {
-  width: 2.5rem;
-  height: 2.5rem;
-  display: flex;
   justify-content: center;
-  align-items: center;
-  border-radius: 50%;
-  background-color: #e5efff;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-content-detalle {
+  background: var(--pensum-bg-card);
+  border-radius: 18px;
+  padding: 24px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: var(--pensum-shadow-lg);
+  animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-content-detalle h3 {
+  margin: 0 0 20px 0;
+  color: var(--pensum-text-primary);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+  line-height: 1.3;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.04);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--pensum-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  line-height: 1;
+}
+
+.modal-close:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--pensum-text-primary);
+  transform: scale(1.1);
+}
+
+.detalle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detalle-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.detalle-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.detalle-row strong {
+  color: var(--pensum-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  margin-bottom: 4px;
+}
+
+.detalle-row span,
+.detalle-row ul {
+  color: var(--pensum-text-secondary);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.estado-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+}
+
+.estado-badge.activa {
+  background: linear-gradient(135deg, rgba(255, 149, 0, 0.08) 0%, rgba(255, 149, 0, 0.04) 100%);
+  color: #8B4513;
+  border: 1.5px solid var(--pensum-warning);
+}
+
+.estado-badge.matriculada {
+  background: linear-gradient(135deg, rgba(201, 162, 63, 0.1) 0%, rgba(255, 216, 96, 0.05) 100%);
+  color: #5C4A1F;
+  border: 1.5px solid var(--pensum-primary-gold);
+}
+
+.estado-badge.cursada {
+  background: linear-gradient(135deg, rgba(52, 199, 89, 0.1) 0%, rgba(52, 199, 89, 0.05) 100%);
+  color: #1B5E20;
+  border: 1.5px solid var(--pensum-success);
+}
+
+.estado-badge.en-espera {
+  background: linear-gradient(135deg, rgba(175, 82, 222, 0.1) 0%, rgba(175, 82, 222, 0.05) 100%);
+  color: #4A148C;
+  border: 1.5px solid var(--pensum-info);
+}
+
+.estado-badge.pendiente-repeticion,
+.estado-badge.obligatoria-repeticion {
+  background: linear-gradient(135deg, rgba(255, 59, 48, 0.1) 0%, rgba(255, 59, 48, 0.05) 100%);
+  color: #B71C1C;
+  border: 1.5px solid var(--pensum-danger);
+}
+
+.prerequisitos-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0 0;
+}
+
+.prerequisitos-list li {
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  background: rgba(0, 0, 0, 0.02);
+  border-left: 3px solid var(--pensum-info);
+  border-radius: 12px;
+  font-size: 13px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.prerequisitos-list li:hover {
+  background: rgba(0, 0, 0, 0.04);
+  transform: translateX(4px);
+}
+
+.prerequisitos-list li.completado {
+  border-left-color: var(--pensum-success);
+  background: rgba(52, 199, 89, 0.05);
+}
+
+.prerequisitos-list li.pendiente {
+  border-left-color: var(--pensum-danger);
+  background: rgba(255, 59, 48, 0.05);
+}
+
+.check-mark {
+  color: var(--pensum-success);
+  font-weight: bold;
+  margin-left: 6px;
+}
+
+.pending-mark {
+  color: var(--pensum-danger);
+  font-weight: bold;
+  margin-left: 6px;
+}
+
+/* ============================================
+   TOOLTIP
+   ============================================ */
+.tooltip-prerequisitos {
+  background: var(--pensum-bg-card);
+  border: 1.5px solid var(--pensum-danger);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: var(--pensum-shadow-lg);
+  max-width: 320px;
+  z-index: 1000;
+  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tooltip-header {
+  font-weight: 600;
+  color: var(--pensum-danger);
+  margin-bottom: 10px;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding-bottom: 8px;
+  letter-spacing: -0.1px;
+}
+
+.tooltip-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tooltip-list li {
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--pensum-text-primary);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  line-height: 1.5;
+}
+
+.tooltip-list li:last-child {
+  border-bottom: none;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+/* Móviles pequeños (320px - 374px) */
+@media (max-width: 374px) {
+  .pensum-container {
+    padding: 10px;
+  }
+
+  .modal-header {
+    padding: 16px 0;
+    margin-bottom: 20px;
+  }
+
+  .logo-circle {
+    width: 48px;
+    height: 48px;
+  }
+
+  .header-info h3 {
+    font-size: 18px;
+  }
+
+  .pensum-name {
+    font-size: 11px;
+  }
+
+  .semestre-column {
+    width: 130px;
+    min-width: 130px;
+  }
+
+  .semestre-title {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
+  .materia-card {
+    min-height: 85px;
+    padding: 10px;
+    font-size: 11px;
+  }
+
+  .materia-nombre {
+    font-size: 11px;
+  }
+
+  .materia-info {
+    font-size: 9px;
+  }
+
+  .materia-extra {
+    font-size: 8px;
+  }
+
+  .pensum-legend {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .legend-item {
+    font-size: 10px;
+    padding: 6px 10px;
+    min-width: 80px;
+  }
+}
+
+/* Móviles (375px+) */
+@media (min-width: 375px) {
+  .pensum-container {
+    padding: 12px;
+  }
+
+  .semestre-column {
+    width: 150px;
+    min-width: 150px;
+  }
+
+  .materia-card {
+    min-height: 90px;
+    padding: 12px;
+  }
+}
+
+/* Móviles grandes (480px+) */
+@media (min-width: 480px) {
+  .pensum-container {
+    padding: 16px;
+  }
+
+  .modal-header {
+    padding: 24px 0;
+    margin-bottom: 24px;
+  }
+
+  .header-info h3 {
+    font-size: 24px;
+  }
+
+  .pensum-name {
+    font-size: 14px;
+  }
+
+  .semestre-column {
+    width: 160px;
+    min-width: 160px;
+  }
+
+  .materia-card {
+    min-height: 100px;
+    padding: 14px;
+    font-size: 12px;
+  }
+
+  .materia-nombre {
+    font-size: 12px;
+  }
+
+  .materia-info {
+    font-size: 10px;
+  }
+
+  .pensum-legend {
+    padding: 16px;
+    gap: 10px;
+  }
+
+  .legend-item {
+    font-size: 11px;
+    padding: 8px 12px;
+  }
+}
+
+/* Tablets (768px+) */
+@media (min-width: 768px) {
+  .pensum-container {
+    padding: 24px;
+  }
+
+  .modal-header {
+    padding: 28px 0;
+    margin-bottom: 32px;
+  }
+
+  .header-info h3 {
+    font-size: 28px;
+  }
+
+  .pensum-name {
+    font-size: 15px;
+  }
+
+  .semestre-column {
+    width: 180px;
+    min-width: 180px;
+  }
+
+  .semestre-title {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+
+  .materia-card {
+    min-height: 110px;
+    padding: 16px;
+    font-size: 13px;
+  }
+
+  .materia-nombre {
+    font-size: 13px;
+  }
+
+  .materia-info {
+    font-size: 11px;
+  }
+
+  .pensum-legend {
+    padding: 20px;
+    gap: 12px;
+  }
+
+  .legend-item {
+    font-size: 12px;
+    padding: 10px 14px;
+  }
+}
+
+/* Desktop pequeño (1025px+) */
+@media (min-width: 1025px) {
+  .pensum-container {
+    padding: 32px;
+    padding-left: calc(280px + 32px); /* sidebar width (280px) + padding (32px) */
+    transition: padding-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Cuando sidebar está cerrado en desktop */
+  html.sidebar-closed .pensum-container {
+    padding-left: calc(70px + 32px); /* sidebar collapsed (70px) + padding (32px) */
+  }
+
+  .semestre-column {
+    width: 200px;
+    min-width: 200px;
+  }
+
+  .materia-card {
+    min-height: 120px;
+    padding: 18px;
+  }
+
+  .pensum-grid {
+    gap: 20px;
+  }
+}
+
+/* Desktop grande (1441px+) */
+@media (min-width: 1441px) {
+  .pensum-container {
+    padding: 40px;
+    padding-left: calc(280px + 40px);
+  }
+
+  html.sidebar-closed .pensum-container {
+    padding-left: calc(70px + 40px);
+  }
+
+  .semestre-column {
+    width: 220px;
+    min-width: 220px;
+  }
+
+  .materia-card {
+    min-height: 130px;
+    padding: 20px;
+  }
+
+  .pensum-grid {
+    gap: 24px;
+  }
+}
+
+/* Pantallas extra grandes (1921px+) */
+@media (min-width: 1921px) {
+  .pensum-container {
+    padding: 56px;
+    padding-left: calc(280px + 56px);
+  }
+
+  html.sidebar-closed .pensum-container {
+    padding-left: calc(70px + 56px);
+  }
+
+  .semestre-column {
+    width: 240px;
+    min-width: 240px;
+  }
+
+  .materia-card {
+    min-height: 140px;
+    padding: 24px;
+  }
+
+  .pensum-grid {
+    gap: 28px;
+  }
+}
+
+/* Hover effects - solo en dispositivos con hover */
+@media (hover: hover) {
+  .materia-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--pensum-shadow-md);
+  }
+
+  .materia-card.resaltada:hover {
+    transform: translateY(-8px) scale(1.04);
+    box-shadow: var(--pensum-shadow-gold), var(--pensum-shadow-lg);
+  }
+}
+
+/* Optimización para pantallas táctiles */
+@media (pointer: coarse) {
+  .materia-card {
+    min-height: 100px;
+    padding: 14px;
+  }
+}
+
+/* Accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.materia-card:focus-visible {
+  outline: 2px solid var(--pensum-primary-gold);
+  outline-offset: 2px;
+}
+
+.modal-close:focus-visible {
+  outline: 2px solid var(--pensum-primary-gold);
+  outline-offset: 2px;
+}
