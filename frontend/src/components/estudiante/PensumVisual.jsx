@@ -273,34 +273,31 @@ const PensumVisual = () => {
     ];
   };
 
-  // Obtener colores y estilos variados para las líneas - Paleta Universidad
+  // Obtener colores variados para las líneas (como en la imagen de referencia)
   const obtenerEstiloLinea = (completado, index) => {
     // Grosor base - se ajustará con CSS responsive
     const baseWidth = 3;
     
-    if (completado) {
-      // Variaciones de dorado/verde - Paleta Universidad
-      const estilos = [
-        { color: "#C9A23F", width: baseWidth }, // Primary gold
-        { color: "#34c759", width: baseWidth - 0.3 }, // Success green
-        { color: "#FFD860", width: baseWidth - 0.2 }, // Secondary gold
-        { color: "#10b981", width: baseWidth - 0.1 }, // Emerald
-        { color: "#E8D5A3", width: baseWidth - 0.1 }, // Gold light
-        { color: "#22c55e", width: baseWidth - 0.2 }, // Green bright
-      ];
-      return estilos[index % estilos.length];
-    } else {
-      // Variaciones de rojo/naranja para pendientes
-      const estilos = [
-        { color: "#ff3b30", width: baseWidth }, // Danger red
-        { color: "#ff9500", width: baseWidth - 0.3 }, // Warning orange
-        { color: "#ef4444", width: baseWidth - 0.2 }, // Red
-        { color: "#f97316", width: baseWidth - 0.1 }, // Orange
-        { color: "#dc2626", width: baseWidth - 0.1 }, // Dark red
-        { color: "#ea580c", width: baseWidth - 0.2 }, // Dark orange
-      ];
-      return estilos[index % estilos.length];
-    }
+    // Colores variados para diferenciar las líneas (similar a la imagen)
+    const colores = [
+      "#8B5CF6", // Purple
+      "#3B82F6", // Blue
+      "#10B981", // Green
+      "#F59E0B", // Yellow/Orange
+      "#EF4444", // Red
+      "#06B6D4", // Light Blue
+      "#1E40AF", // Dark Blue
+      "#F97316", // Orange
+      "#EC4899", // Pink
+      "#6366F1", // Indigo
+      "#14B8A6", // Teal
+      "#F43F5E", // Rose
+    ];
+    
+    return {
+      color: colores[index % colores.length],
+      width: baseWidth
+    };
   };
 
   // Dibujar flechas SVG para prerrequisitos con camino en L
@@ -309,6 +306,7 @@ const PensumVisual = () => {
 
     const allAsignaturas = getAllAsignaturas();
     const arrows = [];
+    let globalArrowIndex = 0;
 
     pensumData.semestres.forEach((semestre) => {
       semestre.asignaturas.forEach((asignatura) => {
@@ -341,7 +339,7 @@ const PensumVisual = () => {
                   camino: camino,
                   completado: prereq.completado,
                   key: `${prereq.prerequisito_id}-${asignatura.id}-${prereqIndex}`,
-                  colorIndex: prereqIndex,
+                  colorIndex: globalArrowIndex++,
                   asignaturaId: asignatura.id,
                   prerequisitoId: prereq.prerequisito_id,
                 });
@@ -516,37 +514,11 @@ const PensumVisual = () => {
                     aria-label={`${asignatura.nombre}, ${asignatura.estado || 'activa'}, ${asignatura.creditos} créditos`}
                     style={{ position: 'relative', zIndex: 2 }}
                   >
-                    <div className="materia-header">
-                      <div className="materia-nombre">{asignatura.nombre}</div>
-                      {getEstadoIcon(asignatura.estado) && (
-                        <div className="estado-icon">{getEstadoIcon(asignatura.estado)}</div>
-                      )}
-                    </div>
+                    <div className="materia-nombre">{asignatura.nombre}</div>
                     <div className="materia-info">
                       <span className="materia-codigo">{asignatura.codigo}</span>
-                      <span className="materia-creditos">{asignatura.creditos} crd</span>
+                      <span className="materia-creditos">{asignatura.creditos}</span>
                     </div>
-                    <div className="materia-extra">
-                      <span className="materia-tipo">{formatTipo(asignatura.tipo_nombre)}</span>
-                      {asignatura.tiene_laboratorio && (
-                        <span className="laboratorio-badge">Lab</span>
-                      )}
-                    </div>
-                    {asignatura.nota !== null && asignatura.nota !== undefined && (
-                      <div className="materia-nota">
-                        Nota: {asignatura.nota.toFixed(2)}
-                      </div>
-                    )}
-                    {asignatura.repeticiones > 0 && (
-                      <div className="materia-repeticiones">
-                        Repeticiones: {asignatura.repeticiones}
-                      </div>
-                    )}
-                    {asignatura.prerequisitos && asignatura.prerequisitos.length > 0 && (
-                      <div className="prerequisitos-indicator">
-                        <FaInfoCircle /> {asignatura.prerequisitos.length} prereq.
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -579,28 +551,68 @@ const PensumVisual = () => {
 
       {/* Información para el usuario - Leyenda */}
       <div className="pensum-legend">
-        <div className="legend-item activa">
-          <FaInfoCircle /> Activa
+        <div className="legend-header">
+          <h4>Estados de Asignaturas</h4>
         </div>
-        <div className="legend-item matriculada">
-          <FaBook /> Matriculada
+        <div className="legend-content">
+          <div className="legend-item activa">
+            <FaInfoCircle /> 
+            <div className="legend-text">
+              <strong>Activa</strong>
+              <small>Asignatura disponible para matricular, no tiene prerrequisitos pendientes.</small>
+            </div>
+          </div>
+          <div className="legend-item matriculada">
+            <FaBook /> 
+            <div className="legend-text">
+              <strong>Matriculada</strong>
+              <small>Asignatura en la que estás actualmente inscrito en el semestre vigente.</small>
+            </div>
+          </div>
+          <div className="legend-item cursada">
+            <FaCheckCircle /> 
+            <div className="legend-text">
+              <strong>Cursada</strong>
+              <small>Asignatura que ya has cursado y aprobado (nota ≥ 3.0).</small>
+            </div>
+          </div>
+          <div className="legend-item en-espera">
+            <FaClock /> 
+            <div className="legend-text">
+              <strong>En Espera</strong>
+              <small>Asignatura que requiere prerrequisitos que aún no has completado.</small>
+            </div>
+          </div>
+          <div className="legend-item pendiente-repeticion">
+            <FaExclamationTriangle /> 
+            <div className="legend-text">
+              <strong>Pendiente Repetición</strong>
+              <small>Asignatura que debes repetir porque no alcanzaste la nota mínima.</small>
+            </div>
+          </div>
+          <div className="legend-item obligatoria-repeticion">
+            <FaExclamationTriangle /> 
+            <div className="legend-text">
+              <strong>Obligatoria Repetición</strong>
+              <small>Asignatura que debes repetir obligatoriamente según el reglamento académico.</small>
+            </div>
+          </div>
         </div>
-        <div className="legend-item cursada">
-          <FaCheckCircle /> Cursada
+      </div>
+
+      {/* Información sobre el formato de las cards */}
+      <div className="pensum-format-info">
+        <div className="format-header">
+          <h4>Formato de las Asignaturas</h4>
         </div>
-        <div className="legend-item en-espera">
-          <FaClock /> En Espera
-        </div>
-        <div className="legend-item pendiente-repeticion">
-          <FaExclamationTriangle /> Pendiente Repetición
-        </div>
-        <div className="legend-item obligatoria-repeticion">
-          <FaExclamationTriangle /> Obligatoria Repetición
-        </div>
-        <div className="legend-item descripcion">
-          <strong>FLECHAS:</strong>
-          <br />
-          <small>Verde = Completado | Rojo = Pendiente</small>
+        <div className="format-example">
+          <div className="format-card-example">
+            <div className="format-card-nombre">Nombre de la Asignatura</div>
+            <div className="format-card-info">
+              <span className="format-card-codigo">CODIGO</span>
+              <span className="format-card-creditos">Crd</span>
+            </div>
+          </div>
         </div>
       </div>
 
