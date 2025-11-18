@@ -50,27 +50,40 @@ const PensumVisual = () => {
       setArrowsKey(prev => prev + 1);
     };
 
-    // Throttle para mejorar rendimiento
+    // Throttle más agresivo para móvil (más responsivo)
     let timeoutId;
     const throttledUpdate = () => {
       clearTimeout(timeoutId);
-      timeoutId = setTimeout(handleUpdate, 50);
+      timeoutId = setTimeout(handleUpdate, 16); // ~60fps para mejor respuesta en móvil
     };
 
-    // Escuchar scroll del grid y de la ventana
+    // Escuchar scroll del grid (el contenedor con scroll horizontal)
     const gridElement = containerRef.current.querySelector('.pensum-grid');
     if (gridElement) {
+      // Scroll del grid (horizontal y vertical)
       gridElement.addEventListener('scroll', throttledUpdate, { passive: true });
+      // Touch events para móvil (touchmove durante scroll)
+      gridElement.addEventListener('touchmove', throttledUpdate, { passive: true });
+      gridElement.addEventListener('touchend', handleUpdate, { passive: true });
     }
+    
+    // También escuchar scroll de la ventana por si acaso
     window.addEventListener('scroll', throttledUpdate, true);
-    window.addEventListener('resize', throttledUpdate);
+    window.addEventListener('resize', handleUpdate);
+    // Touch events globales para móvil
+    window.addEventListener('touchmove', throttledUpdate, { passive: true });
+    window.addEventListener('touchend', handleUpdate, { passive: true });
 
     return () => {
       if (gridElement) {
         gridElement.removeEventListener('scroll', throttledUpdate);
+        gridElement.removeEventListener('touchmove', throttledUpdate);
+        gridElement.removeEventListener('touchend', handleUpdate);
       }
       window.removeEventListener('scroll', throttledUpdate, true);
-      window.removeEventListener('resize', throttledUpdate);
+      window.removeEventListener('resize', handleUpdate);
+      window.removeEventListener('touchmove', throttledUpdate);
+      window.removeEventListener('touchend', handleUpdate);
       clearTimeout(timeoutId);
     };
   }, [pensumData]);
@@ -145,18 +158,18 @@ const PensumVisual = () => {
     const element = asignaturaRefs.current[asignaturaId];
     if (!element || !containerRef.current) return null;
     
-    // Encontrar el grid que tiene el scroll
+    // Encontrar el grid que tiene el scroll (el contenedor con scroll)
     const gridElement = containerRef.current.querySelector('.pensum-grid');
-    const scrollLeft = gridElement?.scrollLeft || 0;
-    const scrollTop = gridElement?.scrollTop || 0;
+    if (!gridElement) return null;
     
-    // Usar getBoundingClientRect pero compensar el transform si existe
-    // Primero obtenemos la posición visual
+    // Obtener posiciones relativas al grid con scroll
+    const gridRect = gridElement.getBoundingClientRect();
     const elementRect = element.getBoundingClientRect();
-    const containerRect = containerRef.current.getBoundingClientRect();
     
-    let baseX = elementRect.left - containerRect.left + scrollLeft;
-    let baseY = elementRect.top - containerRect.top + scrollTop;
+    // Calcular posición relativa al grid (no a la ventana)
+    // Esto funciona correctamente con scroll horizontal y vertical
+    let baseX = elementRect.left - gridRect.left + gridElement.scrollLeft;
+    let baseY = elementRect.top - gridRect.top + gridElement.scrollTop;
     
     // Obtener el estilo computado para detectar transform de hover
     const computedStyle = window.getComputedStyle(element);
@@ -164,10 +177,6 @@ const PensumVisual = () => {
     
     // Si hay transform (por hover), compensar para obtener la posición original
     if (transform && transform !== 'none') {
-      // El transform es: translateY(-6px) scale(1.03)
-      // Esto se convierte en una matrix transform
-      // Necesitamos revertir el translateY y el scale
-      
       // Extraer valores del matrix transform
       const matrixMatch = transform.match(/matrix\(([^)]+)\)/);
       if (matrixMatch) {
@@ -347,6 +356,20 @@ const PensumVisual = () => {
 
     if (!containerRef.current) return null;
 
+    // Obtener el grid para calcular el tamaño real del contenido
+    const gridElement = containerRef.current.querySelector('.pensum-grid');
+    if (!gridElement) return null;
+
+    // Calcular el tamaño real del contenido (incluyendo lo que está fuera del viewport)
+    const scrollWidth = gridElement.scrollWidth;
+    const scrollHeight = gridElement.scrollHeight;
+    const clientWidth = gridElement.clientWidth;
+    const clientHeight = gridElement.clientHeight;
+
+    // Usar el tamaño más grande entre el viewport y el contenido scrolleable
+    const svgWidth = Math.max(scrollWidth, clientWidth);
+    const svgHeight = Math.max(scrollHeight, clientHeight);
+
     return (
       <svg 
         key={arrowsKey}
@@ -355,8 +378,8 @@ const PensumVisual = () => {
           position: 'absolute', 
           top: 0, 
           left: 0, 
-          width: '100%', 
-          height: '100%', 
+          width: `${svgWidth}px`, 
+          height: `${svgHeight}px`, 
           pointerEvents: 'none', 
           zIndex: 1,
           overflow: 'visible'
@@ -450,11 +473,10 @@ const PensumVisual = () => {
 
       {/* Sección principal: cuadrícula con los semestres */}
       <div className="pensum-flow-container" ref={containerRef}>
-        {/* Renderizar flechas primero (capa inferior) */}
-        {renderPrerequisitoArrows()}
-        
         {/* Grid de semestres en columnas */}
         <div className="pensum-grid" role="list" aria-label="Pensum académico por semestres">
+          {/* Renderizar flechas dentro del grid para que las coordenadas funcionen con scroll */}
+          {renderPrerequisitoArrows()}
           {pensumData.semestres.map((semestre) => (
             <div key={semestre.numero} className="semestre-column" role="listitem">
               <h3 className="semestre-title">Semestre {semestre.numero}</h3>
