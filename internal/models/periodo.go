@@ -49,3 +49,10 @@ type ActivePlazosResponse struct {
 	Periodo *PeriodoAcademico `json:"periodo"`
 	Plazos  *Plazos           `json:"plazos,omitempty"`
 }
+
+// ValidarInscripcionResponse representa la respuesta de validación de inscripción
+type ValidarInscripcionResponse struct {
+	PuedeInscribir bool             `json:"puede_inscribir"`
+	Razon          string           `json:"razon"`
+	Periodo        *PeriodoAcademico `json:"periodo,omitempty"`
+}
