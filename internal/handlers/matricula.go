@@ -429,6 +429,10 @@ func (h *MatriculaHandler) GetHorarioActual(w http.ResponseWriter, r *http.Reque
 	// Convertir mapa a slice
 	asignaturas := make([]map[string]interface{}, 0, len(asignaturasMap))
 	for _, item := range asignaturasMap {
+		docenteValue := ""
+		if item.Docente.Valid {
+			docenteValue = item.Docente.String
+		}
 		asignaturas = append(asignaturas, map[string]interface{}{
 			"asignatura_id":     item.AsignaturaID,
 			"asignatura_codigo": item.AsignaturaCodigo,
@@ -436,7 +440,7 @@ func (h *MatriculaHandler) GetHorarioActual(w http.ResponseWriter, r *http.Reque
 			"creditos":          item.Creditos,
 			"grupo_id":          item.GrupoID,
 			"grupo_codigo":      item.GrupoCodigo,
-			"docente":           item.Docente.String,
+			"docente":           docenteValue,
 			"horarios":          item.Horarios,
 		})
 	}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import "../../styles/PensumVisual.css";
-import { FaCalendarAlt, FaInfoCircle, FaCheckCircle, FaClock, FaExclamationTriangle, FaBook } from "react-icons/fa";
+import { FaInfoCircle, FaCheckCircle, FaClock, FaExclamationTriangle, FaBook } from "react-icons/fa";
 import { pensumService } from "../../services/pensum";
 
 const PensumVisual = () => {
@@ -465,11 +465,6 @@ const PensumVisual = () => {
             className="pensum-logo"
           />
         </div>
-        <div className="modal-logo">
-          <span className="logo-circle">
-            <FaCalendarAlt size={20} />
-          </span>
-        </div>
         <div className="header-info">
           <h3>Pénsum - {pensumData.programa_nombre}</h3>
           <p className="pensum-name">{pensumData.pensum_nombre}</p>
@@ -522,14 +517,18 @@ const PensumVisual = () => {
                     style={{ position: 'relative', zIndex: 2 }}
                   >
                     <div className="materia-nombre">{asignatura.nombre}</div>
-                    <div className="materia-info">
+                    <div className="materia-info-top">
                       <span className="materia-codigo">{asignatura.codigo}</span>
                       <span className="materia-creditos">{asignatura.creditos}</span>
-                      {/* Mostrar nota si está cursada, matriculada o tiene historial */}
-                      {asignatura.nota !== null && asignatura.nota !== undefined && (
-                        <span className="materia-nota">{asignatura.nota.toFixed(2)}</span>
-                      )}
                     </div>
+                    {/* Mostrar nota en la parte inferior izquierda si el estado no es matriculada, activa o en_espera */}
+                    {asignatura.nota !== null && asignatura.nota !== undefined && 
+                     asignatura.estado && 
+                     !['matriculada', 'activa', 'en_espera'].includes(asignatura.estado.toLowerCase()) && (
+                      <div className="materia-info-bottom">
+                        <span className="materia-nota-left">{asignatura.nota.toFixed(2)}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -537,29 +536,6 @@ const PensumVisual = () => {
           ))}
         </div>
       </div>
-
-      {/* Tooltip con prerrequisitos faltantes */}
-      {/* Tooltip de estado - Solo en PC */}
-      {hoveredAsignatura && (
-        <div
-          className="tooltip-estado"
-          style={{
-            position: 'fixed',
-            left: `${tooltipPosition.x + 10}px`,
-            top: `${tooltipPosition.y + 10}px`,
-            zIndex: 1000,
-          }}
-        >
-          <div className={`tooltip-estado-badge ${getEstadoClass(hoveredAsignatura.estado)}`}>
-            {hoveredAsignatura.estado
-              ? hoveredAsignatura.estado
-                  .split("_")
-                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                  .join(" ")
-              : "Activa"}
-          </div>
-        </div>
-      )}
 
       {/* Tooltip de prerrequisitos faltantes */}
       {hoveredAsignatura && hoveredAsignatura.prerequisitos_faltantes && hoveredAsignatura.prerequisitos_faltantes.length > 0 && (
@@ -648,9 +624,12 @@ const PensumVisual = () => {
         <div className="format-example">
           <div className="format-card-example">
             <div className="format-card-nombre">Nombre de la Asignatura</div>
-            <div className="format-card-info">
+            <div className="format-card-info-top">
               <span className="format-card-codigo">CODIGO</span>
               <span className="format-card-creditos">Crd</span>
+            </div>
+            <div className="format-card-info-bottom">
+              <span className="format-card-nota-example">Nota</span>
             </div>
           </div>
         </div>
