@@ -160,45 +160,6 @@ const ConsultarMatricula = () => {
         </div>
       </div>
 
-      {/* Resumen de asignaturas */}
-      <div className="asignaturas-resumen">
-        <h2>Asignaturas Matriculadas ({horarioData.asignaturas.length})</h2>
-        <div className="asignaturas-grid">
-          {horarioData.asignaturas.map((asignatura) => (
-            <div key={asignatura.asignatura_id} className="asignatura-card">
-              <div className="asignatura-header">
-                <span className="asignatura-codigo">{asignatura.asignatura_codigo}</span>
-                <span className="asignatura-creditos">{asignatura.creditos} créditos</span>
-              </div>
-              <h3 className="asignatura-nombre">{asignatura.asignatura_nombre}</h3>
-              <div className="asignatura-details">
-                <div className="detail-item">
-                  <FaUser size={14} />
-                  <span>Grupo {asignatura.grupo_codigo}</span>
-                </div>
-                {asignatura.docente && (
-                  <div className="detail-item">
-                    <FaUser size={14} />
-                    <span>{asignatura.docente}</span>
-                  </div>
-                )}
-                <div className="detail-item">
-                  <FaClock size={14} />
-                  <span>
-                    {asignatura.horarios.map((h, idx) => (
-                      <span key={idx}>
-                        {h.dia.substring(0, 3)} {formatearHora(h.hora_inicio)}-{formatearHora(h.hora_fin)}
-                        {idx < asignatura.horarios.length - 1 && ", "}
-                      </span>
-                    ))}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Horario Visual */}
       <div className="horario-visual-container">
         <h2>Horario Semanal</h2>
@@ -268,6 +229,14 @@ const ConsultarMatricula = () => {
                                   <FaUser size={10} />
                                   <span>G{bloqueInicio.grupo_codigo}</span>
                                 </div>
+                                {bloqueInicio.docente && bloqueInicio.docente.trim() !== "" && (
+                                  <div className="horario-block-profesor">
+                                    <FaUser size={10} />
+                                    <span>{bloqueInicio.docente.length > 20
+                                      ? bloqueInicio.docente.substring(0, 20) + "..."
+                                      : bloqueInicio.docente}</span>
+                                  </div>
+                                )}
                                 {horarioDia.salon && (
                                   <div className="horario-block-salon">
                                     <FaMapMarkerAlt size={10} />
@@ -290,6 +259,45 @@ const ConsultarMatricula = () => {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Resumen de asignaturas */}
+      <div className="asignaturas-resumen">
+        <h2>Asignaturas Matriculadas ({horarioData.asignaturas.length})</h2>
+        <div className="asignaturas-grid">
+          {horarioData.asignaturas.map((asignatura) => (
+            <div key={asignatura.asignatura_id} className="asignatura-card">
+              <div className="asignatura-header">
+                <span className="asignatura-codigo">{asignatura.asignatura_codigo}</span>
+                <span className="asignatura-creditos">{asignatura.creditos} créditos</span>
+              </div>
+              <h3 className="asignatura-nombre">{asignatura.asignatura_nombre}</h3>
+              <div className="asignatura-details">
+                <div className="detail-item">
+                  <FaUser size={14} />
+                  <span>Grupo {asignatura.grupo_codigo}</span>
+                </div>
+                {asignatura.docente && asignatura.docente.trim() !== "" && (
+                  <div className="detail-item">
+                    <FaUser size={14} />
+                    <span>{asignatura.docente}</span>
+                  </div>
+                )}
+                <div className="detail-item">
+                  <FaClock size={14} />
+                  <span>
+                    {asignatura.horarios.map((h, idx) => (
+                      <span key={idx}>
+                        {h.dia.substring(0, 3)} {formatearHora(h.hora_inicio)}-{formatearHora(h.hora_fin)}
+                        {idx < asignatura.horarios.length - 1 && ", "}
+                      </span>
+                    ))}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
