@@ -491,7 +491,7 @@
 }
 
 /* Información de materia */
-.materia-info {
+.materia-info-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -505,23 +505,28 @@
   gap: 6px;
 }
 
-.materia-info-left {
+.materia-info-bottom {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex: 1;
+  font-size: 9.5px;
+  padding-top: 4px;
+  margin-top: 2px;
+  position: relative;
+  z-index: 2;
 }
 
 @media (min-width: 1025px) {
-  .materia-info {
+  .materia-info-top {
     font-size: 10px;
     padding-top: 7px;
     margin-top: 5px;
     gap: 7px;
   }
   
-  .materia-info-left {
-    gap: 7px;
+  .materia-info-bottom {
+    font-size: 10px;
+    padding-top: 5px;
+    margin-top: 3px;
   }
 }
 
@@ -976,7 +981,7 @@
   -webkit-box-orient: vertical;
 }
 
-.format-card-info {
+.format-card-info-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -988,11 +993,12 @@
   gap: 8px;
 }
 
-.format-card-left {
+.format-card-info-bottom {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex: 1;
+  font-size: 10px;
+  padding-top: 4px;
+  margin-top: 2px;
 }
 
 .format-card-nota-example {

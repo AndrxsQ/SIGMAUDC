@@ -517,18 +517,18 @@ const PensumVisual = () => {
                     style={{ position: 'relative', zIndex: 2 }}
                   >
                     <div className="materia-nombre">{asignatura.nombre}</div>
-                    <div className="materia-info">
-                      <div className="materia-info-left">
-                        {/* Mostrar nota en la parte inferior izquierda si el estado no es matriculada, activa o en_espera */}
-                        {asignatura.nota !== null && asignatura.nota !== undefined && 
-                         asignatura.estado && 
-                         !['matriculada', 'activa', 'en_espera'].includes(asignatura.estado.toLowerCase()) && (
-                          <span className="materia-nota-left">{asignatura.nota.toFixed(2)}</span>
-                        )}
-                        <span className="materia-codigo">{asignatura.codigo}</span>
-                      </div>
+                    <div className="materia-info-top">
+                      <span className="materia-codigo">{asignatura.codigo}</span>
                       <span className="materia-creditos">{asignatura.creditos}</span>
                     </div>
+                    {/* Mostrar nota en la parte inferior izquierda si el estado no es matriculada, activa o en_espera */}
+                    {asignatura.nota !== null && asignatura.nota !== undefined && 
+                     asignatura.estado && 
+                     !['matriculada', 'activa', 'en_espera'].includes(asignatura.estado.toLowerCase()) && (
+                      <div className="materia-info-bottom">
+                        <span className="materia-nota-left">{asignatura.nota.toFixed(2)}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -624,12 +624,12 @@ const PensumVisual = () => {
         <div className="format-example">
           <div className="format-card-example">
             <div className="format-card-nombre">Nombre de la Asignatura</div>
-            <div className="format-card-info">
-              <div className="format-card-left">
-                <span className="format-card-nota-example">4.5</span>
-                <span className="format-card-codigo">CODIGO</span>
-              </div>
+            <div className="format-card-info-top">
+              <span className="format-card-codigo">CODIGO</span>
               <span className="format-card-creditos">Crd</span>
+            </div>
+            <div className="format-card-info-bottom">
+              <span className="format-card-nota-example">Nota</span>
             </div>
           </div>
         </div>
