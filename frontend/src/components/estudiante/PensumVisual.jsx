@@ -456,8 +456,15 @@ const PensumVisual = () => {
 
   return (
     <div className="pensum-container">
-      {/* Encabezado con ícono y título del programa */}
+      {/* Encabezado con logo, ícono y título del programa */}
       <div className="modal-header">
+        <div className="pensum-logo-container">
+          <img 
+            src="/logo-udc.png" 
+            alt="Logo Universidad" 
+            className="pensum-logo"
+          />
+        </div>
         <div className="modal-logo">
           <span className="logo-circle">
             <FaCalendarAlt size={20} />
@@ -518,6 +525,10 @@ const PensumVisual = () => {
                     <div className="materia-info">
                       <span className="materia-codigo">{asignatura.codigo}</span>
                       <span className="materia-creditos">{asignatura.creditos}</span>
+                      {/* Mostrar nota si está cursada, matriculada o tiene historial */}
+                      {asignatura.nota !== null && asignatura.nota !== undefined && (
+                        <span className="materia-nota">{asignatura.nota.toFixed(2)}</span>
+                      )}
                     </div>
                   </div>
                 ))}

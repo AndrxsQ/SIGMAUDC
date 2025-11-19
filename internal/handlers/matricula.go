@@ -224,3 +224,233 @@ func joinDocumentos(docs []string) string {
 	return result
 }
 
+// GetAsignaturasDisponibles obtiene las asignaturas disponibles para inscripción
+// Por ahora retorna un array vacío ya que la lógica completa aún no está implementada
+func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *http.Request) {
+	claims, err := h.getClaims(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if claims.Rol != "estudiante" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	// Por ahora retornar array vacío - la lógica completa se implementará después
+	// El frontend usará datos mock mientras tanto
+	response := []interface{}{}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// GetHorarioActual obtiene el horario actual del estudiante para el periodo activo
+func (h *MatriculaHandler) GetHorarioActual(w http.ResponseWriter, r *http.Request) {
+	claims, err := h.getClaims(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if claims.Rol != "estudiante" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	// Obtener estudiante_id
+	var estudianteID int
+	queryEstudiante := `SELECT id FROM estudiante WHERE usuario_id = $1`
+	err = h.db.QueryRow(queryEstudiante, claims.Sub).Scan(&estudianteID)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		log.Printf("Error getting estudiante: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Obtener periodo activo
+	var periodoID int
+	var periodoYear int
+	var periodoSemestre int
+	queryPeriodo := `SELECT id, year, semestre FROM periodo_academico WHERE activo = true AND archivado = false LIMIT 1`
+	err = h.db.QueryRow(queryPeriodo).Scan(&periodoID, &periodoYear, &periodoSemestre)
+	if err == sql.ErrNoRows {
+		// No hay periodo activo, retornar horario vacío
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"periodo": map[string]interface{}{
+				"id":       nil,
+				"year":     nil,
+				"semestre": nil,
+			},
+			"asignaturas": []interface{}{},
+		})
+		return
+	}
+	if err != nil {
+		log.Printf("Error getting periodo activo: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Primero verificar si hay matrículas para este estudiante y periodo
+	var countMatriculas int
+	queryCount := `SELECT COUNT(*) FROM matricula WHERE estudiante_id = $1 AND periodo_id = $2`
+	err = h.db.QueryRow(queryCount, estudianteID, periodoID).Scan(&countMatriculas)
+	if err != nil {
+		log.Printf("Error counting matriculas: %v", err)
+	} else {
+		log.Printf("Matrículas encontradas para estudiante %d, periodo %d: %d", estudianteID, periodoID, countMatriculas)
+	}
+
+	// Verificar matrículas con estado 'inscrita'
+	var countInscritas int
+	queryCountInscritas := `SELECT COUNT(*) FROM matricula WHERE estudiante_id = $1 AND periodo_id = $2 AND estado = 'inscrita'`
+	err = h.db.QueryRow(queryCountInscritas, estudianteID, periodoID).Scan(&countInscritas)
+	if err != nil {
+		log.Printf("Error counting matriculas inscritas: %v", err)
+	} else {
+		log.Printf("Matrículas inscritas: %d", countInscritas)
+	}
+
+	// Obtener todas las matrículas del estudiante para el periodo activo con estado 'inscrita'
+	// Usar LEFT JOIN para horario_grupo porque puede que algunos grupos no tengan horarios aún
+	query := `
+		SELECT 
+			m.id as matricula_id,
+			a.id as asignatura_id,
+			a.codigo as asignatura_codigo,
+			a.nombre as asignatura_nombre,
+			a.creditos,
+			g.id as grupo_id,
+			g.codigo as grupo_codigo,
+			g.docente,
+			hg.id as horario_id,
+			COALESCE(hg.dia, '') as dia,
+			COALESCE(hg.hora_inicio::text, '') as hora_inicio,
+			COALESCE(hg.hora_fin::text, '') as hora_fin,
+			COALESCE(hg.salon, '') as salon
+		FROM matricula m
+		JOIN grupo g ON m.grupo_id = g.id
+		JOIN asignatura a ON g.asignatura_id = a.id
+		LEFT JOIN horario_grupo hg ON hg.grupo_id = g.id
+		WHERE m.estudiante_id = $1 
+			AND m.periodo_id = $2 
+			AND m.estado = 'inscrita'
+		ORDER BY 
+			CASE COALESCE(hg.dia, '')
+				WHEN 'LUNES' THEN 1
+				WHEN 'MARTES' THEN 2
+				WHEN 'MIERCOLES' THEN 3
+				WHEN 'JUEVES' THEN 4
+				WHEN 'VIERNES' THEN 5
+				WHEN 'SABADO' THEN 6
+				ELSE 7
+			END,
+			COALESCE(hg.hora_inicio, '00:00:00')
+	`
+	rows, err := h.db.Query(query, estudianteID, periodoID)
+	if err != nil {
+		log.Printf("Error querying horario: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	// Estructura para agrupar por asignatura
+	type HorarioItem struct {
+		AsignaturaID   int     `json:"asignatura_id"`
+		AsignaturaCodigo string `json:"asignatura_codigo"`
+		AsignaturaNombre string `json:"asignatura_nombre"`
+		Creditos       int     `json:"creditos"`
+		GrupoID        int     `json:"grupo_id"`
+		GrupoCodigo    string  `json:"grupo_codigo"`
+		Docente        sql.NullString `json:"docente"`
+		Horarios       []map[string]interface{} `json:"horarios"`
+	}
+
+	asignaturasMap := make(map[int]*HorarioItem)
+
+	rowCount := 0
+	for rows.Next() {
+		rowCount++
+		var matriculaID, asignaturaID, creditos, grupoID int
+		var horarioID sql.NullInt64
+		var asignaturaCodigo, asignaturaNombre, grupoCodigo, dia, horaInicio, horaFin string
+		var salon sql.NullString
+		var docente sql.NullString
+
+		err := rows.Scan(
+			&matriculaID, &asignaturaID, &asignaturaCodigo, &asignaturaNombre, &creditos,
+			&grupoID, &grupoCodigo, &docente, &horarioID, &dia, &horaInicio, &horaFin, &salon,
+		)
+		if err != nil {
+			log.Printf("Error scanning horario row: %v", err)
+			continue
+		}
+
+		log.Printf("Row %d: asignatura_id=%d, codigo=%s, grupo_id=%d, horario_id=%v, dia=%s", 
+			rowCount, asignaturaID, asignaturaCodigo, grupoID, horarioID, dia)
+
+		// Si la asignatura no existe en el mapa, crearla
+		if _, exists := asignaturasMap[asignaturaID]; !exists {
+			asignaturasMap[asignaturaID] = &HorarioItem{
+				AsignaturaID:     asignaturaID,
+				AsignaturaCodigo: asignaturaCodigo,
+				AsignaturaNombre: asignaturaNombre,
+				Creditos:         creditos,
+				GrupoID:          grupoID,
+				GrupoCodigo:      grupoCodigo,
+				Docente:          docente,
+				Horarios:         []map[string]interface{}{},
+			}
+		}
+
+		// Agregar horario solo si tiene datos válidos
+		if horarioID.Valid && dia != "" && horaInicio != "" && horaFin != "" {
+			horario := map[string]interface{}{
+				"id":           horarioID.Int64,
+				"dia":          dia,
+				"hora_inicio":  horaInicio,
+				"hora_fin":     horaFin,
+				"salon":        salon.String,
+			}
+			asignaturasMap[asignaturaID].Horarios = append(asignaturasMap[asignaturaID].Horarios, horario)
+		}
+	}
+	
+	log.Printf("Total rows procesadas: %d, Asignaturas únicas: %d", rowCount, len(asignaturasMap))
+
+	// Convertir mapa a slice
+	asignaturas := make([]map[string]interface{}, 0, len(asignaturasMap))
+	for _, item := range asignaturasMap {
+		asignaturas = append(asignaturas, map[string]interface{}{
+			"asignatura_id":     item.AsignaturaID,
+			"asignatura_codigo": item.AsignaturaCodigo,
+			"asignatura_nombre": item.AsignaturaNombre,
+			"creditos":          item.Creditos,
+			"grupo_id":          item.GrupoID,
+			"grupo_codigo":      item.GrupoCodigo,
+			"docente":           item.Docente.String,
+			"horarios":          item.Horarios,
+		})
+	}
+
+	response := map[string]interface{}{
+		"periodo": map[string]interface{}{
+			"id":       periodoID,
+			"year":     periodoYear,
+			"semestre": periodoSemestre,
+		},
+		"asignaturas": asignaturas,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+

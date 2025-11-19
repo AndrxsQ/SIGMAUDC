@@ -75,7 +75,19 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Obtener periodo activo para verificar matrícula actual
+	var periodoActivoID sql.NullInt64
+	queryPeriodoActivo := `SELECT id FROM periodo_academico WHERE activo = true AND archivado = false LIMIT 1`
+	errPeriodo := h.db.QueryRow(queryPeriodoActivo).Scan(&periodoActivoID)
+	if errPeriodo != nil && errPeriodo != sql.ErrNoRows {
+		log.Printf("Error getting periodo activo: %v", errPeriodo)
+		// Continuar sin periodo activo si hay error
+		periodoActivoID = sql.NullInt64{Valid: false}
+	}
+
 	// Obtener todas las asignaturas del pensum organizadas por semestre
+	// Incluye información de matrícula actual e historial académico
+	// Usamos una subquery para el periodo activo para evitar problemas con NULL
 	queryAsignaturas := `
 		SELECT 
 			pa.semestre,
@@ -87,8 +99,28 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 			a.tiene_laboratorio,
 			pa.categoria,
 			COALESCE(ea.estado, 'activa') as estado,
-			ea.nota,
-			COALESCE(ea.repeticiones, 0) as repeticiones
+			ea.nota as nota_estudiante_asignatura,
+			COALESCE(ea.repeticiones, 0) as repeticiones,
+			-- Nota del historial académico (última nota registrada)
+			(SELECT ha.nota 
+			 FROM historial_academico ha 
+			 WHERE ha.estudiante_id = $1 AND ha.asignatura_id = a.id 
+			 ORDER BY ha.id DESC 
+			 LIMIT 1) as nota_historial,
+			-- Verificar si está matriculada en el periodo actual
+			CASE 
+				WHEN (SELECT id FROM periodo_academico WHERE activo = true AND archivado = false LIMIT 1) IS NOT NULL 
+					AND EXISTS (
+						SELECT 1 FROM matricula m
+						JOIN grupo g ON m.grupo_id = g.id
+						JOIN periodo_academico p ON m.periodo_id = p.id
+						WHERE m.estudiante_id = $1 
+						AND g.asignatura_id = a.id 
+						AND p.activo = true AND p.archivado = false
+						AND m.estado = 'inscrita'
+					) THEN true
+				ELSE false
+			END as esta_matriculada
 		FROM pensum_asignatura pa
 		JOIN asignatura a ON pa.asignatura_id = a.id
 		JOIN asignatura_tipo at ON a.tipo_id = at.id
@@ -110,8 +142,10 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 	for rows.Next() {
 		var asignatura models.AsignaturaCompleta
 		var estado sql.NullString
-		var nota sql.NullFloat64
+		var notaEstudianteAsignatura sql.NullFloat64
+		var notaHistorial sql.NullFloat64
 		var repeticiones int
+		var estaMatriculada bool
 
 		err := rows.Scan(
 			&asignatura.Semestre,
@@ -123,25 +157,45 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 			&asignatura.TieneLaboratorio,
 			&asignatura.Categoria,
 			&estado,
-			&nota,
+			&notaEstudianteAsignatura,
 			&repeticiones,
+			&notaHistorial,
+			&estaMatriculada,
 		)
 		if err != nil {
 			log.Printf("Error scanning asignatura: %v", err)
 			continue
 		}
 
-		// Convertir valores nulos
-		if estado.Valid {
+		// Determinar estado: si está matriculada en el periodo actual, el estado es "matriculada"
+		if estaMatriculada {
+			estadoMatriculada := "matriculada"
+			asignatura.Estado = &estadoMatriculada
+		} else if estado.Valid {
 			asignatura.Estado = &estado.String
 		} else {
 			estadoDefault := "activa"
 			asignatura.Estado = &estadoDefault
 		}
 
-		if nota.Valid {
-			asignatura.Nota = &nota.Float64
+		// Lógica para determinar qué nota mostrar:
+		// 1. Si está matriculada (cursando actualmente), mostrar nota de estudiante_asignatura
+		// 2. Si no está matriculada pero tiene historial, mostrar nota del historial
+		// 3. Si tiene nota en estudiante_asignatura y está en estado "matriculada" o "cursada", usar esa
+		if estaMatriculada && notaEstudianteAsignatura.Valid {
+			// Está cursando actualmente, mostrar nota actual
+			asignatura.Nota = &notaEstudianteAsignatura.Float64
+		} else if estado.Valid && (estado.String == "matriculada" || estado.String == "cursada") && notaEstudianteAsignatura.Valid {
+			// Está matriculada o cursada según estudiante_asignatura
+			asignatura.Nota = &notaEstudianteAsignatura.Float64
+		} else if notaHistorial.Valid {
+			// Si tiene historial académico, mostrar esa nota (fue cursada en algún momento)
+			asignatura.Nota = &notaHistorial.Float64
+		} else if notaEstudianteAsignatura.Valid {
+			// Si tiene nota en estudiante_asignatura pero no en historial, usar esa
+			asignatura.Nota = &notaEstudianteAsignatura.Float64
 		}
+		// Si no tiene ninguna nota, asignatura.Nota queda como nil
 
 		asignatura.Repeticiones = repeticiones
 
@@ -189,10 +243,15 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Error encoding response: %v", err)
+		http.Error(w, "Error encoding response", http.StatusInternalServerError)
+		return
+	}
 }
 
 // getPrerequisitos obtiene los prerrequisitos de una asignatura (versión simple)
+// Nota: Esta función no se usa actualmente, pero se mantiene por compatibilidad
 func (h *PensumHandler) getPrerequisitos(asignaturaID int) ([]models.Prerequisito, error) {
 	query := `
 		SELECT 
@@ -201,7 +260,7 @@ func (h *PensumHandler) getPrerequisitos(asignaturaID int) ([]models.Prerequisit
 			pr.prerequisito_id,
 			a.codigo,
 			a.nombre
-		FROM prerequisito pr
+		FROM pensum_prerequisito pr
 		JOIN asignatura a ON pr.prerequisito_id = a.id
 		WHERE pr.asignatura_id = $1
 		ORDER BY a.codigo
@@ -242,14 +301,14 @@ func (h *PensumHandler) getPrerequisitosConEstado(asignaturaID int, estudianteID
 			a.nombre,
 			COALESCE(pa.semestre, 0) as semestre,
 			CASE 
-				WHEN ea.estado = 'cursada' AND (ea.nota IS NULL OR ea.nota >= 3.0) THEN true
+				WHEN ea.estado = 'aprobada' OR (ea.estado = 'cursada' AND (ea.nota IS NULL OR ea.nota >= 3.0)) THEN true
 				ELSE false
 			END as completado
-		FROM prerequisito pr
+		FROM pensum_prerequisito pr
 		JOIN asignatura a ON pr.prerequisito_id = a.id
 		LEFT JOIN pensum_asignatura pa ON pa.asignatura_id = a.id AND pa.pensum_id = $3
 		LEFT JOIN estudiante_asignatura ea ON ea.estudiante_id = $2 AND ea.asignatura_id = a.id
-		WHERE pr.asignatura_id = $1
+		WHERE pr.asignatura_id = $1 AND pr.pensum_id = $3
 		ORDER BY a.codigo
 	`
 	rows, err := h.db.Query(query, asignaturaID, estudianteID, pensumID)
@@ -322,12 +381,20 @@ func (h *PensumHandler) calcularEstadoAsignatura(asignatura models.AsignaturaCom
 // cuando se aprueba un prerrequisito. Se debe llamar cuando una asignatura cambia a "cursada"
 func (h *PensumHandler) ActualizarEstadosPorPrerequisitos(estudianteID int, asignaturaAprobadaID int) error {
 	// Obtener todas las asignaturas que tienen como prerrequisito la asignatura aprobada
+	// Obtener pensum del estudiante primero
+	var pensumID int
+	queryPensum := `SELECT pensum_id FROM estudiante_pensum WHERE estudiante_id = $1`
+	err := h.db.QueryRow(queryPensum, estudianteID).Scan(&pensumID)
+	if err != nil {
+		return err
+	}
+	
 	query := `
 		SELECT DISTINCT pr.asignatura_id
-		FROM prerequisito pr
-		WHERE pr.prerequisito_id = $1
+		FROM pensum_prerequisito pr
+		WHERE pr.prerequisito_id = $1 AND pr.pensum_id = $2
 	`
-	rows, err := h.db.Query(query, asignaturaAprobadaID)
+	rows, err := h.db.Query(query, asignaturaAprobadaID, pensumID)
 	if err != nil {
 		return err
 	}
@@ -342,14 +409,7 @@ func (h *PensumHandler) ActualizarEstadosPorPrerequisitos(estudianteID int, asig
 		asignaturasAfectadas = append(asignaturasAfectadas, asignaturaID)
 	}
 
-	// Obtener pensum del estudiante para la función getPrerequisitosConEstado
-	var pensumID int
-	queryPensum := `SELECT pensum_id FROM estudiante_pensum WHERE estudiante_id = $1`
-	err = h.db.QueryRow(queryPensum, estudianteID).Scan(&pensumID)
-	if err != nil {
-		log.Printf("Error getting pensum for estudiante %d: %v", estudianteID, err)
-		return err
-	}
+	// pensumID ya se obtuvo arriba
 
 	// Para cada asignatura afectada, verificar si ahora puede activarse
 	for _, asignaturaID := range asignaturasAfectadas {
