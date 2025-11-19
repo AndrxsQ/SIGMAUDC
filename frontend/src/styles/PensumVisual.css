@@ -271,19 +271,21 @@
    MATERIA CARD
    ============================================ */
 .materia-card {
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
   background: var(--pensum-bg-card);
   font-size: 12px;
-  transition: box-shadow 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-              border-color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: box-shadow 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              border-color 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   display: flex;
   flex-direction: column;
   padding: 14px;
   min-height: 100px;
   cursor: pointer;
   position: relative;
-  box-shadow: var(--pensum-shadow-sm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04),
+              0 1px 4px rgba(0, 0, 0, 0.02);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -294,58 +296,61 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 2.5px;
   background: linear-gradient(90deg, var(--pensum-primary-gold) 0%, var(--pensum-secondary-gold) 100%);
   opacity: 0;
-  transition: opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: opacity 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   z-index: 1;
+  border-radius: 16px 16px 0 0;
 }
 
-.materia-card:hover {
-  border-color: rgba(201, 162, 63, 0.25);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08),
-              0 2px 8px rgba(201, 162, 63, 0.12);
-}
-
-.materia-card:hover::before {
-  opacity: 1;
-}
-
-/* Estados de asignatura - Colores únicos y diferenciables - MÁS VISIBLES */
+/* Estados de asignatura - Colores tipo Apple, más fuertes y bien diferenciados */
 .materia-card.activa {
-  background: linear-gradient(135deg, rgba(255, 235, 59, 0.4) 0%, rgba(255, 235, 59, 0.25) 100%) !important;
-  border: 2px solid rgba(255, 235, 59, 0.8) !important;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.3) 0%, rgba(245, 158, 11, 0.2) 100%) !important;
+  border: 1.5px solid rgba(217, 119, 6, 0.65) !important;
   color: var(--pensum-text-primary);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .materia-card.matriculada {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.45) 0%, rgba(59, 130, 246, 0.3) 100%) !important;
-  border: 2px solid rgba(59, 130, 246, 0.85) !important;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.32) 0%, rgba(37, 99, 235, 0.22) 100%) !important;
+  border: 1.5px solid rgba(29, 78, 216, 0.7) !important;
   color: var(--pensum-text-primary);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .materia-card.cursada {
-  background: linear-gradient(135deg, rgba(52, 199, 89, 0.45) 0%, rgba(52, 199, 89, 0.3) 100%) !important;
-  border: 2px solid rgba(52, 199, 89, 0.85) !important;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.32) 0%, rgba(21, 128, 61, 0.22) 100%) !important;
+  border: 1.5px solid rgba(20, 83, 45, 0.7) !important;
   color: var(--pensum-text-primary);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .materia-card.en-espera {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.4) 0%, rgba(99, 102, 241, 0.25) 100%) !important;
-  border: 2px solid rgba(99, 102, 241, 0.8) !important;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(147, 51, 234, 0.2) 100%) !important;
+  border: 1.5px solid rgba(126, 34, 206, 0.65) !important;
   color: var(--pensum-text-primary);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .materia-card.pendiente-repeticion {
-  background: linear-gradient(135deg, rgba(255, 128, 0, 0.4) 0%, rgba(255, 128, 0, 0.25) 100%) !important;
-  border: 2px solid rgba(255, 128, 0, 0.8) !important;
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.3) 0%, rgba(234, 88, 12, 0.2) 100%) !important;
+  border: 1.5px solid rgba(194, 65, 12, 0.65) !important;
   color: var(--pensum-text-primary);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .materia-card.obligatoria-repeticion {
-  background: linear-gradient(135deg, rgba(185, 28, 28, 0.5) 0%, rgba(185, 28, 28, 0.35) 100%) !important;
-  border: 2px solid rgba(185, 28, 28, 0.9) !important;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.32) 0%, rgba(220, 38, 38, 0.22) 100%) !important;
+  border: 1.5px solid rgba(185, 28, 28, 0.7) !important;
   color: var(--pensum-text-primary);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 /* ============================================
@@ -354,60 +359,170 @@
    Sin scale, solo sombras elegantes que rodean el cuadro
    ============================================ */
 @media (hover: hover) and (pointer: fine) {
-  /* Prerrequisitos resaltados: sombra más pronunciada */
-  .materia-card.resaltada:not(:hover) {
-    /* SOLO sombras externas alrededor de la caja */
-    box-shadow: 0 12px 32px rgba(201, 162, 63, 0.25),
-                0 6px 16px rgba(201, 162, 63, 0.15),
-                0 4px 12px rgba(0, 0, 0, 0.1),
-                0 4px 12px rgba(201, 162, 63, 0.12),
-                0 -2px 8px rgba(201, 162, 63, 0.08);
-    border-color: rgba(201, 162, 63, 0.4) !important;
+  /* Prerrequisitos resaltados - Sombras mucho más intensas y visibles */
+  .materia-card.resaltada:not(:hover).activa {
+    box-shadow: 0 12px 36px rgba(245, 158, 11, 0.35),
+                0 6px 18px rgba(245, 158, 11, 0.28),
+                0 4px 12px rgba(245, 158, 11, 0.22),
+                0 2px 6px rgba(0, 0, 0, 0.1),
+                0 0 0 2px rgba(245, 158, 11, 0.15) inset;
+    border-color: rgba(245, 158, 11, 0.85) !important;
+    border-width: 2px !important;
     z-index: 9 !important;
-    transition: box-shadow 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                border-color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    /* NO TOCAR NADA MÁS - las dimensiones se mantienen iguales */
+    transform: translateY(-2px);
+  }
+  
+  .materia-card.resaltada:not(:hover).matriculada {
+    box-shadow: 0 12px 36px rgba(37, 99, 235, 0.35),
+                0 6px 18px rgba(37, 99, 235, 0.28),
+                0 4px 12px rgba(37, 99, 235, 0.22),
+                0 2px 6px rgba(0, 0, 0, 0.1),
+                0 0 0 2px rgba(37, 99, 235, 0.15) inset;
+    border-color: rgba(37, 99, 235, 0.85) !important;
+    border-width: 2px !important;
+    z-index: 9 !important;
+    transform: translateY(-2px);
+  }
+  
+  .materia-card.resaltada:not(:hover).cursada {
+    box-shadow: 0 12px 36px rgba(21, 128, 61, 0.35),
+                0 6px 18px rgba(21, 128, 61, 0.28),
+                0 4px 12px rgba(21, 128, 61, 0.22),
+                0 2px 6px rgba(0, 0, 0, 0.1),
+                0 0 0 2px rgba(21, 128, 61, 0.15) inset;
+    border-color: rgba(21, 128, 61, 0.85) !important;
+    border-width: 2px !important;
+    z-index: 9 !important;
+    transform: translateY(-2px);
+  }
+  
+  .materia-card.resaltada:not(:hover).en-espera {
+    box-shadow: 0 12px 36px rgba(147, 51, 234, 0.35),
+                0 6px 18px rgba(147, 51, 234, 0.28),
+                0 4px 12px rgba(147, 51, 234, 0.22),
+                0 2px 6px rgba(0, 0, 0, 0.1),
+                0 0 0 2px rgba(147, 51, 234, 0.15) inset;
+    border-color: rgba(126, 34, 206, 0.85) !important;
+    border-width: 2px !important;
+    z-index: 9 !important;
+    transform: translateY(-2px);
+  }
+  
+  .materia-card.resaltada:not(:hover).pendiente-repeticion {
+    box-shadow: 0 12px 36px rgba(234, 88, 12, 0.35),
+                0 6px 18px rgba(234, 88, 12, 0.28),
+                0 4px 12px rgba(234, 88, 12, 0.22),
+                0 2px 6px rgba(0, 0, 0, 0.1),
+                0 0 0 2px rgba(234, 88, 12, 0.15) inset;
+    border-color: rgba(234, 88, 12, 0.85) !important;
+    border-width: 2px !important;
+    z-index: 9 !important;
+    transform: translateY(-2px);
+  }
+  
+  .materia-card.resaltada:not(:hover).obligatoria-repeticion {
+    box-shadow: 0 12px 36px rgba(220, 38, 38, 0.35),
+                0 6px 18px rgba(220, 38, 38, 0.28),
+                0 4px 12px rgba(220, 38, 38, 0.22),
+                0 2px 6px rgba(0, 0, 0, 0.1),
+                0 0 0 2px rgba(220, 38, 38, 0.15) inset;
+    border-color: rgba(220, 38, 38, 0.85) !important;
+    border-width: 2px !important;
+    z-index: 9 !important;
+    transform: translateY(-2px);
   }
   
   .materia-card.resaltada:not(:hover)::before {
-    opacity: 0.7;
-    height: 3px;
-    box-shadow: 0 1px 4px rgba(201, 162, 63, 0.25);
+    opacity: 1;
+    height: 3.5px;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
   }
   
-  /* Caja principal con hover: mismo sombreado que prerrequisitos */
-  .materia-card.resaltada:hover {
-    /* Mismo sombreado que los prerrequisitos */
-    box-shadow: 0 12px 32px rgba(201, 162, 63, 0.25),
-                0 6px 16px rgba(201, 162, 63, 0.15),
-                0 4px 12px rgba(0, 0, 0, 0.1),
-                0 4px 12px rgba(201, 162, 63, 0.12),
-                0 -2px 8px rgba(201, 162, 63, 0.08);
+  /* Hover sobre tarjetas resaltadas - Mantener color original */
+  .materia-card.resaltada.activa:hover {
+    box-shadow: 0 16px 40px rgba(245, 158, 11, 0.25),
+                0 8px 20px rgba(245, 158, 11, 0.18),
+                0 4px 10px rgba(0, 0, 0, 0.1),
+                0 0 40px rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.7) !important;
     z-index: 10 !important;
-    transition: box-shadow 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                border-color 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    border-color: rgba(201, 162, 63, 0.4) !important;
-    /* NO TOCAR NADA MÁS - las dimensiones se mantienen iguales */
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, rgba(255, 235, 59, 0.28) 0%, rgba(255, 235, 59, 0.18) 100%) !important;
+  }
+  
+  .materia-card.resaltada.matriculada:hover {
+    box-shadow: 0 16px 40px rgba(37, 99, 235, 0.25),
+                0 8px 20px rgba(37, 99, 235, 0.18),
+                0 4px 10px rgba(0, 0, 0, 0.1),
+                0 0 40px rgba(37, 99, 235, 0.1);
+    border-color: rgba(37, 99, 235, 0.7) !important;
+    z-index: 10 !important;
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.2) 100%) !important;
+  }
+  
+  .materia-card.resaltada.cursada:hover {
+    box-shadow: 0 16px 40px rgba(21, 128, 61, 0.25),
+                0 8px 20px rgba(21, 128, 61, 0.18),
+                0 4px 10px rgba(0, 0, 0, 0.1),
+                0 0 40px rgba(21, 128, 61, 0.1);
+    border-color: rgba(21, 128, 61, 0.7) !important;
+    z-index: 10 !important;
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.2) 100%) !important;
+  }
+  
+  .materia-card.resaltada.en-espera:hover {
+    box-shadow: 0 16px 40px rgba(147, 51, 234, 0.25),
+                0 8px 20px rgba(147, 51, 234, 0.18),
+                0 4px 10px rgba(0, 0, 0, 0.1),
+                0 0 40px rgba(147, 51, 234, 0.1);
+    border-color: rgba(126, 34, 206, 0.7) !important;
+    z-index: 10 !important;
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.38) 0%, rgba(147, 51, 234, 0.28) 100%) !important;
+  }
+  
+  .materia-card.resaltada.pendiente-repeticion:hover {
+    box-shadow: 0 16px 40px rgba(234, 88, 12, 0.25),
+                0 8px 20px rgba(234, 88, 12, 0.18),
+                0 4px 10px rgba(0, 0, 0, 0.1),
+                0 0 40px rgba(234, 88, 12, 0.1);
+    border-color: rgba(234, 88, 12, 0.7) !important;
+    z-index: 10 !important;
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.3) 0%, rgba(251, 146, 60, 0.2) 100%) !important;
+  }
+  
+  .materia-card.resaltada.obligatoria-repeticion:hover {
+    box-shadow: 0 16px 40px rgba(220, 38, 38, 0.25),
+                0 8px 20px rgba(220, 38, 38, 0.18),
+                0 4px 10px rgba(0, 0, 0, 0.1),
+                0 0 40px rgba(220, 38, 38, 0.1);
+    border-color: rgba(220, 38, 38, 0.7) !important;
+    z-index: 10 !important;
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(239, 68, 68, 0.2) 100%) !important;
   }
   
   .materia-card.resaltada:hover::before {
-    opacity: 0.7;
+    opacity: 1;
     height: 3px;
-    box-shadow: 0 1px 4px rgba(201, 162, 63, 0.25);
   }
   
-  
-  /* Mejorar el ícono de estado cuando está resaltada - sin scale excesivo */
-  .materia-card.resaltada .estado-icon {
-    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                filter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                opacity 0.4s ease;
+  /* Hover general mejorado para todas las tarjetas (excepto las resaltadas) */
+  .materia-card:not(.resaltada):hover {
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08),
+                0 4px 10px rgba(0, 0, 0, 0.04),
+                0 0 0 1px rgba(0, 0, 0, 0.05) inset;
+    transform: translateY(-1px);
+    transition: box-shadow 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
   
-  .materia-card.resaltada .estado-icon {
-    transform: scale(1.05);
-    filter: drop-shadow(0 1px 3px rgba(201, 162, 63, 0.2));
-    opacity: 0.95;
+  .materia-card:not(.resaltada):hover::before {
+    opacity: 0.6;
+    height: 2px;
   }
 }
 
@@ -804,8 +919,8 @@
 }
 
 .legend-color-box.en-espera {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.4) 0%, rgba(99, 102, 241, 0.25) 100%);
-  border-color: rgba(99, 102, 241, 0.8);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.4) 0%, rgba(147, 51, 234, 0.25) 100%);
+  border-color: rgba(126, 34, 206, 0.8);
 }
 
 .legend-color-box.pendiente-repeticion {
@@ -873,12 +988,12 @@
 }
 
 .legend-item.en-espera {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.1) 100%);
-  border: 1.5px solid rgba(99, 102, 241, 0.5);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(147, 51, 234, 0.12) 100%);
+  border: 1.5px solid rgba(126, 34, 206, 0.6);
 }
 
 .legend-item.en-espera svg {
-  color: rgba(99, 102, 241, 1);
+  color: rgba(147, 51, 234, 1);
 }
 
 .legend-item.pendiente-repeticion {
@@ -1760,18 +1875,7 @@
   }
 }
 
-/* Hover effects - solo en dispositivos con hover */
-@media (hover: hover) {
-  .materia-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--pensum-shadow-md);
-  }
-
-  .materia-card.resaltada:hover {
-    transform: translateY(-8px) scale(1.04);
-    box-shadow: var(--pensum-shadow-gold), var(--pensum-shadow-lg);
-  }
-}
+/* Hover effects mejorados están definidos arriba en @media (hover: hover) and (pointer: fine) */
 
 /* Optimización para pantallas táctiles */
 @media (pointer: coarse) {
