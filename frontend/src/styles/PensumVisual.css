@@ -109,7 +109,7 @@
 }
 
 .pensum-logo {
-  height: 60px;
+  height: 90px;
   width: auto;
   object-fit: contain;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
@@ -123,7 +123,7 @@
 /* Responsive logo */
 @media (max-width: 767px) {
   .pensum-logo {
-    height: 45px;
+    height: 60px;
   }
   
   .modal-header {
@@ -135,7 +135,7 @@
 
 @media (max-width: 374px) {
   .pensum-logo {
-    height: 40px;
+    height: 50px;
   }
   
   .modal-header {
@@ -495,14 +495,34 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 10px;
+  font-size: 9.5px;
   color: var(--pensum-text-secondary);
   border-top: 1px solid rgba(0, 0, 0, 0.06);
-  padding-top: 8px;
-  margin-top: 6px;
+  padding-top: 6px;
+  margin-top: 4px;
   position: relative;
   z-index: 2;
-  gap: 8px;
+  gap: 6px;
+}
+
+.materia-info-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+@media (min-width: 1025px) {
+  .materia-info {
+    font-size: 10px;
+    padding-top: 7px;
+    margin-top: 5px;
+    gap: 7px;
+  }
+  
+  .materia-info-left {
+    gap: 7px;
+  }
 }
 
 .materia-codigo {
@@ -566,6 +586,26 @@
   text-align: center;
   font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
   margin-left: auto;
+}
+
+.materia-nota-left {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--pensum-text-primary);
+  background: rgba(201, 162, 63, 0.15);
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(201, 162, 63, 0.3);
+  text-align: center;
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  flex-shrink: 0;
+}
+
+@media (min-width: 1025px) {
+  .materia-nota-left {
+    font-size: 10.5px;
+    padding: 3px 7px;
+  }
 }
 
 .materia-repeticiones {
@@ -946,6 +986,26 @@
   padding-top: 8px;
   margin-top: 6px;
   gap: 8px;
+}
+
+.format-card-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.format-card-nota-example {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--pensum-text-primary);
+  background: rgba(201, 162, 63, 0.15);
+  padding: 2px 5px;
+  border-radius: 6px;
+  border: 1px solid rgba(201, 162, 63, 0.3);
+  text-align: center;
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  flex-shrink: 0;
 }
 
 .format-card-codigo {
