@@ -44,6 +44,7 @@ func main() {
 	plazosHandler := handlers.NewPlazosHandler(db)
 	documentosHandler := handlers.NewDocumentosHandler(db)
 	pensumHandler := handlers.NewPensumHandler(db)
+	matriculaHandler := handlers.NewMatriculaHandler(db)
 
 	// Configurar router
 	r := mux.NewRouter()
@@ -83,6 +84,9 @@ func main() {
 
 	// Rutas de pensum (protegidas)
 	protected.HandleFunc("/pensum", pensumHandler.GetPensumEstudiante).Methods("GET") // Para estudiantes
+
+	// Rutas de matrícula (protegidas)
+	protected.HandleFunc("/matricula/validar-inscripcion", matriculaHandler.ValidarInscripcion).Methods("GET") // Para estudiantes
 
 	// Servir archivos estáticos (uploads) - soporta estructura de carpetas periodo/programa/
 	r.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads/"))))

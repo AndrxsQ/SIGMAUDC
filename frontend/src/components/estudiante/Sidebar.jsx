@@ -145,10 +145,10 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
 
         {/* Opción: Inscribir asignaturas */}
         <div className="icon-content">
-          <button className={activePage === "Inscribir" ? "active" : ""} onClick={() => setActivePage("inscribir")}>
+          <button className={activePage === "inscribir" ? "active" : ""} onClick={() => setActivePage("inscribir")}>
             <FaClipboardList /> <span>Inscribir asignaturas</span>
           </button>
-          {!isOpen && <span className="tooltip">Incribir asignaturas</span>}
+          {!isOpen && <span className="tooltip">Inscribir asignaturas</span>}
         </div>
 
         {/* Opción: Modificar matrícula */}
