@@ -518,6 +518,10 @@ const PensumVisual = () => {
                     <div className="materia-info">
                       <span className="materia-codigo">{asignatura.codigo}</span>
                       <span className="materia-creditos">{asignatura.creditos}</span>
+                      {/* Mostrar nota si está cursada, matriculada o tiene historial */}
+                      {asignatura.nota !== null && asignatura.nota !== undefined && (
+                        <span className="materia-nota">{asignatura.nota.toFixed(2)}</span>
+                      )}
                     </div>
                   </div>
                 ))}

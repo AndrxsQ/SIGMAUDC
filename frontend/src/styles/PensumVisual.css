@@ -507,11 +507,17 @@
 }
 
 .materia-nota {
-  font-size: 10px;
-  color: var(--pensum-success);
-  font-weight: 600;
-  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pensum-text-primary);
+  background: rgba(201, 162, 63, 0.15);
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(201, 162, 63, 0.3);
+  min-width: 45px;
+  text-align: center;
   font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  margin-left: auto;
 }
 
 .materia-repeticiones {

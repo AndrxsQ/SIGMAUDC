@@ -224,3 +224,25 @@ func joinDocumentos(docs []string) string {
 	return result
 }
 
+// GetAsignaturasDisponibles obtiene las asignaturas disponibles para inscripción
+// Por ahora retorna un array vacío ya que la lógica completa aún no está implementada
+func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *http.Request) {
+	claims, err := h.getClaims(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if claims.Rol != "estudiante" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	// Por ahora retornar array vacío - la lógica completa se implementará después
+	// El frontend usará datos mock mientras tanto
+	response := []interface{}{}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
