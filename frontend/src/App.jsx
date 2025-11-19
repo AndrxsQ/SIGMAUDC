@@ -17,6 +17,7 @@ import SidebarJefe from "./components/jefe/SidebarJefe";
 // Páginas de estudiantes
 import Home from "./pages/estudiante/Home";
 import InscribirAsignaturas from "./pages/estudiante/InscribirAsignaturas";
+import ConsultarMatricula from "./pages/estudiante/ConsultarMatricula";
 
 // Páginas de jefes
 import HomeJefe from "./pages/jefe/HomeJefe";
@@ -106,6 +107,8 @@ function AppContent() {
       setActivePage("pensul");
     } else if (path === "/inscribir") {
       setActivePage("inscribir");
+    } else if (path === "/prueba") {
+      setActivePage("Consultar");
     } else if (path === "/plazos") {
       setActivePage("plazos");
     } else if (path === "/verificar-documentos") {
@@ -207,6 +210,7 @@ function AppContent() {
                       <Route path="/hoja" element={<HojaDeVida />} />
                       <Route path="/pensul" element={<PensumVisual />} />
                       <Route path="/inscribir" element={<InscribirAsignaturas />} />
+                      <Route path="/prueba" element={<ConsultarMatricula />} />
                     </>
                   )}
                   
