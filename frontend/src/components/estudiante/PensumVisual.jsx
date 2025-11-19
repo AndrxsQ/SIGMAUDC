@@ -528,13 +528,36 @@ const PensumVisual = () => {
       </div>
 
       {/* Tooltip con prerrequisitos faltantes */}
+      {/* Tooltip de estado - Solo en PC */}
+      {hoveredAsignatura && (
+        <div
+          className="tooltip-estado"
+          style={{
+            position: 'fixed',
+            left: `${tooltipPosition.x + 10}px`,
+            top: `${tooltipPosition.y + 10}px`,
+            zIndex: 1000,
+          }}
+        >
+          <div className={`tooltip-estado-badge ${getEstadoClass(hoveredAsignatura.estado)}`}>
+            {hoveredAsignatura.estado
+              ? hoveredAsignatura.estado
+                  .split("_")
+                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                  .join(" ")
+              : "Activa"}
+          </div>
+        </div>
+      )}
+
+      {/* Tooltip de prerrequisitos faltantes */}
       {hoveredAsignatura && hoveredAsignatura.prerequisitos_faltantes && hoveredAsignatura.prerequisitos_faltantes.length > 0 && (
         <div
           className="tooltip-prerequisitos"
           style={{
             position: 'fixed',
             left: `${tooltipPosition.x + 10}px`,
-            top: `${tooltipPosition.y + 10}px`,
+            top: `${tooltipPosition.y + 50}px`,
             zIndex: 1000,
           }}
         >
@@ -556,6 +579,7 @@ const PensumVisual = () => {
         </div>
         <div className="legend-content">
           <div className="legend-item activa">
+            <div className="legend-color-box activa"></div>
             <FaInfoCircle /> 
             <div className="legend-text">
               <strong>Activa</strong>
@@ -563,6 +587,7 @@ const PensumVisual = () => {
             </div>
           </div>
           <div className="legend-item matriculada">
+            <div className="legend-color-box matriculada"></div>
             <FaBook /> 
             <div className="legend-text">
               <strong>Matriculada</strong>
@@ -570,6 +595,7 @@ const PensumVisual = () => {
             </div>
           </div>
           <div className="legend-item cursada">
+            <div className="legend-color-box cursada"></div>
             <FaCheckCircle /> 
             <div className="legend-text">
               <strong>Cursada</strong>
@@ -577,6 +603,7 @@ const PensumVisual = () => {
             </div>
           </div>
           <div className="legend-item en-espera">
+            <div className="legend-color-box en-espera"></div>
             <FaClock /> 
             <div className="legend-text">
               <strong>En Espera</strong>
@@ -584,6 +611,7 @@ const PensumVisual = () => {
             </div>
           </div>
           <div className="legend-item pendiente-repeticion">
+            <div className="legend-color-box pendiente-repeticion"></div>
             <FaExclamationTriangle /> 
             <div className="legend-text">
               <strong>Pendiente Repetición</strong>
@@ -591,6 +619,7 @@ const PensumVisual = () => {
             </div>
           </div>
           <div className="legend-item obligatoria-repeticion">
+            <div className="legend-color-box obligatoria-repeticion"></div>
             <FaExclamationTriangle /> 
             <div className="legend-text">
               <strong>Obligatoria Repetición</strong>
