@@ -456,8 +456,15 @@ const PensumVisual = () => {
 
   return (
     <div className="pensum-container">
-      {/* Encabezado con ícono y título del programa */}
+      {/* Encabezado con logo, ícono y título del programa */}
       <div className="modal-header">
+        <div className="pensum-logo-container">
+          <img 
+            src="/logo-udc.png" 
+            alt="Logo Universidad" 
+            className="pensum-logo"
+          />
+        </div>
         <div className="modal-logo">
           <span className="logo-circle">
             <FaCalendarAlt size={20} />

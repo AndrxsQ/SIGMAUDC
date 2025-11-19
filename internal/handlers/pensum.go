@@ -28,38 +28,30 @@ func (h *PensumHandler) getClaims(r *http.Request) (*models.JWTClaims, error) {
 
 // GetPensumEstudiante obtiene el pensum completo de un estudiante con toda la información
 func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Request) {
-	log.Printf("GetPensumEstudiante: Iniciando request")
-	
 	claims, err := h.getClaims(r)
 	if err != nil {
-		log.Printf("GetPensumEstudiante: Error getting claims: %v", err)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	if claims.Rol != "estudiante" {
-		log.Printf("GetPensumEstudiante: Rol no es estudiante: %s", claims.Rol)
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
-	
-	log.Printf("GetPensumEstudiante: Claims obtenidos correctamente, estudiante_id: %d", claims.Sub)
 
 	// Obtener estudiante_id
 	var estudianteID int
 	queryEstudiante := `SELECT id FROM estudiante WHERE usuario_id = $1`
 	err = h.db.QueryRow(queryEstudiante, claims.Sub).Scan(&estudianteID)
 	if err == sql.ErrNoRows {
-		log.Printf("GetPensumEstudiante: Estudiante no encontrado para usuario_id: %d", claims.Sub)
 		http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
 		return
 	}
 	if err != nil {
-		log.Printf("GetPensumEstudiante: Error getting estudiante: %v", err)
+		log.Printf("Error getting estudiante: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("GetPensumEstudiante: Estudiante encontrado, estudiante_id: %d", estudianteID)
 
 	// Obtener pensum asignado al estudiante
 	var pensumID int
@@ -74,31 +66,23 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 	`
 	err = h.db.QueryRow(queryPensum, estudianteID).Scan(&pensumID, &pensumNombre, &programaNombre)
 	if err == sql.ErrNoRows {
-		log.Printf("GetPensumEstudiante: Pensum no asignado al estudiante_id: %d", estudianteID)
 		http.Error(w, "Pensum no asignado al estudiante", http.StatusNotFound)
 		return
 	}
 	if err != nil {
-		log.Printf("GetPensumEstudiante: Error getting pensum: %v", err)
+		log.Printf("Error getting pensum: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("GetPensumEstudiante: Pensum encontrado, pensum_id: %d, nombre: %s", pensumID, pensumNombre)
 
 	// Obtener periodo activo para verificar matrícula actual
 	var periodoActivoID sql.NullInt64
 	queryPeriodoActivo := `SELECT id FROM periodo_academico WHERE activo = true AND archivado = false LIMIT 1`
 	errPeriodo := h.db.QueryRow(queryPeriodoActivo).Scan(&periodoActivoID)
 	if errPeriodo != nil && errPeriodo != sql.ErrNoRows {
-		log.Printf("GetPensumEstudiante: Error getting periodo activo: %v", errPeriodo)
+		log.Printf("Error getting periodo activo: %v", errPeriodo)
 		// Continuar sin periodo activo si hay error
 		periodoActivoID = sql.NullInt64{Valid: false}
-	}
-	
-	if periodoActivoID.Valid {
-		log.Printf("GetPensumEstudiante: Periodo activo encontrado, periodo_id: %d", periodoActivoID.Int64)
-	} else {
-		log.Printf("GetPensumEstudiante: No hay periodo activo")
 	}
 
 	// Obtener todas las asignaturas del pensum organizadas por semestre
@@ -258,14 +242,12 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 		Semestres:      semestres,
 	}
 
-	log.Printf("GetPensumEstudiante: Respuesta construida, %d semestres encontrados", len(semestres))
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("GetPensumEstudiante: Error encoding response: %v", err)
+		log.Printf("Error encoding response: %v", err)
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("GetPensumEstudiante: Respuesta enviada exitosamente")
 }
 
 // getPrerequisitos obtiene los prerrequisitos de una asignatura (versión simple)

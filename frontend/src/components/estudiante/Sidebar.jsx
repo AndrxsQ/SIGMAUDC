@@ -29,6 +29,9 @@ import "../../styles/Sidebar.css";
 const Sidebar = ({ activePage, setActivePage, onLogout }) => {
   // Estado local para controlar si la barra lateral está abierta o cerrada.
   const [isOpen, setIsOpen] = useState(false);
+  const pageChangeCountRef = React.useRef(0);
+  const autoCloseTimerRef = React.useRef(null);
+  
   // Función que alterna entre los estados abierto/cerrado del menú lateral.
   const toggleSidebar = () => {
     const newState = !isOpen;
@@ -48,6 +51,40 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
       if (backdrop) backdrop.classList.remove('active');
     }
   };
+
+  // Función para cerrar el sidebar con animación suave
+  const closeSidebar = () => {
+    if (isOpen) {
+      setIsOpen(false);
+      const backdrop = document.querySelector('.sidebar-backdrop');
+      document.documentElement.classList.remove('sidebar-open');
+      document.documentElement.classList.add('sidebar-closed');
+      if (backdrop) backdrop.classList.remove('active');
+    }
+  };
+
+  // Efecto para auto-cerrar después de cambiar de página (después de 3 cambios)
+  useEffect(() => {
+    // Solo en desktop (>= 1025px)
+    if (window.innerWidth >= 1025) {
+      // Incrementar contador de cambios de página
+      pageChangeCountRef.current += 1;
+      
+      // Limpiar timer anterior si existe
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current);
+      }
+      
+      // Si ha habido 3 o más cambios de página, cerrar después de un delay suave
+      if (pageChangeCountRef.current >= 3) {
+        autoCloseTimerRef.current = setTimeout(() => {
+          closeSidebar();
+          // Resetear contador después de cerrar
+          pageChangeCountRef.current = 0;
+        }, 600); // Delay elegante de 600ms
+      }
+    }
+  }, [activePage]);
 
   // Cerrar sidebar al hacer click en backdrop
   useEffect(() => {
@@ -70,16 +107,23 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
   // Inicializar estado del sidebar en desktop
   useEffect(() => {
     if (window.innerWidth >= 1025) {
-      // En desktop, sidebar abierto por defecto
-      document.documentElement.classList.remove('sidebar-closed');
-      document.documentElement.classList.add('sidebar-open');
-      setIsOpen(true);
+      // En desktop, sidebar cerrado por defecto para mejor experiencia
+      document.documentElement.classList.remove('sidebar-open');
+      document.documentElement.classList.add('sidebar-closed');
+      setIsOpen(false);
     } else {
       // En móviles, sidebar cerrado por defecto
       document.documentElement.classList.remove('sidebar-open');
       document.documentElement.classList.add('sidebar-closed');
       setIsOpen(false);
     }
+    
+    // Cleanup timer al desmontar
+    return () => {
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current);
+      }
+    };
   }, []);
 
   return (

@@ -95,9 +95,57 @@
 .modal-header {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
   padding: 20px 0;
   margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.pensum-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pensum-logo {
+  height: 60px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.pensum-logo:hover {
+  transform: scale(1.05);
+}
+
+/* Responsive logo */
+@media (max-width: 767px) {
+  .pensum-logo {
+    height: 45px;
+  }
+  
+  .modal-header {
+    gap: 12px;
+    padding: 16px 0;
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 374px) {
+  .pensum-logo {
+    height: 40px;
+  }
+  
+  .modal-header {
+    gap: 10px;
+    padding: 12px 0;
+    margin-bottom: 16px;
+  }
+}
+
+.modal-header {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
