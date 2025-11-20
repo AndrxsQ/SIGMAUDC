@@ -64,6 +64,8 @@ type AsignaturaCompleta struct {
 	Estado                *string  `json:"estado"` // puede ser null si no está en estudiante_asignatura
 	Nota                  *float64 `json:"nota"`
 	Repeticiones          int      `json:"repeticiones"`
+	GrupoID               *int     `json:"grupo_id,omitempty"`
+	PeriodoCursada        *string  `json:"periodo_cursada,omitempty"`
 	Prerequisitos         []Prerequisito `json:"prerequisitos"`
 	PrerequisitosFaltantes []Prerequisito `json:"prerequisitos_faltantes"` // Prerrequisitos que aún no están aprobados
 	PosicionX             *float64 `json:"posicion_x,omitempty"` // Posición X para visualización
