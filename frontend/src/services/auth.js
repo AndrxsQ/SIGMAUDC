@@ -21,34 +21,45 @@ const api = axios.create({
 
 // Interceptor para agregar el token a las peticiones
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
+	(config) => {
+		const token = localStorage.getItem('token');
+		if (token) {
+			config.headers.Authorization = `Bearer ${token}`;
+		} else {
+			console.warn('No token found in localStorage for request to:', config.url);
+		}
+		return config;
+	},
+	(error) => {
+		return Promise.reject(error);
+	}
 );
 
 // Interceptor para manejar errores de autenticación
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // Solo redirigir si NO es una petición de login o set-password
-    // El login y set-password manejan sus propios errores 401
-    if (error.response?.status === 401 && 
-        !error.config?.url?.includes('/auth/login') && 
-        !error.config?.url?.includes('/auth/set-password')) {
-      // Token inválido o expirado en otras rutas
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
+	(response) => response,
+	(error) => {
+		// Log para depuración
+		if (error.response) {
+			console.error('API Error:', error.response.status, error.response.statusText, error.config?.url);
+		} else if (error.request) {
+			console.error('API Request Error:', error.request);
+		} else {
+			console.error('API Error:', error.message);
+		}
+		
+		// Solo redirigir si NO es una petición de login o set-password
+		// El login y set-password manejan sus propios errores 401
+		if (error.response?.status === 401 && 
+			!error.config?.url?.includes('/auth/login') && 
+			!error.config?.url?.includes('/auth/set-password')) {
+			// Token inválido o expirado en otras rutas
+			localStorage.removeItem('token');
+			localStorage.removeItem('user');
+			window.location.href = '/login';
+		}
+		return Promise.reject(error);
+	}
 );
 
 export const authService = {

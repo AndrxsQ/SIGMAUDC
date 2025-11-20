@@ -28,11 +28,14 @@ func (h *PensumHandler) getClaims(r *http.Request) (*models.JWTClaims, error) {
 
 // GetPensumEstudiante obtiene el pensum completo de un estudiante con toda la información
 func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Request) {
+	log.Printf("🎯 GetPensumEstudiante - Handler llamado para %s", r.URL.Path)
 	claims, err := h.getClaims(r)
 	if err != nil {
+		log.Printf("❌ GetPensumEstudiante - Error obteniendo claims: %v", err)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	log.Printf("✅ GetPensumEstudiante - Claims obtenidos: Rol=%s, Sub=%s", claims.Rol, claims.Sub)
 
 	if claims.Rol != "estudiante" {
 		http.Error(w, "Forbidden", http.StatusForbidden)
@@ -42,16 +45,19 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 	// Obtener estudiante_id
 	var estudianteID int
 	queryEstudiante := `SELECT id FROM estudiante WHERE usuario_id = $1`
+	log.Printf("🔍 Buscando estudiante con usuario_id: %v", claims.Sub)
 	err = h.db.QueryRow(queryEstudiante, claims.Sub).Scan(&estudianteID)
 	if err == sql.ErrNoRows {
+		log.Printf("❌ Estudiante no encontrado para usuario_id: %v", claims.Sub)
 		http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
 		return
 	}
 	if err != nil {
-		log.Printf("Error getting estudiante: %v", err)
+		log.Printf("❌ Error getting estudiante: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("✅ Estudiante encontrado: estudiante_id=%d", estudianteID)
 
 	// Obtener pensum asignado al estudiante
 	var pensumID int
@@ -64,16 +70,19 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 		JOIN programa pr ON p.programa_id = pr.id
 		WHERE ep.estudiante_id = $1
 	`
+	log.Printf("🔍 Buscando pensum para estudiante_id: %d", estudianteID)
 	err = h.db.QueryRow(queryPensum, estudianteID).Scan(&pensumID, &pensumNombre, &programaNombre)
 	if err == sql.ErrNoRows {
+		log.Printf("❌ Pensum no asignado al estudiante_id: %d", estudianteID)
 		http.Error(w, "Pensum no asignado al estudiante", http.StatusNotFound)
 		return
 	}
 	if err != nil {
-		log.Printf("Error getting pensum: %v", err)
+		log.Printf("❌ Error getting pensum: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("✅ Pensum encontrado: pensum_id=%d, nombre=%s, programa=%s", pensumID, pensumNombre, programaNombre)
 
 	// Obtener periodo activo para verificar matrícula actual
 	var periodoActivoID sql.NullInt64
@@ -87,7 +96,7 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 
 	// Obtener todas las asignaturas del pensum organizadas por semestre
 	// Incluye información de matrícula actual e historial académico
-	// Usamos una subquery para el periodo activo para evitar problemas con NULL
+	// RN-14 a RN-17: Profundizaciones y electivas se tratan como obligatorias normales
 	queryAsignaturas := `
 		SELECT 
 			pa.semestre,
@@ -98,7 +107,8 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 			at.nombre as tipo_nombre,
 			a.tiene_laboratorio,
 			pa.categoria,
-			COALESCE(ea.estado, 'activa') as estado,
+			-- Estado de estudiante_asignatura (puede ser null)
+			ea.estado as estado_estudiante_asignatura,
 			ea.nota as nota_estudiante_asignatura,
 			COALESCE(ea.repeticiones, 0) as repeticiones,
 			-- Nota del historial académico (última nota registrada)
@@ -107,6 +117,31 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 			 WHERE ha.estudiante_id = $1 AND ha.asignatura_id = a.id 
 			 ORDER BY ha.id DESC 
 			 LIMIT 1) as nota_historial,
+			-- Verificar si está aprobada (nota >= 3.0 en historial)
+			CASE 
+				WHEN EXISTS (
+					SELECT 1 FROM historial_academico ha
+					WHERE ha.estudiante_id = $1 
+					AND ha.asignatura_id = a.id 
+					AND ha.aprobado = true
+				) THEN true
+				ELSE false
+			END as esta_aprobada,
+			-- Verificar si está reprobada (último intento fue reprobado)
+			CASE 
+				WHEN EXISTS (
+					SELECT 1 FROM estudiante_asignatura_intentos eai
+					WHERE eai.estudiante_id = $1 
+					AND eai.asignatura_id = a.id 
+					AND eai.estado = 'reprobado'
+					AND eai.periodo_id = (
+						SELECT MAX(periodo_id) 
+						FROM estudiante_asignatura_intentos 
+						WHERE estudiante_id = $1 AND asignatura_id = a.id
+					)
+				) THEN true
+				ELSE false
+			END as esta_reprobada,
 			-- Verificar si está matriculada en el periodo actual
 			CASE 
 				WHEN (SELECT id FROM periodo_academico WHERE activo = true AND archivado = false LIMIT 1) IS NOT NULL 
@@ -128,24 +163,28 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 		WHERE pa.pensum_id = $2
 		ORDER BY pa.semestre, a.codigo
 	`
+	log.Printf("🔍 Consultando asignaturas para estudiante_id=%d, pensum_id=%d", estudianteID, pensumID)
 	rows, err := h.db.Query(queryAsignaturas, estudianteID, pensumID)
 	if err != nil {
-		log.Printf("Error querying asignaturas: %v", err)
+		log.Printf("❌ Error querying asignaturas: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
+	log.Printf("✅ Query de asignaturas ejecutada exitosamente")
 
 	// Mapa para organizar asignaturas por semestre
 	semestresMap := make(map[int][]models.AsignaturaCompleta)
 
 	for rows.Next() {
 		var asignatura models.AsignaturaCompleta
-		var estado sql.NullString
+		var estadoEstudianteAsignatura sql.NullString
 		var notaEstudianteAsignatura sql.NullFloat64
 		var notaHistorial sql.NullFloat64
 		var repeticiones int
 		var estaMatriculada bool
+		var estaAprobada bool
+		var estaReprobada bool
 
 		err := rows.Scan(
 			&asignatura.Semestre,
@@ -156,10 +195,12 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 			&asignatura.TipoNombre,
 			&asignatura.TieneLaboratorio,
 			&asignatura.Categoria,
-			&estado,
+			&estadoEstudianteAsignatura,
 			&notaEstudianteAsignatura,
 			&repeticiones,
 			&notaHistorial,
+			&estaAprobada,
+			&estaReprobada,
 			&estaMatriculada,
 		)
 		if err != nil {
@@ -167,13 +208,23 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 			continue
 		}
 
-		// Determinar estado: si está matriculada en el periodo actual, el estado es "matriculada"
-		if estaMatriculada {
+		// RN-03: Si está aprobada, el estado es "aprobada"
+		if estaAprobada {
+			estadoAprobada := "aprobada"
+			asignatura.Estado = &estadoAprobada
+		} else if estaMatriculada {
+			// Si está matriculada en el periodo actual, el estado es "matriculada"
 			estadoMatriculada := "matriculada"
 			asignatura.Estado = &estadoMatriculada
-		} else if estado.Valid {
-			asignatura.Estado = &estado.String
+		} else if estaReprobada {
+			// Si está reprobada, el estado inicial es "reprobada" (luego se calculará si es pendiente u obligatoria)
+			estadoReprobada := "reprobada"
+			asignatura.Estado = &estadoReprobada
+		} else if estadoEstudianteAsignatura.Valid {
+			// Usar el estado de estudiante_asignatura si existe
+			asignatura.Estado = &estadoEstudianteAsignatura.String
 		} else {
+			// Estado inicial por defecto (se calculará después)
 			estadoDefault := "activa"
 			asignatura.Estado = &estadoDefault
 		}
@@ -185,7 +236,7 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 		if estaMatriculada && notaEstudianteAsignatura.Valid {
 			// Está cursando actualmente, mostrar nota actual
 			asignatura.Nota = &notaEstudianteAsignatura.Float64
-		} else if estado.Valid && (estado.String == "matriculada" || estado.String == "cursada") && notaEstudianteAsignatura.Valid {
+		} else if estadoEstudianteAsignatura.Valid && (estadoEstudianteAsignatura.String == "matriculada" || estadoEstudianteAsignatura.String == "cursada") && notaEstudianteAsignatura.Valid {
 			// Está matriculada o cursada según estudiante_asignatura
 			asignatura.Nota = &notaEstudianteAsignatura.Float64
 		} else if notaHistorial.Valid {
@@ -200,6 +251,7 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 		asignatura.Repeticiones = repeticiones
 
 		// Obtener prerrequisitos para esta asignatura con información de completitud
+		// RN-25 a RN-32: Los prerrequisitos se validan según el pensum del estudiante (núcleo común)
 		prerequisitos, err := h.getPrerequisitosConEstado(asignatura.ID, estudianteID, pensumID)
 		if err != nil {
 			log.Printf("Error getting prerequisitos for asignatura %d: %v", asignatura.ID, err)
@@ -216,7 +268,7 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 			asignatura.PrerequisitosFaltantes = faltantes
 		}
 
-		// Calcular estado correcto según prerrequisitos
+		// Calcular estado correcto según las reglas de negocio (RN-01 a RN-32)
 		estadoCalculado := h.calcularEstadoAsignatura(asignatura, estudianteID)
 		asignatura.Estado = &estadoCalculado
 
@@ -236,6 +288,7 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Construir respuesta
+	log.Printf("📊 Construyendo respuesta: %d semestres encontrados", len(semestres))
 	response := models.PensumEstudianteResponse{
 		ProgramaNombre: programaNombre,
 		PensumNombre:   pensumNombre,
@@ -243,11 +296,13 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	log.Printf("✅ Enviando respuesta JSON")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("Error encoding response: %v", err)
+		log.Printf("❌ Error encoding response: %v", err)
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("✅ Respuesta enviada exitosamente")
 }
 
 // getPrerequisitos obtiene los prerrequisitos de una asignatura (versión simple)
@@ -291,6 +346,9 @@ func (h *PensumHandler) getPrerequisitos(asignaturaID int) ([]models.Prerequisit
 }
 
 // getPrerequisitosConEstado obtiene los prerrequisitos con información de si están completados
+// RN-08: Un estudiante solo puede matricular una asignatura si ha aprobado todas las materias prerrequisito
+// RN-10: Cadena de dependencia - los prerrequisitos se heredan
+// RN-26: Para núcleo común, se validan los prerrequisitos del pensum del estudiante
 func (h *PensumHandler) getPrerequisitosConEstado(asignaturaID int, estudianteID int, pensumID int) ([]models.Prerequisito, error) {
 	query := `
 		SELECT 
@@ -300,14 +358,19 @@ func (h *PensumHandler) getPrerequisitosConEstado(asignaturaID int, estudianteID
 			a.codigo,
 			a.nombre,
 			COALESCE(pa.semestre, 0) as semestre,
+			-- RN-08: Un prerrequisito está completado solo si está aprobado (nota >= 3.0 en historial)
 			CASE 
-				WHEN ea.estado = 'aprobada' OR (ea.estado = 'cursada' AND (ea.nota IS NULL OR ea.nota >= 3.0)) THEN true
+				WHEN EXISTS (
+					SELECT 1 FROM historial_academico ha
+					WHERE ha.estudiante_id = $2 
+					AND ha.asignatura_id = a.id 
+					AND ha.aprobado = true
+				) THEN true
 				ELSE false
 			END as completado
 		FROM pensum_prerequisito pr
 		JOIN asignatura a ON pr.prerequisito_id = a.id
 		LEFT JOIN pensum_asignatura pa ON pa.asignatura_id = a.id AND pa.pensum_id = $3
-		LEFT JOIN estudiante_asignatura ea ON ea.estudiante_id = $2 AND ea.asignatura_id = a.id
 		WHERE pr.asignatura_id = $1 AND pr.pensum_id = $3
 		ORDER BY a.codigo
 	`
@@ -340,41 +403,334 @@ func (h *PensumHandler) getPrerequisitosConEstado(asignaturaID int, estudianteID
 	return prerequisitos, nil
 }
 
-// calcularEstadoAsignatura calcula el estado correcto de una asignatura según sus prerrequisitos
+// calcularEstadoAsignatura calcula el estado correcto de una asignatura según las reglas de negocio
+// Implementa RN-01 a RN-32
 func (h *PensumHandler) calcularEstadoAsignatura(asignatura models.AsignaturaCompleta, estudianteID int) string {
-	// Si ya tiene un estado específico que no sea "activa" o "en_espera", mantenerlo
-	if asignatura.Estado != nil {
-		estadoActual := *asignatura.Estado
-		if estadoActual == "cursada" || estadoActual == "matriculada" || 
-		   estadoActual == "pendiente_repeticion" || estadoActual == "obligatoria_repeticion" {
-			return estadoActual
+	// RN-03: Una asignatura aprobada no puede volver a matricularse
+	if asignatura.Estado != nil && *asignatura.Estado == "aprobada" {
+		return "aprobada"
+	}
+
+	// RN-19, RN-20: Verificar si hay repetición obligatoria
+	esRepeticionObligatoria, err := h.esRepeticionObligatoria(estudianteID, asignatura.ID)
+	if err != nil {
+		log.Printf("Error verificando repetición obligatoria: %v", err)
+	} else if esRepeticionObligatoria {
+		return "obligatoria_repeticion"
+	}
+
+	// RN-18: Verificar si está pendiente de repetición (primera vez reprobada)
+	if asignatura.Estado != nil && *asignatura.Estado == "reprobada" {
+		// Verificar si debe estar en pendiente_repeticion o ya pasó el periodo de gracia
+		esPendienteRepeticion, err := h.esPendienteRepeticion(estudianteID, asignatura.ID)
+		if err != nil {
+			log.Printf("Error verificando pendiente repetición: %v", err)
+		} else if esPendienteRepeticion {
+			return "pendiente_repeticion"
 		}
 	}
 
-	// Si no tiene prerrequisitos, está activa
-	if len(asignatura.Prerequisitos) == 0 {
-		return "activa"
-	}
-
-	// Verificar si todos los prerrequisitos están completados
-	todosCompletados := true
+	// RN-01, RN-02: Verificar prerrequisitos para determinar si está ACTIVA o EN ESPERA
+	// RN-08: Un estudiante solo puede matricular una asignatura si ha aprobado todas las materias prerrequisito
+	// RN-10: Cadena de dependencia - los prerrequisitos se heredan
+	todosPrerequisitosCompletados := true
 	for _, prereq := range asignatura.Prerequisitos {
 		if !prereq.Completado {
-			todosCompletados = false
+			todosPrerequisitosCompletados = false
 			break
 		}
 	}
 
-	if todosCompletados {
-		// Si todos los prerrequisitos están completados y no tiene estado específico, está activa
-		if asignatura.Estado == nil || *asignatura.Estado == "activa" || *asignatura.Estado == "en_espera" {
-			return "activa"
+	// RN-22: Verificar si está bloqueada por repetición obligatoria de otra materia
+	estaBloqueada, err := h.estaBloqueadaPorRepeticionObligatoria(estudianteID, asignatura.ID)
+	if err != nil {
+		log.Printf("Error verificando bloqueo por repetición: %v", err)
+	} else if estaBloqueada {
+		// Si está bloqueada pero tiene prerrequisitos completados, sigue en espera
+		// pero por bloqueo, no por prerrequisitos
+		if !todosPrerequisitosCompletados {
+			return "en_espera"
 		}
-		return *asignatura.Estado
+		// Si tiene prerrequisitos completados pero está bloqueada, mantener estado actual
+		// o retornar en_espera si no tiene estado específico
+		if asignatura.Estado == nil {
+			return "en_espera"
+		}
 	}
 
-	// Si faltan prerrequisitos, está en espera
+	// Si no tiene prerrequisitos y no está bloqueada, está activa (RN-01)
+	if len(asignatura.Prerequisitos) == 0 {
+		if asignatura.Estado != nil && (*asignatura.Estado == "matriculada" || *asignatura.Estado == "reprobada") {
+			return *asignatura.Estado
+		}
+		return "activa"
+	}
+
+	// Si todos los prerrequisitos están completados, está activa (RN-01)
+	if todosPrerequisitosCompletados {
+		if asignatura.Estado != nil && (*asignatura.Estado == "matriculada" || *asignatura.Estado == "reprobada") {
+			return *asignatura.Estado
+		}
+		return "activa"
+	}
+
+	// Si faltan prerrequisitos, está en espera (RN-02)
 	return "en_espera"
+}
+
+// esRepeticionObligatoria verifica si una asignatura debe repetirse obligatoriamente
+// RN-19: Si el estudiante NO repite la materia el periodo inmediatamente siguiente,
+// entonces debe cursarla obligatoriamente en el segundo periodo después de haberla perdido
+// RN-20: Si la reprueba dos veces, debe matricularla obligatoriamente en el siguiente periodo disponible
+func (h *PensumHandler) esRepeticionObligatoria(estudianteID int, asignaturaID int) (bool, error) {
+	// Obtener el último periodo donde se reprobó
+	query := `
+		SELECT periodo_id, estado, nota
+		FROM estudiante_asignatura_intentos
+		WHERE estudiante_id = $1 AND asignatura_id = $2
+		ORDER BY periodo_id DESC
+		LIMIT 2
+	`
+	rows, err := h.db.Query(query, estudianteID, asignaturaID)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	var intentos []struct {
+		periodoID int
+		estado    string
+		nota      sql.NullFloat64
+	}
+
+	for rows.Next() {
+		var intento struct {
+			periodoID int
+			estado    string
+			nota      sql.NullFloat64
+		}
+		if err := rows.Scan(&intento.periodoID, &intento.estado, &intento.nota); err != nil {
+			continue
+		}
+		intentos = append(intentos, intento)
+	}
+
+	if len(intentos) == 0 {
+		return false, nil
+	}
+
+	// RN-20: Si la reprueba dos veces, es obligatoria
+	if len(intentos) >= 2 {
+		// Verificar si los dos últimos intentos fueron reprobados
+		ultimoReprobado := intentos[0].estado == "reprobado"
+		penultimoReprobado := intentos[1].estado == "reprobado"
+		if ultimoReprobado && penultimoReprobado {
+			return true, nil
+		}
+	}
+
+	// RN-19: Verificar si pasó el periodo de gracia
+	if len(intentos) >= 1 && intentos[0].estado == "reprobado" {
+		periodoReprobadoID := intentos[0].periodoID
+		
+		// Obtener el periodo activo actual
+		var periodoActivoID sql.NullInt64
+		queryPeriodo := `SELECT id FROM periodo_academico WHERE activo = true AND archivado = false ORDER BY year DESC, semestre DESC LIMIT 1`
+		err := h.db.QueryRow(queryPeriodo).Scan(&periodoActivoID)
+		if err != nil || !periodoActivoID.Valid {
+			return false, nil
+		}
+
+		// Obtener información de los periodos
+		var periodoReprobadoYear, periodoReprobadoSemestre int
+		var periodoActivoYear, periodoActivoSemestre int
+		
+		queryPeriodoReprobado := `SELECT year, semestre FROM periodo_academico WHERE id = $1`
+		err = h.db.QueryRow(queryPeriodoReprobado, periodoReprobadoID).Scan(&periodoReprobadoYear, &periodoReprobadoSemestre)
+		if err != nil {
+			return false, nil
+		}
+
+		queryPeriodoActivo := `SELECT year, semestre FROM periodo_academico WHERE id = $1`
+		err = h.db.QueryRow(queryPeriodoActivo, periodoActivoID.Int64).Scan(&periodoActivoYear, &periodoActivoSemestre)
+		if err != nil {
+			return false, nil
+		}
+
+		// Calcular cuántos periodos han pasado
+		periodosPasados := (periodoActivoYear-periodoReprobadoYear)*2 + (periodoActivoSemestre - periodoReprobadoSemestre)
+		
+		// Si han pasado 2 o más periodos desde que se reprobó, es obligatoria
+		if periodosPasados >= 2 {
+			// Verificar si ya se matriculó en algún periodo después de reprobar
+			queryMatriculada := `
+				SELECT COUNT(*) FROM matricula m
+				JOIN grupo g ON m.grupo_id = g.id
+				JOIN periodo_academico p ON m.periodo_id = p.id
+				WHERE m.estudiante_id = $1 
+				AND g.asignatura_id = $2
+				AND (p.year > $3 OR (p.year = $3 AND p.semestre > $4))
+				AND m.estado = 'inscrita'
+			`
+			var count int
+			err = h.db.QueryRow(queryMatriculada, estudianteID, asignaturaID, periodoReprobadoYear, periodoReprobadoSemestre).Scan(&count)
+			if err == nil && count == 0 {
+				// No se ha matriculado después de reprobar, es obligatoria
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+// esPendienteRepeticion verifica si una asignatura está pendiente de repetición (primera vez)
+// RN-18: Si el estudiante reprueba una asignatura, puede repetirla en el periodo siguiente o no repetirla
+func (h *PensumHandler) esPendienteRepeticion(estudianteID int, asignaturaID int) (bool, error) {
+	// Obtener el último intento
+	query := `
+		SELECT periodo_id, estado
+		FROM estudiante_asignatura_intentos
+		WHERE estudiante_id = $1 AND asignatura_id = $2
+		ORDER BY periodo_id DESC
+		LIMIT 1
+	`
+	var periodoID int
+	var estado string
+	err := h.db.QueryRow(query, estudianteID, asignaturaID).Scan(&periodoID, &estado)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	if estado != "reprobado" {
+		return false, nil
+	}
+
+	// Verificar si ya se matriculó en el periodo siguiente
+	var periodoReprobadoYear, periodoReprobadoSemestre int
+	queryPeriodo := `SELECT year, semestre FROM periodo_academico WHERE id = $1`
+	err = h.db.QueryRow(queryPeriodo, periodoID).Scan(&periodoReprobadoYear, &periodoReprobadoSemestre)
+	if err != nil {
+		return false, nil
+	}
+
+	// Obtener el periodo activo actual
+	var periodoActivoID sql.NullInt64
+	queryPeriodoActivo := `SELECT id FROM periodo_academico WHERE activo = true AND archivado = false ORDER BY year DESC, semestre DESC LIMIT 1`
+	err = h.db.QueryRow(queryPeriodoActivo).Scan(&periodoActivoID)
+	if err != nil || !periodoActivoID.Valid {
+		return false, nil
+	}
+
+	var periodoActivoYear, periodoActivoSemestre int
+	queryPeriodoActivoInfo := `SELECT year, semestre FROM periodo_academico WHERE id = $1`
+	err = h.db.QueryRow(queryPeriodoActivoInfo, periodoActivoID.Int64).Scan(&periodoActivoYear, &periodoActivoSemestre)
+	if err != nil {
+		return false, nil
+	}
+
+	// Calcular cuántos periodos han pasado
+	periodosPasados := (periodoActivoYear-periodoReprobadoYear)*2 + (periodoActivoSemestre - periodoReprobadoSemestre)
+	
+	// Si pasó exactamente 1 periodo y no se ha matriculado, está pendiente
+	if periodosPasados == 1 {
+		queryMatriculada := `
+			SELECT COUNT(*) FROM matricula m
+			JOIN grupo g ON m.grupo_id = g.id
+			WHERE m.estudiante_id = $1 
+			AND g.asignatura_id = $2
+			AND m.periodo_id = $3
+			AND m.estado = 'inscrita'
+		`
+		var count int
+		err = h.db.QueryRow(queryMatriculada, estudianteID, asignaturaID, periodoActivoID.Int64).Scan(&count)
+		if err == nil && count == 0 {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// estaBloqueadaPorRepeticionObligatoria verifica si una asignatura está bloqueada
+// porque el estudiante tiene materias obligatorias de repetición pendientes
+// RN-22: No se puede matricular una asignatura avanzada si el estudiante tiene pendiente una materia obligatoria por repetición
+func (h *PensumHandler) estaBloqueadaPorRepeticionObligatoria(estudianteID int, asignaturaID int) (bool, error) {
+	// Obtener todas las asignaturas que están en estado obligatoria_repeticion
+	query := `
+		SELECT asignatura_id
+		FROM estudiante_asignatura
+		WHERE estudiante_id = $1
+		AND estado = 'obligatoria_repeticion'
+	`
+	rows, err := h.db.Query(query, estudianteID)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	var asignaturasObligatorias []int
+	for rows.Next() {
+		var asigID int
+		if err := rows.Scan(&asigID); err != nil {
+			continue
+		}
+		asignaturasObligatorias = append(asignaturasObligatorias, asigID)
+	}
+
+	if len(asignaturasObligatorias) == 0 {
+		return false, nil
+	}
+
+	// Verificar si la asignatura actual tiene como prerrequisito alguna de las obligatorias
+	// Si no tiene prerrequisitos directos, no está bloqueada
+	// La lógica de bloqueo es: si hay una asignatura obligatoria de repetición,
+	// todas las asignaturas avanzadas (que no sean esa misma) están bloqueadas
+	
+	// Obtener el semestre de la asignatura actual
+	var semestreActual int
+	querySemestre := `
+		SELECT pa.semestre
+		FROM pensum_asignatura pa
+		JOIN estudiante_pensum ep ON pa.pensum_id = ep.pensum_id
+		WHERE pa.asignatura_id = $1 AND ep.estudiante_id = $2
+		LIMIT 1
+	`
+	err = h.db.QueryRow(querySemestre, asignaturaID, estudianteID).Scan(&semestreActual)
+	if err != nil {
+		return false, nil
+	}
+
+	// Obtener el semestre de las asignaturas obligatorias
+	for _, asigObligID := range asignaturasObligatorias {
+		if asigObligID == asignaturaID {
+			// La misma asignatura no se bloquea a sí misma
+			continue
+		}
+
+		var semestreOblig int
+		querySemestreOblig := `
+			SELECT pa.semestre
+			FROM pensum_asignatura pa
+			JOIN estudiante_pensum ep ON pa.pensum_id = ep.pensum_id
+			WHERE pa.asignatura_id = $1 AND ep.estudiante_id = $2
+			LIMIT 1
+		`
+		err = h.db.QueryRow(querySemestreOblig, asigObligID, estudianteID).Scan(&semestreOblig)
+		if err != nil {
+			continue
+		}
+
+		// Si la asignatura actual está en un semestre mayor que la obligatoria, está bloqueada
+		if semestreActual > semestreOblig {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // ActualizarEstadosPorPrerequisitos actualiza automáticamente los estados de las asignaturas
