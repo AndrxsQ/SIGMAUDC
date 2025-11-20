@@ -49,6 +49,10 @@ func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Reque
 
 	pensumID, pensumNombre, programaNombre, err := h.getPensumInfo(estudianteID)
 	if err != nil {
+		if errors.Is(err, errPensumNoAsignado) {
+			http.Error(w, "Pensum no asignado al estudiante", http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -149,6 +153,8 @@ func (h *PensumHandler) getEstudianteID(usuarioID int) (int, error) {
 	return estudianteID, nil
 }
 
+var errPensumNoAsignado = errors.New("pensum no asignado")
+
 func (h *PensumHandler) getPensumInfo(estudianteID int) (int, string, string, error) {
 	var pensumID int
 	var pensumNombre, programaNombre string
@@ -162,7 +168,7 @@ func (h *PensumHandler) getPensumInfo(estudianteID int) (int, string, string, er
 	err := h.db.QueryRow(query, estudianteID).Scan(&pensumID, &pensumNombre, &programaNombre)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, "", "", fmt.Errorf("pensum no asignado")
+			return 0, "", "", errPensumNoAsignado
 		}
 		return 0, "", "", err
 	}
