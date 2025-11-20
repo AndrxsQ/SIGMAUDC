@@ -674,6 +674,16 @@ const PensumVisual = () => {
                     : "Activa"}
                 </span>
               </div>
+              {selectedAsignatura.grupo_id && (
+                <div className="detalle-row">
+                  <strong>Grupo:</strong> {selectedAsignatura.grupo_id}
+                </div>
+              )}
+              {selectedAsignatura.periodo_cursada && (
+                <div className="detalle-row">
+                  <strong>Periodo cursada:</strong> {selectedAsignatura.periodo_cursada}
+                </div>
+              )}
               {selectedAsignatura.nota !== null && selectedAsignatura.nota !== undefined && (
                 <div className="detalle-row">
                   <strong>Nota:</strong> {selectedAsignatura.nota.toFixed(2)}

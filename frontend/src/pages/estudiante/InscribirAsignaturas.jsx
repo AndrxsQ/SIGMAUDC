@@ -322,8 +322,19 @@ const InscribirAsignaturas = () => {
   return (
     <div className="inscribir-container">
       <div className="inscribir-header">
-        <h1>Inscribir Asignaturas</h1>
-        <p>Selecciona los grupos de las asignaturas que deseas matricular</p>
+        <div className="header-logo-title">
+          <div className="udc-logo-container">
+            <img 
+              src="/logo-udc.png" 
+              alt="Logo Universidad" 
+              className="udc-logo"
+            />
+          </div>
+          <div>
+            <h1>Inscribir Asignaturas</h1>
+            <p>Selecciona los grupos de las asignaturas que deseas matricular</p>
+          </div>
+        </div>
       </div>
 
       <div className="inscribir-content">

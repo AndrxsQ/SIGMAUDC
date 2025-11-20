@@ -121,8 +121,12 @@ const ConsultarMatricula = () => {
       <div className="consultar-matricula-container">
         <div className="horario-header">
           <div className="header-content">
-            <div className="header-icon">
-              <FaCalendarAlt size={24} />
+            <div className="udc-logo-container">
+              <img 
+                src="/logo-udc.png" 
+                alt="Logo Universidad" 
+                className="udc-logo"
+              />
             </div>
             <div className="header-info">
               <h1>Consultar Matrícula</h1>
@@ -148,8 +152,12 @@ const ConsultarMatricula = () => {
       {/* Header */}
       <div className="horario-header">
         <div className="header-content">
-          <div className="header-icon">
-            <FaCalendarAlt size={24} />
+          <div className="udc-logo-container">
+            <img 
+              src="/logo-udc.png" 
+              alt="Logo Universidad" 
+              className="udc-logo"
+            />
           </div>
           <div className="header-info">
             <h1>Consultar Matrícula</h1>

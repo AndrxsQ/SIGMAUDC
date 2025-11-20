@@ -13,6 +13,7 @@ import (
 	"github.com/andrxsq/SIGMAUDC/internal/models"
 	"github.com/andrxsq/SIGMAUDC/internal/utils"
 	"github.com/gorilla/mux"
+	"github.com/lib/pq"
 )
 
 type PlazosHandler struct {
@@ -32,6 +33,41 @@ func (h *PlazosHandler) getClaims(r *http.Request) (*models.JWTClaims, error) {
 }
 
 func (h *PlazosHandler) getOrCreatePlazos(periodoID, programaID int) (*models.Plazos, error) {
+	plazos, err := h.fetchPlazos(periodoID, programaID)
+	if err == nil {
+		return plazos, nil
+	}
+	if err != sql.ErrNoRows {
+		return nil, err
+	}
+
+	insert := `INSERT INTO plazos (periodo_id, programa_id, documentos, inscripcion, modificaciones)
+			   VALUES ($1, $2, false, false, false)
+			   RETURNING id, periodo_id, programa_id, documentos, inscripcion, modificaciones`
+	var created models.Plazos
+	err = h.db.QueryRow(insert, periodoID, programaID).Scan(
+		&created.ID,
+		&created.PeriodoID,
+		&created.ProgramaID,
+		&created.Documentos,
+		&created.Inscripcion,
+		&created.Modificaciones,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return h.getOrCreatePlazos(periodoID, programaID)
+		}
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			return h.getOrCreatePlazos(periodoID, programaID)
+		}
+		return nil, err
+	}
+
+	return &created, nil
+}
+
+func (h *PlazosHandler) fetchPlazos(periodoID, programaID int) (*models.Plazos, error) {
 	var plazos models.Plazos
 	query := `SELECT id, periodo_id, programa_id, documentos, inscripcion, modificaciones 
 			  FROM plazos WHERE periodo_id = $1 AND programa_id = $2`
@@ -43,24 +79,6 @@ func (h *PlazosHandler) getOrCreatePlazos(periodoID, programaID int) (*models.Pl
 		&plazos.Inscripcion,
 		&plazos.Modificaciones,
 	)
-	if err == sql.ErrNoRows {
-		insert := `INSERT INTO plazos (periodo_id, programa_id, documentos, inscripcion, modificaciones)
-				   VALUES ($1, $2, false, false, false)
-				   ON CONFLICT (periodo_id, programa_id) DO NOTHING
-				   RETURNING id, periodo_id, programa_id, documentos, inscripcion, modificaciones`
-		err = h.db.QueryRow(insert, periodoID, programaID).Scan(
-			&plazos.ID,
-			&plazos.PeriodoID,
-			&plazos.ProgramaID,
-			&plazos.Documentos,
-			&plazos.Inscripcion,
-			&plazos.Modificaciones,
-		)
-		if err == sql.ErrNoRows {
-			// Otro proceso creó el registro. Reintentar lectura.
-			return h.getOrCreatePlazos(periodoID, programaID)
-		}
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -338,8 +356,8 @@ func (h *PlazosHandler) UpdatePlazos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var archivado bool
-	err = h.db.QueryRow(`SELECT archivado FROM periodo_academico WHERE id = $1`, periodoID).Scan(&archivado)
+	var activo, archivado bool
+	err = h.db.QueryRow(`SELECT activo, archivado FROM periodo_academico WHERE id = $1`, periodoID).Scan(&activo, &archivado)
 	if err == sql.ErrNoRows {
 		http.Error(w, "Periodo not found", http.StatusNotFound)
 		return
@@ -350,6 +368,10 @@ func (h *PlazosHandler) UpdatePlazos(w http.ResponseWriter, r *http.Request) {
 	}
 	if archivado {
 		http.Error(w, "No se pueden modificar plazos de un periodo archivado", http.StatusBadRequest)
+		return
+	}
+	if !activo {
+		http.Error(w, "No se pueden modificar plazos de un periodo inactivo", http.StatusBadRequest)
 		return
 	}
 

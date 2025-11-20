@@ -84,6 +84,7 @@ func main() {
 
 	// Rutas de pensum (protegidas)
 	protected.HandleFunc("/pensum", pensumHandler.GetPensumEstudiante).Methods("GET") // Para estudiantes
+	log.Println("✅ Ruta /api/pensum registrada correctamente")
 
 	// Rutas de matrícula (protegidas)
 	protected.HandleFunc("/matricula/validar-inscripcion", matriculaHandler.ValidarInscripcion).Methods("GET") // Para estudiantes
@@ -112,11 +113,24 @@ func main() {
 	// Aplicar CORS
 	handler := corsHandler(r)
 
+	// Agregar logging para todas las peticiones (para depuración)
+	loggedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("📥 Request: %s %s", r.Method, r.URL.Path)
+		handler.ServeHTTP(w, r)
+	})
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	log.Printf("Server starting on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, handler))
+	log.Printf("🚀 Server starting on port %s", port)
+	log.Println("📋 Rutas registradas:")
+	log.Println("   GET  /api/pensum")
+	log.Println("   GET  /api/me")
+	log.Println("   GET  /api/periodos")
+	log.Println("   GET  /api/documentos")
+	log.Println("   POST /auth/login")
+	log.Println("   POST /auth/set-password")
+	log.Fatal(http.ListenAndServe(":"+port, loggedHandler))
 }

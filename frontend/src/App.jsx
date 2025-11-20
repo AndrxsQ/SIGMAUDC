@@ -53,7 +53,7 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const [activePage, setActivePage] = useState("home");
   const [userRole, setUserRole] = useState(null);
-  const [roleLoading, setRoleLoading] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -129,12 +129,31 @@ function AppContent() {
 
   const handlePageChange = (page) => {
     setActivePage(page);
-    // Navegar a la ruta correspondiente
     if (page === "home") {
       navigate("/");
     } else {
       navigate(`/${page}`);
     }
+  };
+
+  const renderRouteLoading = () => (
+    <div className="route-loading">
+      <div className="loading-spinner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="32">
+            <animate attributeName="stroke-dasharray" dur="2s" values="0 32;16 16;0 32;0 32" repeatCount="indefinite" />
+            <animate attributeName="stroke-dashoffset" dur="2s" values="0;-16;-32;-32" repeatCount="indefinite" />
+          </circle>
+        </svg>
+      </div>
+    </div>
+  );
+
+  const renderRoleProtected = (element, predicate) => {
+    if (roleLoading) {
+      return renderRouteLoading();
+    }
+    return predicate() ? element : <Navigate to="/" replace />;
   };
 
   return (
@@ -202,32 +221,47 @@ function AppContent() {
               <div className="main-content" style={{ width: "100%", padding: 0, overflowY: "auto", minHeight: "100vh", marginLeft: 0 }}>
                 <Routes>
                   {/* Rutas para estudiantes */}
-                  {userRole !== "jefe_departamental" && (
-                    <>
-                      <Route path="/" element={<Home />} />
-                      <Route path="/home" element={<Home />} />
-                      <Route path="/subir" element={<Subir />} />
-                      <Route path="/hoja" element={<HojaDeVida />} />
-                      <Route path="/pensul" element={<PensumVisual />} />
-                      <Route path="/inscribir" element={<InscribirAsignaturas />} />
-                      <Route path="/prueba" element={<ConsultarMatricula />} />
-                    </>
-                  )}
+                  <Route
+                    path="/"
+                    element={
+                      roleLoading
+                        ? renderRouteLoading()
+                        : userRole === "jefe_departamental"
+                          ? <HomeJefe />
+                          : <Home />
+                    }
+                  />
+                  <Route
+                    path="/home"
+                    element={
+                      roleLoading
+                        ? renderRouteLoading()
+                        : userRole === "jefe_departamental"
+                          ? <HomeJefe />
+                          : <Home />
+                    }
+                  />
+                  <Route path="/subir" element={renderRoleProtected(<Subir />, () => userRole !== "jefe_departamental")} />
+                  <Route path="/hoja" element={renderRoleProtected(<HojaDeVida />, () => userRole !== "jefe_departamental")} />
+                  <Route path="/pensul" element={renderRoleProtected(<PensumVisual />, () => userRole !== "jefe_departamental")} />
+                  <Route path="/inscribir" element={renderRoleProtected(<InscribirAsignaturas />, () => userRole !== "jefe_departamental")} />
+                  <Route path="/prueba" element={renderRoleProtected(<ConsultarMatricula />, () => userRole !== "jefe_departamental")} />
+                  <Route path="/plazos" element={renderRoleProtected(<Plazos />, () => userRole === "jefe_departamental")} />
+                  <Route path="/verificar-documentos" element={renderRoleProtected(<VerificarDocumentos />, () => userRole === "jefe_departamental")} />
+                  <Route
+                    path="/modificaciones"
+                    element={renderRoleProtected(<div>Modificaciones (En desarrollo)</div>, () => userRole === "jefe_departamental")}
+                  />
+                  <Route
+                    path="/plan-estudio"
+                    element={renderRoleProtected(<div>Modificar Plan de Estudio (En desarrollo)</div>, () => userRole === "jefe_departamental")}
+                  />
+                  <Route
+                    path="/perfil"
+                    element={renderRoleProtected(<div>Mi Información (En desarrollo)</div>, () => userRole === "jefe_departamental")}
+                  />
                   
-                  {/* Rutas para jefes departamentales */}
-                  {userRole === "jefe_departamental" && (
-                    <>
-                      <Route path="/" element={<HomeJefe />} />
-                      <Route path="/home" element={<HomeJefe />} />
-                      <Route path="/plazos" element={<Plazos />} />
-                      <Route path="/verificar-documentos" element={<VerificarDocumentos />} />
-                      <Route path="/modificaciones" element={<div>Modificaciones (En desarrollo)</div>} />
-                      <Route path="/plan-estudio" element={<div>Modificar Plan de Estudio (En desarrollo)</div>} />
-                      <Route path="/perfil" element={<div>Mi Información (En desarrollo)</div>} />
-                    </>
-                  )}
-                  
-                  <Route path="*" element={<Navigate to="/" replace />} />
+                  <Route path="*" element={roleLoading ? renderRouteLoading() : <Navigate to="/" replace />} />
                 </Routes>
               </div>
             </div>

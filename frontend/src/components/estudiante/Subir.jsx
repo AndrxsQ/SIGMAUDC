@@ -140,9 +140,11 @@ const SubirDocumentos = () => {
         {/* Encabezado del modal */}
         <div className="modal-header">
           <div className="modal-logo">
-            <span className="logo-circle">
-              <FaFileUpload size={20} />
-            </span>
+            <img 
+              src="/logo-udc.png" 
+              alt="Logo Universidad" 
+              className="udc-logo"
+            />
           </div>
           <div>
             <h3>Subir Documentos Requeridos</h3>

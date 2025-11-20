@@ -65,6 +65,21 @@
 
 .modal-logo {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.udc-logo {
+  height: 70px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.udc-logo:hover {
+  transform: scale(1.05);
 }
 
 .logo-circle {
@@ -633,6 +648,29 @@
 
   .upload-area-title {
     font-size: 17px;
+  }
+}
+
+/* Responsive logo */
+@media (max-width: 767px) {
+  .udc-logo {
+    height: 50px;
+  }
+  
+  .modal-header {
+    gap: 12px;
+    padding: 16px 12px;
+  }
+}
+
+@media (max-width: 374px) {
+  .udc-logo {
+    height: 40px;
+  }
+  
+  .modal-header {
+    gap: 10px;
+    padding: 12px;
   }
 }
 

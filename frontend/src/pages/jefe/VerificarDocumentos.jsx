@@ -96,11 +96,20 @@ const VerificarDocumentos = () => {
   return (
     <div className="verificar-documentos-container">
       <div className="verificar-header">
-        <div>
-          <h1 className="page-title">Verificar Documentos</h1>
-          <p className="page-subtitle">
-            Revisa y aprueba o rechaza los documentos subidos por los estudiantes
-          </p>
+        <div className="header-logo-title">
+          <div className="udc-logo-container">
+            <img 
+              src="/logo-udc.png" 
+              alt="Logo Universidad" 
+              className="udc-logo"
+            />
+          </div>
+          <div>
+            <h1 className="page-title">Verificar Documentos</h1>
+            <p className="page-subtitle">
+              Revisa y aprueba o rechaza los documentos subidos por los estudiantes
+            </p>
+          </div>
         </div>
 
         {/* Filtro de estado */}
