@@ -177,19 +177,17 @@ const InscribirAsignaturas = () => {
     if (asignatura.estado === "cursada") {
       return;
     }
-    // Si es obligatoria por repetición, no permitir desmarcar
-    if (asignatura.obligatoria_repeticion && gruposSeleccionados.has(grupoId)) {
-      return;
-    }
-
     const grupo = asignatura.grupos?.find((g) => g.id === grupoId);
     if (!grupo) return;
 
-    const otroGrupoSeleccionado = asignatura.grupos?.some(
+    const otroGrupoSeleccionado = asignatura.grupos?.find(
       (g) => g.id !== grupoId && gruposSeleccionados.has(g.id)
     );
-    if (otroGrupoSeleccionado) {
-      openDialog("Grupo duplicado", "Solo puedes inscribir un grupo por asignatura.");
+    if (otroGrupoSeleccionado && !gruposSeleccionados.has(grupoId)) {
+      openDialog(
+        "Grupo duplicado",
+        "Solo puedes seleccionar un grupo por asignatura. Deselecciona el grupo actual antes de elegir otro."
+      );
       return;
     }
 
@@ -283,7 +281,10 @@ const InscribirAsignaturas = () => {
     return colors[hash % colors.length];
   };
 
-  const bloqueoObligatorias = resumen?.obligatoriasSinGrupo?.length > 0;
+  const asignaturasObligatorias = asignaturas.filter((asignatura) => asignatura.obligatoria_repeticion);
+  const faltanObligatoriasSeleccionadas = asignaturasObligatorias.some((asignatura) => {
+    return !asignatura.grupos?.some((grupo) => gruposSeleccionados.has(grupo.id));
+  });
   const creditosDisponiblesBackend = resumen?.creditos?.disponibles ?? 0;
   const creditosDisponiblesActual = Math.max(creditosDisponiblesBackend - creditosSeleccionados, 0);
 
@@ -567,15 +568,23 @@ const InscribirAsignaturas = () => {
 
             {gruposSeleccionados.size > 0 && (
               <div className="inscribir-actions">
+                {faltanObligatoriasSeleccionadas && (
+                  <p className="inscribir-warning">
+                    Debes tener al menos un grupo seleccionado por cada asignatura en repetición obligatoria antes de continuar.
+                  </p>
+                )}
                 <button
                   className="btn-inscribir"
-                  disabled={bloqueoObligatorias}
+                  disabled={faltanObligatoriasSeleccionadas}
                   title={
-                    bloqueoObligatorias
-                      ? "Debes matricular primero las asignaturas en repetición obligatoria"
+                    faltanObligatoriasSeleccionadas
+                      ? "Selecciona los grupos obligatorios antes de inscribir"
                       : undefined
                   }
                   onClick={async () => {
+                    if (faltanObligatoriasSeleccionadas) {
+                      return;
+                    }
                     try {
                       await matriculaService.inscribirAsignaturas(Array.from(gruposSeleccionados));
                       setGruposSeleccionados(new Set());
