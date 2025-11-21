@@ -90,6 +90,17 @@ const InscribirAsignaturas = () => {
           : asignaturasData || {};
         const nuevasAsignaturas = payload.asignaturas || [];
         setAsignaturas(nuevasAsignaturas);
+        const obligatoriosPreselected = new Set();
+        let creditosIniciales = 0;
+        nuevasAsignaturas.forEach((asig) => {
+          if (asig.obligatoria_repeticion && asig.grupos?.length) {
+            const grupoInicial = asig.grupos[0];
+            obligatoriosPreselected.add(grupoInicial.id);
+            creditosIniciales += asig.creditos;
+          }
+        });
+        setGruposSeleccionados(obligatoriosPreselected);
+        setCreditosSeleccionados(creditosIniciales);
         setMensajes(payload.mensajes || []);
         if (payload.periodo || payload.creditos || payload.estado_estudiante) {
           setResumen({
@@ -500,13 +511,13 @@ const InscribirAsignaturas = () => {
                                 className={`grupo-item ${estaSeleccionado ? "seleccionado" : ""} ${tieneConflicto ? "conflicto" : ""} ${sinCupo ? "sin-cupo" : ""} ${esObligatorio ? "obligatorio" : ""}`}
                               >
                                 <label className="grupo-checkbox-label">
-                                  <input
-                                    type="checkbox"
-                                    checked={estaSeleccionado}
-                                    disabled={esCursada || esObligatorio || sinCupo}
-                                    onChange={() => toggleGrupo(grupo.id, asignatura)}
-                                    className="grupo-checkbox"
-                                  />
+                                    <input
+                                      type="checkbox"
+                                      checked={estaSeleccionado}
+                                      disabled={esCursada || sinCupo}
+                                      onChange={() => toggleGrupo(grupo.id, asignatura)}
+                                      className="grupo-checkbox"
+                                    />
                                   <div className="grupo-content">
                                     <div className="grupo-header">
                                       <span className="grupo-codigo">{grupo.codigo}</span>

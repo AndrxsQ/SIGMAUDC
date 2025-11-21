@@ -424,8 +424,8 @@ func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *h
 				Nombre: asig.Nombre,
 			})
 		}
-		// No mostrar materias que ya están aprobadas o que se encuentran en estado de repetición por reprobada.
-		if state == "cursada" || state == "pendiente_repeticion" || state == "obligatoria_repeticion" {
+		// No mostrar materias que ya están aprobadas.
+		if state == "cursada" {
 			continue
 		}
 
