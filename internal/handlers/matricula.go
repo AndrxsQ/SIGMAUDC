@@ -375,9 +375,6 @@ func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *h
 	obligatoriasSinGrupo := []ObligatoriaInfo{}
 
 	for _, asig := range asignaturas {
-		if asig.Semestre != ctx.Semestre {
-			continue
-		}
 		rawPrereqs := prereqMap[asig.ID]
 		prereqs := make([]models.Prerequisito, 0, len(rawPrereqs))
 		prereqsFalt := make([]models.Prerequisito, 0, len(rawPrereqs))
@@ -402,6 +399,12 @@ func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *h
 		state, nota, _, periodoCursada, repeticiones := determineEstado(historialMap[asig.ID], ctx.Periodo, &activeOrdinal, len(prereqsFalt) > 0)
 
 		if state == "matriculada" || state == "en_espera" {
+			continue
+		}
+
+		isCurrentSemester := asig.Semestre == ctx.Semestre
+		isAtrasada := state == "pendiente_repeticion" || state == "obligatoria_repeticion"
+		if !isCurrentSemester && !isAtrasada {
 			continue
 		}
 
