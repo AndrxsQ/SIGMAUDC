@@ -71,8 +71,8 @@ func (h *EstudianteHandler) GetDatosEstudiante(w http.ResponseWriter, r *http.Re
 		SELECT
 			e.id,
 			u.codigo,
-			u.nombre,
-			u.apellido,
+			COALESCE(e.nombre, ''),
+			COALESCE(e.apellido, ''),
 			u.email,
 			COALESCE(p.nombre, '') AS programa,
 			e.semestre,
@@ -162,20 +162,14 @@ func (h *EstudianteHandler) UpdateDatosEstudiante(w http.ResponseWriter, r *http
 	}
 	defer tx.Rollback()
 
-	updateUsuario := `UPDATE usuario SET nombre = $1, apellido = $2 WHERE id = $3`
-	if _, err := tx.Exec(updateUsuario, payload.Nombre, payload.Apellido, claims.Sub); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
 	estudianteID, err := h.getEstudianteID(claims.Sub)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	updateEstudiante := `UPDATE estudiante SET sexo = $1 WHERE id = $2`
-	if _, err := tx.Exec(updateEstudiante, sexo, estudianteID); err != nil {
+	updateEstudiante := `UPDATE estudiante SET nombre = $1, apellido = $2, sexo = $3 WHERE id = $4`
+	if _, err := tx.Exec(updateEstudiante, payload.Nombre, payload.Apellido, sexo, estudianteID); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

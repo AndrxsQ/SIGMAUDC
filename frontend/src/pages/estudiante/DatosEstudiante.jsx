@@ -52,6 +52,19 @@ const DatosEstudiante = () => {
     fileInputRef.current?.click();
   };
 
+  const formatPromedio = () => (perfil?.promedio == null ? "Pendiente" : perfil.promedio.toFixed(2));
+  const nombreCompleto = `${perfil?.nombre || ""} ${perfil?.apellido || ""}`.trim() || "Sin datos";
+
+  const datosRows = [
+    { label: "Nombre completo", value: nombreCompleto },
+    { label: "Programa", value: perfil?.programa },
+    { label: "Semestre", value: perfil?.semestre ?? "Sin datos" },
+    { label: "Estado", value: perfil?.estado },
+    { label: "Sexo", value: perfil?.sexo },
+    { label: "Promedio acumulado", value: formatPromedio() },
+    { label: "Correo institucional", value: perfil?.email },
+  ];
+
   if (loading) {
     return (
       <div className="datos-loading">
@@ -69,104 +82,89 @@ const DatosEstudiante = () => {
           <span>Universidad de Cartagena</span>
         </div>
         <div className="datos-hero-text">
-          <p className="datos-hero-sub">Inspirado en los principios Apple de claridad y orden</p>
           <h1>Datos del estudiante</h1>
           <p className="datos-hero-caption">
-            Tu perfil universitario mostrando únicamente información oficial. Haz clic en la foto para actualizarla si aún está en blanco.
+            Mantén la información actualizada para que el sistema muestre siempre tu estado académico real.
           </p>
         </div>
       </header>
 
-      <div className="datos-grid single-panel">
-        <article className="datos-card perfil-panel">
-          <div className="perfil-photo" onClick={handlePhotoAreaClick}>
-            <div className="perfil-photo-frame">
-              {preview ? (
-                <img src={preview} alt="Foto de perfil" />
-              ) : (
-                <div className="perfil-placeholder">
-                  <span>{perfil?.nombre?.[0] || "U"}{perfil?.apellido?.[0] || "D"}</span>
+      <section className="datos-panel">
+        <article className="datos-card datos-main-card">
+          <div className="datos-main-grid">
+            <div className="perfil-photo" onClick={handlePhotoAreaClick}>
+              <div className="perfil-photo-frame">
+                {preview ? (
+                  <img src={preview} alt="Foto de perfil" />
+                ) : (
+                  <div className="perfil-placeholder">
+                    <span>{perfil?.nombre?.[0] || "U"}{perfil?.apellido?.[0] || "D"}</span>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png"
+                style={{ display: "none" }}
+                onChange={handleFotoSelect}
+              />
+              <p className="perfil-photo-hint">{uploading ? "Subiendo..." : "Haz clic en la foto para actualizar"}</p>
+            </div>
+
+            <div className="perfil-info">
+              <div className="perfil-info-row">
+                <div>
+                  <p className="perfil-label">Código institucional</p>
+                  <p className="perfil-value">{perfil?.codigo || "Sin datos"}</p>
                 </div>
-              )}
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png"
-              style={{ display: "none" }}
-              onChange={handleFotoSelect}
-            />
-            <p className="perfil-photo-hint">
-              {uploading ? "Subiendo..." : "Haz clic en la foto para actualizar"}
-            </p>
-          </div>
-          <div className="perfil-info">
-            <p className="perfil-label">Código institucional</p>
-            <p className="perfil-value">{perfil?.codigo || "Sin datos"}</p>
-            <p className="perfil-label">Correo institucional</p>
-            <p className="perfil-value">{perfil?.email || "Sin datos"}</p>
-            <div className="perfil-meta">
-              <div>
-                <span>Programa</span>
-                <strong>{perfil?.programa || "N/D"}</strong>
+                <div>
+                  <p className="perfil-label">Correo institucional</p>
+                  <p className="perfil-value">{perfil?.email || "Sin datos"}</p>
+                </div>
               </div>
-              <div>
-                <span>Semestre</span>
-                <strong>{perfil?.semestre ?? "N/D"}</strong>
+              <div className="perfil-meta">
+                <div>
+                  <span>Programa</span>
+                  <strong>{perfil?.programa || "Sin datos"}</strong>
+                </div>
+                <div>
+                  <span>Semestre</span>
+                  <strong>{perfil?.semestre ?? "Sin datos"}</strong>
+                </div>
+                <div>
+                  <span>Estado</span>
+                  <strong>{perfil?.estado || "Sin datos"}</strong>
+                </div>
               </div>
-              <div>
-                <span>Estado</span>
-                <strong>{perfil?.estado || "N/D"}</strong>
-              </div>
-            </div>
-            <div className="perfil-meta">
-              <div>
-                <span>Promedio</span>
-                <strong>{perfil?.promedio?.toFixed(2) ?? "Pendiente"}</strong>
-              </div>
-              <div>
-                <span>Sexo</span>
-                <strong>{perfil?.sexo || "Sin datos"}</strong>
+              <div className="perfil-meta">
+                <div>
+                  <span>Promedio</span>
+                  <strong>{formatPromedio()}</strong>
+                </div>
+                <div>
+                  <span>Sexo</span>
+                  <strong>{perfil?.sexo || "Sin datos"}</strong>
+                </div>
               </div>
             </div>
           </div>
+
           {infoMessage && <p className="perfil-note">{infoMessage}</p>}
           {error && <p className="form-error">{error}</p>}
-          <div className="datos-list">
-            <div className="datos-row">
-              <span>Nombre completo</span>
-              <strong>{`${perfil?.nombre || ""} ${perfil?.apellido || ""}`.trim() || "Sin datos"}</strong>
-            </div>
-            <div className="datos-row">
-              <span>Documento</span>
-              <strong>{perfil?.codigo || "Sin datos"}</strong>
-            </div>
-            <div className="datos-row">
-              <span>Programa</span>
-              <strong>{perfil?.programa || "Sin datos"}</strong>
-            </div>
-            <div className="datos-row">
-              <span>Semestre</span>
-              <strong>{perfil?.semestre ?? "Sin datos"}</strong>
-            </div>
-            <div className="datos-row">
-              <span>Estado académico</span>
-              <strong>{perfil?.estado || "Sin datos"}</strong>
-            </div>
-            <div className="datos-row">
-              <span>Sexo registrado</span>
-              <strong>{perfil?.sexo || "Sin datos"}</strong>
-            </div>
-            <div className="datos-row">
-              <span>Promedio acumulado</span>
-              <strong>{perfil?.promedio?.toFixed(2) || "Pendiente"}</strong>
-            </div>
+
+          <div className="datos-detail-grid">
+            {datosRows.map((row) => (
+              <div className="datos-detail-row" key={row.label}>
+                <span>{row.label}</span>
+                <strong>{row.value || "Sin datos"}</strong>
+              </div>
+            ))}
           </div>
         </article>
-      </div>
+      </section>
     </div>
   );
 };
 
 export default DatosEstudiante;
-

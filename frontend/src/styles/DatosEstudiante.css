@@ -1,3 +1,4 @@
+/* Variables compartidas para conservar la identidad visual del panel */
 :root {
   --home-primary-gold: #C9A23F;
   --home-secondary-gold: #FFD860;
@@ -15,25 +16,39 @@
 .datos-page {
   width: 100%;
   min-height: 100vh;
-  padding: 32px 20px 56px;
+  padding: 28px 20px 52px;
   background: var(--home-bg-primary);
-  font-family: var(--home-font-family, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif);
+  font-family: var(--home-font-family);
   color: var(--home-text-primary);
   box-sizing: border-box;
 }
 
-.datos-hero {
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(135deg, rgba(201, 162, 63, 0.15), rgba(255, 255, 255, 0.8));
-  border: 1px solid rgba(0, 0, 0, 0.08);
+.datos-card {
+  background: var(--home-bg-card);
   border-radius: 24px;
-  padding: 22px;
+  padding: 28px;
+  box-shadow: var(--home-shadow-lg);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.datos-hero {
+  background: linear-gradient(135deg, rgba(201, 162, 63, 0.15), rgba(255, 255, 255, 0.85));
+  border-radius: 26px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 24px;
   box-shadow: var(--home-shadow-md);
   margin-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.datos-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
+  gap: 14px;
 }
 
 .datos-hero-logo {
@@ -51,16 +66,17 @@
 .datos-hero-logo span {
   font-weight: 700;
   letter-spacing: 0.6px;
+  color: var(--home-text-primary);
 }
 
 .datos-hero-text {
   flex: 1;
-  min-width: 260px;
+  min-width: 240px;
 }
 
-.datos-hero h1 {
-  font-size: 28px;
+.datos-hero-text h1 {
   margin: 4px 0;
+  font-size: 32px;
   letter-spacing: -0.6px;
 }
 
@@ -72,27 +88,13 @@
 }
 
 .datos-hero-caption {
-  color: var(--home-text-secondary);
   margin: 0;
+  color: var(--home-text-secondary);
 }
 
-.datos-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 24px;
-}
-
-.datos-grid.single-panel {
-  max-width: 720px;
+.datos-panel {
+  max-width: 980px;
   margin: 0 auto;
-}
-
-.datos-card {
-  background: var(--home-bg-card);
-  border-radius: 24px;
-  padding: 28px;
-  box-shadow: var(--home-shadow-lg);
-  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .perfil-panel {
@@ -135,51 +137,25 @@
   color: var(--home-text-secondary);
 }
 
-.perfil-actions {
-  width: 100%;
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.btn-link {
-  border: none;
-  background: transparent;
-  color: var(--home-primary-gold);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
+.perfil-photo-hint {
+  font-size: 12px;
+  letter-spacing: 0.4px;
   font-weight: 600;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--home-primary-gold), var(--home-secondary-gold));
-  color: #000;
-  border: none;
-  border-radius: 12px;
-  padding: 10px 18px;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-primary:not(:disabled):hover {
-  transform: translateY(-2px);
-  box-shadow: var(--home-shadow-md);
+  color: var(--home-text-secondary);
+  text-transform: uppercase;
+  margin: 0;
 }
 
 .perfil-info {
-  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.perfil-info-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
 }
 
 .perfil-label {
@@ -198,7 +174,7 @@
 
 .perfil-meta {
   display: flex;
-  gap: 24px;
+  gap: 20px;
   flex-wrap: wrap;
 }
 
@@ -211,60 +187,70 @@
 
 .perfil-meta strong {
   display: block;
+  margin-top: 4px;
   font-size: 14px;
   font-weight: 700;
-  margin-top: 4px;
 }
 
+.datos-main-card {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
 
-.perfil-photo-hint {
-  font-size: 12px;
-  letter-spacing: 0.4px;
-  font-weight: 600;
-  color: var(--home-text-secondary);
+.datos-main-grid {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.datos-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.datos-detail-row {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  padding: 16px;
+}
+
+.datos-detail-row span {
+  font-size: 11px;
   text-transform: uppercase;
-  margin: 0;
+  letter-spacing: 0.4px;
+  color: var(--home-text-secondary);
+}
+
+.datos-detail-row strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--home-text-primary);
 }
 
 .perfil-note {
   font-size: 13px;
-  color: var(--home-success, #52be80);
+  color: var(--home-success);
   margin: 0;
-  text-align: center;
+  text-align: left;
   letter-spacing: 0.4px;
 }
 
-.datos-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.datos-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  padding-bottom: 8px;
-}
-
-.datos-row span {
-  font-size: 12px;
-  color: var(--home-text-secondary);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-
-.datos-row strong {
-  font-size: 14px;
-  font-weight: 600;
-}
-
 .form-error {
-  color: var(--home-error, #ff6b6b);
+  color: var(--home-error);
   font-size: 13px;
   margin: 0;
-  text-align: center;
+  text-align: left;
+}
+
+.summary-note,
+.summary-error {
+  margin-top: 0;
 }
 
 .datos-loading {
@@ -297,12 +283,44 @@
 }
 
 @media (max-width: 768px) {
-  .datos-hero {
-    flex-direction: column;
+  .datos-page {
+    padding: 20px 16px 48px;
   }
 
-  .datos-grid {
+  .datos-content-grid {
     grid-template-columns: 1fr;
+  }
+
+  .datos-hero {
+    padding: 20px;
+  }
+}
+
+@media (min-width: 1025px) {
+  .datos-page {
+    padding-left: calc(280px + 32px);
+  }
+
+  html.sidebar-closed .datos-page {
+    padding-left: calc(70px + 32px);
+  }
+
+  .datos-card {
+    padding: 32px;
+  }
+}
+
+@media (min-width: 1441px) {
+  .datos-page {
+    padding-left: calc(280px + 40px);
+  }
+
+  html.sidebar-closed .datos-page {
+    padding-left: calc(70px + 40px);
+  }
+
+  .datos-hero-text h1 {
+    font-size: 38px;
   }
 }
 
