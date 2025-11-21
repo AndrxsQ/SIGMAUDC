@@ -126,11 +126,12 @@ func (h *DocumentosHandler) GetDocumentosEstudiante(w http.ResponseWriter, r *ht
 	}
 
 	// Verificar plazos
+	var plazoMensaje string
 	plazos, periodo, err := h.verificarPlazosDocumentos(claims.ProgramaID)
 	if err != nil {
-		// No es un error fatal, puede que no haya periodo activo
 		plazos = nil
 		periodo = nil
+		plazoMensaje = err.Error()
 	}
 
 	// Obtener documentos del estudiante para el periodo activo
@@ -213,6 +214,7 @@ func (h *DocumentosHandler) GetDocumentosEstudiante(w http.ResponseWriter, r *ht
 		PlazoDocumentos:     plazos != nil && plazos.Documentos,
 		PuedeSubir:          puedeSubir,
 		DocumentosAprobados: documentosAprobados,
+		PlazoMensaje:        plazoMensaje,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { matriculaService } from "../../services/matricula";
-import { FaCalendarAlt, FaUser, FaMapMarkerAlt, FaBook } from "react-icons/fa";
+import { FaCalendarAlt, FaUser, FaMapMarkerAlt, FaBook, FaExclamationTriangle } from "react-icons/fa";
 import "../../styles/ConsultarMatricula.css";
 
 const FRANJAS = [
@@ -119,8 +119,28 @@ const ConsultarMatricula = () => {
   if (error) {
     return (
       <div className="consultar-matricula-container">
-        <div className="error-container">
-          <p>{error}</p>
+        <div className="horario-header">
+          <div className="header-content">
+            <div className="udc-logo-container">
+              <img src="/logo-udc.png" alt="Logo Universidad" className="udc-logo" />
+            </div>
+            <div className="header-info">
+              <h1>Consultar Matrícula</h1>
+              <p>Aquí te mostramos cuánto falta para inscribir tus materias.</p>
+            </div>
+          </div>
+        </div>
+        <div className="alert-card error">
+          <div className="alert-icon">
+            <FaExclamationTriangle size={24} />
+          </div>
+          <div className="alert-body">
+            <h2>Plazo inactivo</h2>
+            <p>{error}</p>
+            <button className="alert-primary" onClick={loadHorario}>
+              Reintentar
+            </button>
+          </div>
         </div>
       </div>
     );

@@ -354,6 +354,56 @@
   min-width: 0;
 }
 
+.alert-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 22px;
+  margin: 0 16px 24px 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 241, 238, 0.95));
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  width: calc(100% - 32px);
+}
+
+.alert-card.warning {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(254, 226, 226, 0.95));
+}
+
+.alert-card-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  flex-shrink: 0;
+  font-size: 24px;
+}
+
+.alert-card-body h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--doc-text-primary);
+}
+
+.alert-card-body p {
+  margin: 6px 0 4px;
+  color: var(--doc-text-secondary);
+  font-size: 15px;
+  max-width: 600px;
+}
+
+.alert-card-body small {
+  display: block;
+  color: var(--doc-text-secondary);
+  font-size: 13px;
+}
+
 /* Badges */
 .badge {
   display: inline-flex;
