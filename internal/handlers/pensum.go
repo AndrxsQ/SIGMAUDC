@@ -290,7 +290,8 @@ func (h *PensumHandler) buildPrereqMap(pensumID int) (map[int][]models.Prerequis
 			pr.prerequisito_id,
 			a.codigo,
 			a.nombre,
-			COALESCE(pa.semestre, 0) as semestre
+			COALESCE(pa.semestre, 0) as semestre,
+			pr.tipo
 		FROM pensum_prerequisito pr
 		JOIN asignatura a ON pr.prerequisito_id = a.id
 		LEFT JOIN pensum_asignatura pa ON pa.asignatura_id = a.id AND pa.pensum_id = $1
@@ -312,6 +313,7 @@ func (h *PensumHandler) buildPrereqMap(pensumID int) (map[int][]models.Prerequis
 			&prereq.Codigo,
 			&prereq.Nombre,
 			&prereq.Semestre,
+			&prereq.Tipo,
 		); err != nil {
 			return nil, err
 		}

@@ -4,14 +4,110 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/andrxsq/SIGMAUDC/internal/models"
+	"github.com/gorilla/mux"
+	"github.com/lib/pq"
 )
 
 type MatriculaHandler struct {
 	db *sql.DB
+}
+
+type inscripcionContext struct {
+	EstudianteID   int
+	Semestre       int
+	Estado         string
+	PensumID       int
+	PensumNombre   string
+	ProgramaID     int
+	ProgramaNombre string
+	Periodo        *models.PeriodoAcademico
+	Plazos         models.Plazos
+}
+
+type HorarioDisponible struct {
+	Dia        string `json:"dia"`
+	HoraInicio string `json:"hora_inicio"`
+	HoraFin    string `json:"hora_fin"`
+	Salon      string `json:"salon"`
+}
+
+type GrupoDisponible struct {
+	ID             int                `json:"id"`
+	Codigo         string             `json:"codigo"`
+	Docente        string             `json:"docente"`
+	CupoDisponible int                `json:"cupo_disponible"`
+	CupoMax        int                `json:"cupo_max"`
+	Horarios       []HorarioDisponible `json:"horarios"`
+}
+
+type AsignaturaDisponible struct {
+	ID                     int                     `json:"id"`
+	Codigo                 string                  `json:"codigo"`
+	Nombre                 string                  `json:"nombre"`
+	Creditos               int                     `json:"creditos"`
+	Semestre               int                     `json:"semestre"`
+	Categoria              string                  `json:"categoria"`
+	Estado                 string                  `json:"estado"`
+	Nota                   *float64                `json:"nota,omitempty"`
+	Repeticiones           int                     `json:"repeticiones"`
+	PendienteRepeticion    bool                    `json:"pendiente_repeticion"`
+	ObligatoriaRepeticion  bool                    `json:"obligatoria_repeticion"`
+	Cursada                bool                    `json:"cursada"`
+	Prerequisitos          []models.Prerequisito   `json:"prerequisitos"`
+	PrerequisitosFaltantes []models.Prerequisito   `json:"prerequisitos_faltantes"`
+	Correquisitos          []models.Prerequisito   `json:"correquisitos"`
+	CorrequisitosFaltantes []models.Prerequisito   `json:"correquisitos_faltantes"`
+	Grupos                 []GrupoDisponible       `json:"grupos"`
+	TieneLaboratorio       bool                    `json:"tiene_laboratorio"`
+	PeriodoCursada         *string                 `json:"periodo_cursada,omitempty"`
+}
+
+type ResumenCreditos struct {
+	Maximo     int `json:"maximo"`
+	Inscritos  int `json:"inscritos"`
+	Disponibles int `json:"disponibles"`
+}
+
+type ObligatoriaInfo struct {
+	ID     int    `json:"id"`
+	Codigo string `json:"codigo"`
+	Nombre string `json:"nombre"`
+}
+
+type GetAsignaturasResponse struct {
+	Periodo              *models.PeriodoAcademico `json:"periodo"`
+	Creditos             ResumenCreditos          `json:"creditos"`
+	EstadoEstudiante     string                   `json:"estado_estudiante"`
+	ObligatoriasSinGrupo []ObligatoriaInfo        `json:"obligatorias_sin_grupo"`
+	Asignaturas          []AsignaturaDisponible   `json:"asignaturas"`
+	Mensajes             []string                 `json:"mensajes"`
+}
+
+type InscribirRequest struct {
+	GrupoIDs []int `json:"grupos_ids"`
+}
+
+type groupRecord struct {
+	ID             int
+	Codigo         string
+	AsignaturaID   int
+	CupoDisponible int
+	CupoMax        int
+	Creditos       int
+}
+
+type horarioBloque struct {
+	GrupoID   int
+	Dia       string
+	InicioMin int
+	FinMin    int
 }
 
 func NewMatriculaHandler(db *sql.DB) *MatriculaHandler {
@@ -42,53 +138,66 @@ func (h *MatriculaHandler) ValidarInscripcion(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Obtener estudiante_id
-	var estudianteID int
-	queryEstudiante := `SELECT id FROM estudiante WHERE usuario_id = $1`
-	err = h.db.QueryRow(queryEstudiante, claims.Sub).Scan(&estudianteID)
-	if err == sql.ErrNoRows {
-		http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
-		return
-	}
+	ctx, razon, err := h.prepareInscripcionContext(claims)
 	if err != nil {
-		log.Printf("Error getting estudiante: %v", err)
+		log.Printf("Error preparando contexto de inscripción: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	// Validación 1: Obtener periodo activo
-	var periodo models.PeriodoAcademico
-	queryPeriodo := `SELECT id, year, semestre, activo, archivado 
-					 FROM periodo_academico 
-					 WHERE activo = true AND archivado = false 
-					 LIMIT 1`
-	err = h.db.QueryRow(queryPeriodo).Scan(
-		&periodo.ID,
-		&periodo.Year,
-		&periodo.Semestre,
-		&periodo.Activo,
-		&periodo.Archivado,
-	)
-	if err == sql.ErrNoRows {
+	if razon != "" {
 		response := models.ValidarInscripcionResponse{
 			PuedeInscribir: false,
-			Razon:          "No hay un periodo académico activo.",
+			Razon:          razon,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 		return
 	}
+
+	response := models.ValidarInscripcionResponse{
+		PuedeInscribir: true,
+		Razon:          "",
+		Periodo:        ctx.Periodo,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (h *MatriculaHandler) prepareInscripcionContext(claims *models.JWTClaims) (*inscripcionContext, string, error) {
+	var estudianteID int
+	var semestre int
+	var estado string
+	queryEstudiante := `SELECT id, semestre, estado FROM estudiante WHERE usuario_id = $1`
+	err := h.db.QueryRow(queryEstudiante, claims.Sub).Scan(&estudianteID, &semestre, &estado)
 	if err != nil {
-		log.Printf("Error getting periodo activo: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, "Estudiante no encontrado", nil
+		}
+		return nil, "", err
 	}
 
-	// Validación 1: Verificar plazo de inscripción activo
+	pensumHandler := &PensumHandler{db: h.db}
+	pensumID, pensumNombre, programaNombre, err := pensumHandler.getPensumInfo(estudianteID)
+	if err != nil {
+		if errors.Is(err, errPensumNoAsignado) {
+			return nil, "No tienes un pensum asignado. Contacta a coordinación para asignarte uno.", nil
+		}
+		return nil, "", err
+	}
+
+	var periodo models.PeriodoAcademico
+	queryPeriodo := `SELECT id, year, semestre, activo, archivado FROM periodo_academico WHERE activo = true AND archivado = false ORDER BY year DESC, semestre DESC LIMIT 1`
+	err = h.db.QueryRow(queryPeriodo).Scan(&periodo.ID, &periodo.Year, &periodo.Semestre, &periodo.Activo, &periodo.Archivado)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, "No hay un periodo académico activo.", nil
+		}
+		return nil, "", err
+	}
+
 	var plazos models.Plazos
-	queryPlazos := `SELECT id, periodo_id, programa_id, documentos, inscripcion, modificaciones 
-					FROM plazos 
-					WHERE periodo_id = $1 AND programa_id = $2`
+	queryPlazos := `SELECT id, periodo_id, programa_id, documentos, inscripcion, modificaciones FROM plazos WHERE periodo_id = $1 AND programa_id = $2`
 	err = h.db.QueryRow(queryPlazos, periodo.ID, claims.ProgramaID).Scan(
 		&plazos.ID,
 		&plazos.PeriodoID,
@@ -97,71 +206,44 @@ func (h *MatriculaHandler) ValidarInscripcion(w http.ResponseWriter, r *http.Req
 		&plazos.Inscripcion,
 		&plazos.Modificaciones,
 	)
-	if err == sql.ErrNoRows {
-		response := models.ValidarInscripcionResponse{
-			PuedeInscribir: false,
-			Razon:          "No hay plazos configurados para tu programa en el periodo activo.",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-		return
-	}
 	if err != nil {
-		log.Printf("Error getting plazos: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, "No hay plazos configurados para tu programa en el periodo activo.", nil
+		}
+		return nil, "", err
 	}
 
 	if !plazos.Inscripcion {
-		response := models.ValidarInscripcionResponse{
-			PuedeInscribir: false,
-			Razon:          "El plazo de inscripción no está activo para tu programa en este periodo.",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-		return
+		return nil, "El plazo de inscripción no está activo para tu programa en este periodo.", nil
 	}
 
-	// Validación 2: Verificar documentos aprobados
-	// Obtener todos los documentos del estudiante para el periodo activo
-	queryDocumentos := `SELECT id, tipo_documento, estado 
-						FROM documentos_estudiante 
-						WHERE estudiante_id = $1 AND periodo_id = $2`
+	queryDocumentos := `SELECT tipo_documento, estado FROM documentos_estudiante WHERE estudiante_id = $1 AND periodo_id = $2`
 	rows, err := h.db.Query(queryDocumentos, estudianteID, periodo.ID)
 	if err != nil {
-		log.Printf("Error querying documentos: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		return nil, "", err
 	}
 	defer rows.Close()
 
-	var documentos []struct {
-		ID            int
-		TipoDocumento string
-		Estado        string
-	}
+	documentosPendientes := []string{}
+	documentosRechazados := []string{}
+	count := 0
 	for rows.Next() {
-		var doc struct {
-			ID            int
-			TipoDocumento string
-			Estado        string
-		}
-		if err := rows.Scan(&doc.ID, &doc.TipoDocumento, &doc.Estado); err != nil {
+		var tipo, estadoDoc string
+		if err := rows.Scan(&tipo, &estadoDoc); err != nil {
 			log.Printf("Error scanning documento: %v", err)
 			continue
 		}
-		documentos = append(documentos, doc)
+		count++
+		switch estadoDoc {
+		case "pendiente":
+			documentosPendientes = append(documentosPendientes, tipo)
+		case "rechazado":
+			documentosRechazados = append(documentosRechazados, tipo)
+		}
 	}
 
-	// Verificar que todos los documentos estén aprobados
-	documentosPendientes := []string{}
-	documentosRechazados := []string{}
-	for _, doc := range documentos {
-		if doc.Estado == "pendiente" {
-			documentosPendientes = append(documentosPendientes, doc.TipoDocumento)
-		} else if doc.Estado == "rechazado" {
-			documentosRechazados = append(documentosRechazados, doc.TipoDocumento)
-		}
+	if count == 0 {
+		return nil, "No has subido los documentos requeridos para este periodo. Debes tener todos los documentos aprobados para inscribir asignaturas.", nil
 	}
 
 	if len(documentosPendientes) > 0 || len(documentosRechazados) > 0 {
@@ -173,8 +255,7 @@ func (h *MatriculaHandler) ValidarInscripcion(w http.ResponseWriter, r *http.Req
 		} else {
 			razon = "Tienes documentos rechazados. Debes tener todos los documentos aprobados para inscribir asignaturas."
 		}
-		
-		// Agregar detalles de los documentos
+
 		if len(documentosPendientes) > 0 {
 			razon += " Documentos pendientes: " + joinDocumentos(documentosPendientes)
 		}
@@ -182,34 +263,20 @@ func (h *MatriculaHandler) ValidarInscripcion(w http.ResponseWriter, r *http.Req
 			razon += " Documentos rechazados: " + joinDocumentos(documentosRechazados)
 		}
 
-		response := models.ValidarInscripcionResponse{
-			PuedeInscribir: false,
-			Razon:          razon,
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-		return
+		return nil, razon, nil
 	}
 
-	// Si no hay documentos, también es un problema
-	if len(documentos) == 0 {
-		response := models.ValidarInscripcionResponse{
-			PuedeInscribir: false,
-			Razon:          "No has subido los documentos requeridos para este periodo. Debes tener todos los documentos aprobados para inscribir asignaturas.",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	// Todas las validaciones pasaron
-	response := models.ValidarInscripcionResponse{
-		PuedeInscribir: true,
-		Razon:          "",
-		Periodo:       &periodo,
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	return &inscripcionContext{
+		EstudianteID:   estudianteID,
+		Semestre:       semestre,
+		Estado:         estado,
+		PensumID:       pensumID,
+		PensumNombre:   pensumNombre,
+		ProgramaID:     claims.ProgramaID,
+		ProgramaNombre: programaNombre,
+		Periodo:        &periodo,
+		Plazos:         plazos,
+	}, "", nil
 }
 
 // Función auxiliar para unir documentos
@@ -225,7 +292,6 @@ func joinDocumentos(docs []string) string {
 }
 
 // GetAsignaturasDisponibles obtiene las asignaturas disponibles para inscripción
-// Por ahora retorna un array vacío ya que la lógica completa aún no está implementada
 func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *http.Request) {
 	claims, err := h.getClaims(r)
 	if err != nil {
@@ -238,12 +304,535 @@ func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *h
 		return
 	}
 
-	// Por ahora retornar array vacío - la lógica completa se implementará después
-	// El frontend usará datos mock mientras tanto
-	response := []interface{}{}
-	
+	ctx, razon, err := h.prepareInscripcionContext(claims)
+	if err != nil {
+		log.Printf("Error preparando contexto de inscripción: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if razon != "" {
+		http.Error(w, razon, http.StatusForbidden)
+		return
+	}
+
+	if ctx.Periodo == nil {
+		http.Error(w, "No hay periodo académico activo", http.StatusNotFound)
+		return
+	}
+
+	pensumHandler := &PensumHandler{db: h.db}
+
+	asignaturas, err := pensumHandler.getAsignaturas(ctx.PensumID)
+	if err != nil {
+		log.Printf("Error obteniendo asignaturas del pensum: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	prereqMap, err := pensumHandler.buildPrereqMap(ctx.PensumID)
+	if err != nil {
+		log.Printf("Error obteniendo prerrequisitos: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	historialMap, err := pensumHandler.buildHistorialMap(ctx.EstudianteID)
+	if err != nil {
+		log.Printf("Error obteniendo historial académico: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	gruposMap, err := h.fetchGroupsForAsignaturas(ctx.Periodo.ID, asignaturas)
+	if err != nil {
+		log.Printf("Error obteniendo grupos de asignaturas: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	creditosInscritos, err := h.fetchInscritosCredits(ctx.EstudianteID, ctx.Periodo.ID)
+	if err != nil {
+		log.Printf("Error calculando créditos matriculados: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	creditosMax, err := h.fetchCreditLimit(ctx.PensumID, ctx.Semestre)
+	if err != nil {
+		log.Printf("Error calculando límite de créditos: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	creditosDisponibles := creditosMax - creditosInscritos
+	if creditosDisponibles < 0 {
+		creditosDisponibles = 0
+	}
+
+	activeOrdinal := periodOrdinal(ctx.Periodo.Year, ctx.Periodo.Semestre)
+	result := make([]AsignaturaDisponible, 0, len(asignaturas))
+	obligatoriasSinGrupo := []ObligatoriaInfo{}
+
+	for _, asig := range asignaturas {
+		rawPrereqs := prereqMap[asig.ID]
+		prereqs := make([]models.Prerequisito, 0, len(rawPrereqs))
+		prereqsFalt := make([]models.Prerequisito, 0, len(rawPrereqs))
+		correqs := make([]models.Prerequisito, 0, len(rawPrereqs))
+		correqsFalt := make([]models.Prerequisito, 0, len(rawPrereqs))
+
+		for _, prereq := range rawPrereqs {
+			prereq.Completado = hasApprovedEntry(historialMap, prereq.PrerequisitoID)
+			if prereq.Tipo == "correquisito" {
+				correqs = append(correqs, prereq)
+				if !prereq.Completado {
+					correqsFalt = append(correqsFalt, prereq)
+				}
+			} else {
+				prereqs = append(prereqs, prereq)
+				if !prereq.Completado {
+					prereqsFalt = append(prereqsFalt, prereq)
+				}
+			}
+		}
+
+		state, nota, _, periodoCursada, repeticiones := determineEstado(historialMap[asig.ID], ctx.Periodo, &activeOrdinal, len(prereqsFalt) > 0)
+
+		if state == "matriculada" || state == "en_espera" {
+			continue
+		}
+
+		isCurrentSemester := asig.Semestre == ctx.Semestre
+		isAtrasada := state == "pendiente_repeticion" || state == "obligatoria_repeticion"
+		if !isCurrentSemester && !isAtrasada {
+			continue
+		}
+
+		grupos := gruposMap[asig.ID]
+		conCupo := false
+		for _, grupo := range grupos {
+			if grupo.CupoDisponible > 0 {
+				conCupo = true
+				break
+			}
+		}
+
+		if state == "obligatoria_repeticion" && !conCupo {
+			obligatoriasSinGrupo = append(obligatoriasSinGrupo, ObligatoriaInfo{
+				ID:     asig.ID,
+				Codigo: asig.Codigo,
+				Nombre: asig.Nombre,
+			})
+		}
+
+		result = append(result, AsignaturaDisponible{
+			ID:                     asig.ID,
+			Codigo:                 asig.Codigo,
+			Nombre:                 asig.Nombre,
+			Creditos:               asig.Creditos,
+			Semestre:               asig.Semestre,
+			Categoria:              asig.Categoria,
+			Estado:                 state,
+			Nota:                   nota,
+			Repeticiones:           repeticiones,
+			PendienteRepeticion:    state == "pendiente_repeticion",
+			ObligatoriaRepeticion:  state == "obligatoria_repeticion",
+			Cursada:                state == "cursada",
+			Prerequisitos:          prereqs,
+			PrerequisitosFaltantes: prereqsFalt,
+			Correquisitos:          correqs,
+			CorrequisitosFaltantes: correqsFalt,
+			Grupos:                 grupos,
+			TieneLaboratorio:       asig.TieneLaboratorio,
+			PeriodoCursada:         periodoCursada,
+		})
+	}
+
+	mensajes := []string{
+		fmt.Sprintf("Solo se listan las asignaturas del semestre %d de tu pensum %q.", ctx.Semestre, ctx.PensumNombre),
+	}
+
+	if len(result) == 0 {
+		mensajes = append(mensajes, "Tu semestre actual no tiene asignaturas nuevas disponibles para inscribir. Espera a la apertura de nuevos grupos o consulta con tu asesor.")
+	}
+
+	if len(obligatoriasSinGrupo) > 0 {
+		mensajes = append(mensajes, "Actualmente hay asignaturas en repetición obligatoria sin cupo habilitado; priorízalas o contacta soporte académico para liberar espacios.")
+	}
+
+	response := GetAsignaturasResponse{
+		Periodo:              ctx.Periodo,
+		Creditos:             ResumenCreditos{Maximo: creditosMax, Inscritos: creditosInscritos, Disponibles: creditosDisponibles},
+		EstadoEstudiante:     ctx.Estado,
+		ObligatoriasSinGrupo: obligatoriasSinGrupo,
+		Asignaturas:          result,
+		Mensajes:             mensajes,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// GetGruposAsignatura devuelve los grupos disponibles para una asignatura y periodo activo
+func (h *MatriculaHandler) GetGruposAsignatura(w http.ResponseWriter, r *http.Request) {
+	claims, err := h.getClaims(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if claims.Rol != "estudiante" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	ctx, razon, err := h.prepareInscripcionContext(claims)
+	if err != nil {
+		log.Printf("Error preparando contexto de inscripción: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if razon != "" {
+		http.Error(w, razon, http.StatusForbidden)
+		return
+	}
+	if ctx.Periodo == nil {
+		http.Error(w, "No hay periodo académico activo", http.StatusNotFound)
+		return
+	}
+
+	idStr := mux.Vars(r)["id"]
+	asignaturaID, err := strconv.Atoi(idStr)
+	if err != nil || asignaturaID <= 0 {
+		http.Error(w, "ID de asignatura inválido", http.StatusBadRequest)
+		return
+	}
+
+	groupsMap, err := h.fetchGroupsForAsignaturas(ctx.Periodo.ID, []models.AsignaturaCompleta{{ID: asignaturaID}})
+	if err != nil {
+		log.Printf("Error obteniendo grupos para la asignatura: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"periodo": ctx.Periodo,
+		"grupos":  groupsMap[asignaturaID],
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// InscribirAsignaturas procesa la matrícula provisional de un estudiante
+func (h *MatriculaHandler) InscribirAsignaturas(w http.ResponseWriter, r *http.Request) {
+	claims, err := h.getClaims(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if claims.Rol != "estudiante" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req InscribirRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Payload inválido", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.GrupoIDs) == 0 {
+		http.Error(w, "Debes seleccionar al menos un grupo para inscribir", http.StatusBadRequest)
+		return
+	}
+
+	ctx, razon, err := h.prepareInscripcionContext(claims)
+	if err != nil {
+		log.Printf("Error preparando contexto de inscripción: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if razon != "" {
+		http.Error(w, razon, http.StatusForbidden)
+		return
+	}
+	if ctx.Periodo == nil {
+		http.Error(w, "No hay periodo académico activo", http.StatusNotFound)
+		return
+	}
+
+	uniqueGrupoIDs := make([]int, 0, len(req.GrupoIDs))
+	seenGrupos := make(map[int]struct{})
+	for _, id := range req.GrupoIDs {
+		if id <= 0 {
+			http.Error(w, "ID de grupo inválido", http.StatusBadRequest)
+			return
+		}
+		if _, ok := seenGrupos[id]; ok {
+			http.Error(w, "No puedes inscribir el mismo grupo dos veces", http.StatusBadRequest)
+			return
+		}
+		seenGrupos[id] = struct{}{}
+		uniqueGrupoIDs = append(uniqueGrupoIDs, id)
+	}
+
+	pensumHandler := &PensumHandler{db: h.db}
+	asignaturas, err := pensumHandler.getAsignaturas(ctx.PensumID)
+	if err != nil {
+		log.Printf("Error obteniendo asignaturas del pensum: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	prereqs, err := pensumHandler.buildPrereqMap(ctx.PensumID)
+	if err != nil {
+		log.Printf("Error obteniendo prerrequisitos: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	historialMap, err := pensumHandler.buildHistorialMap(ctx.EstudianteID)
+	if err != nil {
+		log.Printf("Error obteniendo historial académico: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	activeOrdinal := periodOrdinal(ctx.Periodo.Year, ctx.Periodo.Semestre)
+	asignaturaMap := make(map[int]models.AsignaturaCompleta, len(asignaturas))
+	stateMap := make(map[int]string, len(asignaturas))
+	for _, asig := range asignaturas {
+		asignaturaMap[asig.ID] = asig
+		lastState, _, _, _, _ := determineEstado(historialMap[asig.ID], ctx.Periodo, &activeOrdinal, false)
+		stateMap[asig.ID] = lastState
+	}
+
+	obligatorias := []int{}
+	for id, state := range stateMap {
+		if state == "obligatoria_repeticion" {
+			obligatorias = append(obligatorias, id)
+		}
+	}
+
+	if len(obligatorias) > 0 {
+		disponibles := map[int]int{}
+		query := `
+			SELECT asignatura_id, COUNT(*) FILTER (WHERE cupo_disponible > 0) AS disponibles
+			FROM grupo
+			WHERE periodo_id = $1
+			  AND asignatura_id = ANY($2)
+			GROUP BY asignatura_id
+		`
+		rows, err := h.db.Query(query, ctx.Periodo.ID, pq.Array(obligatorias))
+		if err != nil {
+			log.Printf("Error revisando grupos de repetición obligatoria: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var asignaturaID, cantidad int
+			if err := rows.Scan(&asignaturaID, &cantidad); err != nil {
+				log.Printf("Error escaneando repetición obligatoria: %v", err)
+				continue
+			}
+			disponibles[asignaturaID] = cantidad
+		}
+
+		for _, id := range obligatorias {
+			if disponibles[id] == 0 {
+				asig := asignaturaMap[id]
+				http.Error(w, fmt.Sprintf("La asignatura %s %s está en repetición obligatoria y no tiene cupos disponibles, por lo tanto no puedes matricular otras asignaturas.", asig.Codigo, asig.Nombre), http.StatusConflict)
+				return
+			}
+		}
+	}
+
+	query := `
+		SELECT 
+			g.id, g.codigo, g.asignatura_id, g.cupo_disponible, g.cupo_max, a.creditos
+		FROM grupo g
+		JOIN asignatura a ON a.id = g.asignatura_id
+		WHERE g.periodo_id = $1 AND g.id = ANY($2)
+	`
+	rows, err := h.db.Query(query, ctx.Periodo.ID, pq.Array(uniqueGrupoIDs))
+	if err != nil {
+		log.Printf("Error obteniendo grupos solicitados: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	selectedGroups := make(map[int]groupRecord)
+	selectedAsignaturas := make(map[int]int)
+	creditosNuevos := 0
+	for rows.Next() {
+		var reg groupRecord
+		if err := rows.Scan(&reg.ID, &reg.Codigo, &reg.AsignaturaID, &reg.CupoDisponible, &reg.CupoMax, &reg.Creditos); err != nil {
+			log.Printf("Error escaneando grupo: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if reg.CupoDisponible <= 0 {
+			http.Error(w, fmt.Sprintf("El grupo %s ya no tiene cupos disponibles.", reg.Codigo), http.StatusConflict)
+			return
+		}
+
+		state, exists := stateMap[reg.AsignaturaID]
+		if !exists {
+			http.Error(w, "Asignatura fuera del pensum", http.StatusBadRequest)
+			return
+		}
+		switch state {
+		case "matriculada":
+			http.Error(w, fmt.Sprintf("Ya estás matriculado en %s.", asignaturaMap[reg.AsignaturaID].Codigo), http.StatusConflict)
+			return
+		case "cursada":
+			http.Error(w, fmt.Sprintf("No puedes volver a inscribir %s porque ya la aprobaste.", asignaturaMap[reg.AsignaturaID].Codigo), http.StatusConflict)
+			return
+		case "en_espera":
+			http.Error(w, fmt.Sprintf("No puedes inscribir %s hasta que apruebes los prerrequisitos.", asignaturaMap[reg.AsignaturaID].Codigo), http.StatusConflict)
+			return
+		}
+
+		if _, ok := selectedAsignaturas[reg.AsignaturaID]; ok {
+			http.Error(w, "Solo puedes seleccionar un grupo por asignatura.", http.StatusBadRequest)
+			return
+		}
+
+		selectedAsignaturas[reg.AsignaturaID] = reg.ID
+		selectedGroups[reg.ID] = reg
+		creditosNuevos += reg.Creditos
+	}
+
+	if len(selectedGroups) != len(uniqueGrupoIDs) {
+		http.Error(w, "Algunos grupos solicitados no existen o no pertenecen al periodo activo.", http.StatusBadRequest)
+		return
+	}
+
+	selectedAsignaturasSet := make(map[int]struct{}, len(selectedAsignaturas))
+	for asignaturaID := range selectedAsignaturas {
+		selectedAsignaturasSet[asignaturaID] = struct{}{}
+	}
+
+	for asignaturaID := range selectedAsignaturasSet {
+		for _, prereq := range prereqs[asignaturaID] {
+			if prereq.Tipo == "correquisito" {
+				if hasApprovedEntry(historialMap, prereq.PrerequisitoID) {
+					continue
+				}
+				if _, ok := selectedAsignaturasSet[prereq.PrerequisitoID]; !ok {
+					http.Error(w, fmt.Sprintf("Para inscribir %s debes llevar también %s como correquisito.", asignaturaMap[asignaturaID].Nombre, asignaturaMap[prereq.PrerequisitoID].Nombre), http.StatusBadRequest)
+					return
+				}
+				continue
+			}
+				if !hasApprovedEntry(historialMap, prereq.PrerequisitoID) {
+					http.Error(w, fmt.Sprintf("Te falta aprobar %s para inscribir %s.", assignmentDisplay(prereq.PrerequisitoID, asignaturaMap), asignaturaMap[asignaturaID].Nombre), http.StatusBadRequest)
+					return
+				}
+		}
+	}
+
+	existingHorarios, err := h.fetchHorariosInscritos(ctx.EstudianteID, ctx.Periodo.ID)
+	if err != nil {
+		log.Printf("Error obteniendo horarios matriculados: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	nuevosHorarios, err := h.fetchGroupScheduleBlocks(uniqueGrupoIDs)
+	if err != nil {
+		log.Printf("Error obteniendo horarios de los grupos a inscribir: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	checked := []horarioBloque{}
+	for _, bloque := range nuevosHorarios {
+		for _, existente := range existingHorarios {
+			if horariosOverlap(bloque, existente) {
+				http.Error(w, "Conflicto de horario con asignaturas ya matriculadas.", http.StatusConflict)
+				return
+			}
+		}
+		for _, previo := range checked {
+			if horariosOverlap(bloque, previo) {
+				http.Error(w, "Hay conflicto de horario entre dos grupos seleccionados.", http.StatusConflict)
+				return
+			}
+		}
+		checked = append(checked, bloque)
+	}
+
+	creditosInscritos, err := h.fetchInscritosCredits(ctx.EstudianteID, ctx.Periodo.ID)
+	if err != nil {
+		log.Printf("Error calculando créditos matriculados: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	creditosMax, err := h.fetchCreditLimit(ctx.PensumID, ctx.Semestre)
+	if err != nil {
+		log.Printf("Error calculando límite de créditos: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if creditosInscritos+creditosNuevos > creditosMax {
+		http.Error(w, fmt.Sprintf("Inscribir estos grupos supera el límite de %d créditos para el semestre %d.", creditosMax, ctx.Semestre), http.StatusConflict)
+		return
+	}
+
+	tx, err := h.db.Begin()
+	if err != nil {
+		log.Printf("Error iniciando transacción de inscripción: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
+	for _, group := range selectedGroups {
+		var nuevoCupo int
+		err := tx.QueryRow(`
+			UPDATE grupo
+			SET cupo_disponible = cupo_disponible - 1
+			WHERE id = $1 AND cupo_disponible > 0
+			RETURNING cupo_disponible
+		`, group.ID).Scan(&nuevoCupo)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				http.Error(w, fmt.Sprintf("El grupo %s se quedó sin cupo.", group.Codigo), http.StatusConflict)
+				return
+			}
+			log.Printf("Error actualizando cupo del grupo: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = tx.Exec(`
+			INSERT INTO historial_academico (id_estudiante, id_asignatura, id_periodo, grupo_id, estado)
+			VALUES ($1, $2, $3, $4, 'matriculada')
+		`, ctx.EstudianteID, group.AsignaturaID, ctx.Periodo.ID, group.ID)
+		if err != nil {
+			log.Printf("Error insertando registro en historial: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Printf("Error confirmando inscripción: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Inscripción realizada correctamente.",
+	})
 }
 
 // GetHorarioActual obtiene el horario actual del estudiante para el periodo activo
@@ -376,5 +965,248 @@ func (h *MatriculaHandler) GetHorarioActual(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+func (h *MatriculaHandler) fetchGroupsForAsignaturas(periodoID int, asignaturas []models.AsignaturaCompleta) (map[int][]GrupoDisponible, error) {
+	result := make(map[int][]GrupoDisponible)
+	if len(asignaturas) == 0 {
+		return result, nil
+	}
+	ids := make([]int, 0, len(asignaturas))
+	for _, asig := range asignaturas {
+		ids = append(ids, asig.ID)
+	}
+	query := `
+		SELECT id, asignatura_id, codigo, docente, cupo_disponible, cupo_max
+		FROM grupo
+		WHERE periodo_id = $1
+		  AND asignatura_id = ANY($2)
+		ORDER BY codigo
+	`
+	rows, err := h.db.Query(query, periodoID, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	groupIDs := make([]int, 0)
+	temp := make(map[int][]GrupoDisponible)
+	for rows.Next() {
+		var g GrupoDisponible
+		var asignaturaID int
+		if err := rows.Scan(&g.ID, &asignaturaID, &g.Codigo, &g.Docente, &g.CupoDisponible, &g.CupoMax); err != nil {
+			return nil, err
+		}
+		temp[asignaturaID] = append(temp[asignaturaID], g)
+		groupIDs = append(groupIDs, g.ID)
+	}
+
+	horariosMap, err := h.fetchHorariosForGroups(groupIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for asignaturaID, grupos := range temp {
+		for i := range grupos {
+			grupos[i].Horarios = horariosMap[grupos[i].ID]
+		}
+		result[asignaturaID] = grupos
+	}
+
+	return result, nil
+}
+
+func (h *MatriculaHandler) fetchHorariosForGroups(groupIDs []int) (map[int][]HorarioDisponible, error) {
+	horarios := make(map[int][]HorarioDisponible)
+	if len(groupIDs) == 0 {
+		return horarios, nil
+	}
+	query := `
+		SELECT grupo_id, dia, hora_inicio::text, hora_fin::text, salon
+		FROM horario_grupo
+		WHERE grupo_id = ANY($1)
+	`
+	rows, err := h.db.Query(query, pq.Array(groupIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var grupoID int
+		var dia, inicio, fin, salon string
+		if err := rows.Scan(&grupoID, &dia, &inicio, &fin, &salon); err != nil {
+			return nil, err
+		}
+		horarios[grupoID] = append(horarios[grupoID], HorarioDisponible{
+			Dia:        dia,
+			HoraInicio: inicio,
+			HoraFin:    fin,
+			Salon:      salon,
+		})
+	}
+
+	return horarios, nil
+}
+
+func (h *MatriculaHandler) fetchInscritosCredits(estudianteID, periodoID int) (int, error) {
+	var creditos sql.NullInt64
+	query := `
+		SELECT COALESCE(SUM(a.creditos), 0)
+		FROM historial_academico ha
+		JOIN asignatura a ON a.id = ha.id_asignatura
+		WHERE ha.id_estudiante = $1
+		  AND ha.id_periodo = $2
+		  AND ha.estado = 'matriculada'
+	`
+	err := h.db.QueryRow(query, estudianteID, periodoID).Scan(&creditos)
+	if err != nil {
+		return 0, err
+	}
+	return int(creditos.Int64), nil
+}
+
+func (h *MatriculaHandler) fetchCreditLimit(pensumID, semestre int) (int, error) {
+	var limite sql.NullInt64
+	query := `
+		SELECT creditos_semestre
+		FROM creditos_acumulados_pensum
+		WHERE pensum_id = $1 AND semestre = $2
+	`
+	err := h.db.QueryRow(query, pensumID, semestre).Scan(&limite)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return h.fallbackCreditLimit(pensumID, semestre)
+		}
+		return 0, err
+	}
+	if limite.Valid {
+		return int(limite.Int64), nil
+	}
+	return h.fallbackCreditLimit(pensumID, semestre)
+}
+
+func (h *MatriculaHandler) fallbackCreditLimit(pensumID, semestre int) (int, error) {
+	var total sql.NullInt64
+	query := `
+		SELECT COALESCE(SUM(a.creditos), 0)
+		FROM pensum_asignatura pa
+		JOIN asignatura a ON a.id = pa.asignatura_id
+		WHERE pa.pensum_id = $1 AND pa.semestre = $2
+	`
+	err := h.db.QueryRow(query, pensumID, semestre).Scan(&total)
+	if err != nil {
+		return 0, err
+	}
+	return int(total.Int64), nil
+}
+
+func (h *MatriculaHandler) fetchHorariosInscritos(estudianteID, periodoID int) ([]horarioBloque, error) {
+	query := `
+		SELECT hg.grupo_id, hg.dia, hg.hora_inicio::text, hg.hora_fin::text
+		FROM historial_academico ha
+		JOIN grupo g ON g.id = ha.grupo_id
+		JOIN horario_grupo hg ON hg.grupo_id = g.id
+		WHERE ha.id_estudiante = $1 AND ha.id_periodo = $2 AND ha.estado = 'matriculada'
+	`
+	rows, err := h.db.Query(query, estudianteID, periodoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var bloques []horarioBloque
+	for rows.Next() {
+		var grupoID int
+		var dia, inicio, fin string
+		if err := rows.Scan(&grupoID, &dia, &inicio, &fin); err != nil {
+			return nil, err
+		}
+		ini, err := convertTimeToMinutes(inicio)
+		if err != nil {
+			return nil, err
+		}
+		finMin, err := convertTimeToMinutes(fin)
+		if err != nil {
+			return nil, err
+		}
+		bloques = append(bloques, horarioBloque{
+			GrupoID:   grupoID,
+			Dia:       dia,
+			InicioMin: ini,
+			FinMin:    finMin,
+		})
+	}
+
+	return bloques, nil
+}
+
+func (h *MatriculaHandler) fetchGroupScheduleBlocks(groupIDs []int) ([]horarioBloque, error) {
+	if len(groupIDs) == 0 {
+		return nil, nil
+	}
+	query := `
+		SELECT grupo_id, dia, hora_inicio::text, hora_fin::text
+		FROM horario_grupo
+		WHERE grupo_id = ANY($1)
+	`
+	rows, err := h.db.Query(query, pq.Array(groupIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var bloques []horarioBloque
+	for rows.Next() {
+		var grupoID int
+		var dia, inicio, fin string
+		if err := rows.Scan(&grupoID, &dia, &inicio, &fin); err != nil {
+			return nil, err
+		}
+		ini, err := convertTimeToMinutes(inicio)
+		if err != nil {
+			return nil, err
+		}
+		finMin, err := convertTimeToMinutes(fin)
+		if err != nil {
+			return nil, err
+		}
+		bloques = append(bloques, horarioBloque{
+			GrupoID:   grupoID,
+			Dia:       dia,
+			InicioMin: ini,
+			FinMin:    finMin,
+		})
+	}
+
+	return bloques, nil
+}
+
+func convertTimeToMinutes(value string) (int, error) {
+	if value == "" {
+		return 0, fmt.Errorf("hora vacía")
+	}
+	t, err := time.Parse("15:04:05", value)
+	if err != nil {
+		t, err = time.Parse("15:04", value)
+		if err != nil {
+			return 0, err
+		}
+	}
+	return t.Hour()*60 + t.Minute(), nil
+}
+
+func horariosOverlap(a, b horarioBloque) bool {
+	if a.Dia != b.Dia {
+		return false
+	}
+	return !(a.FinMin <= b.InicioMin || b.FinMin <= a.InicioMin)
+}
+
+func assignmentDisplay(id int, asigMap map[int]models.AsignaturaCompleta) string {
+	if asig, ok := asigMap[id]; ok {
+		return fmt.Sprintf("%s %s", asig.Codigo, asig.Nombre)
+	}
+	return fmt.Sprintf("asignatura %d", id)
 }
 
