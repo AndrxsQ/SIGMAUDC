@@ -9,7 +9,6 @@ import React, { useState, useEffect } from "react";
 // Importación de íconos desde react-icons (representan cada opción del menú)
 import {
   FaBars,
-  FaUserEdit,
   FaBookOpen,
   FaClipboardList,
   FaEdit,
@@ -158,16 +157,6 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
           {!isOpen && <span className="tooltip">Pensul</span>}
         </div>
         
-        {/* Opción: Actualizar datos del estudiante */}
-        <div className="icon-content">
-          <button className={activePage === "actualizar" ? "active" : ""} onClick={() => setActivePage("actualizar")}>
-            <FaUserEdit />
-            <span>Actualizar datos</span>
-          </button>
-
-          {!isOpen && <span className="tooltip">Actualizar datos</span>}
-        </div>
-
         {/* Opción: Guía de matrícula */}
         <div className="icon-content">
           <button  className={activePage === "guia" ? "active" : ""} onClick={() => setActivePage("guia")}>
@@ -177,6 +166,14 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
           {!isOpen && <span className="tooltip">Guía de matrícula</span>}
         </div>
         
+        {/* Opción: Datos del estudiante */}
+        <div className="icon-content">
+          <button className={activePage === "hoja" ? "active" : ""} onClick={() => setActivePage("hoja")}>
+            <FaFileAlt /> <span>Datos del estudiante</span>
+          </button>
+          {!isOpen && <span className="tooltip">Datos del estudiante</span>}
+        </div>
+
         {/* Sección de opciones de matrícula */}
         <p className="menu-title">Matrícula</p>
         {/* Opción: Subir documentos */}
@@ -209,17 +206,6 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
             <FaSearch /> <span>Consultar matrícula</span>
           </button>
           {!isOpen && <span className="tooltip">Consultar matrícula</span>}
-        </div>
-
-        {/* Sección de consulta adicional */}
-        <p className="menu-title">Consultar</p>
-
-        {/* Opción: Hoja de vida académica */}
-        <div className="icon-content">
-        <button className={activePage === "Hoja" ? "active" : ""} onClick={() => setActivePage("hoja")}>
-          <FaFileAlt /> <span>Hoja de vida</span>
-        </button>
-        {!isOpen && <span className="tooltip">Hoja de vida</span>}
         </div>
 
         {/* Opción: Cerrar sesión */}

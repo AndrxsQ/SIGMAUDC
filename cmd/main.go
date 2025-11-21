@@ -45,6 +45,7 @@ func main() {
 	documentosHandler := handlers.NewDocumentosHandler(db)
 	pensumHandler := handlers.NewPensumHandler(db)
 	matriculaHandler := handlers.NewMatriculaHandler(db)
+	estudianteHandler := handlers.NewEstudianteHandler(db)
 
 	// Configurar router
 	r := mux.NewRouter()
@@ -71,25 +72,28 @@ func main() {
 	protected.HandleFunc("/periodos/{id}", plazosHandler.DeletePeriodo).Methods("DELETE")
 	protected.HandleFunc("/periodos-con-plazos", plazosHandler.GetPeriodosConPlazos).Methods("GET")
 	protected.HandleFunc("/plazos/activo", plazosHandler.GetActivePeriodoPlazos).Methods("GET")
-	
+
 	// Rutas de plazos
 	protected.HandleFunc("/periodos/{periodo_id}/plazos", plazosHandler.GetPlazos).Methods("GET")
 	protected.HandleFunc("/periodos/{periodo_id}/plazos", plazosHandler.UpdatePlazos).Methods("PUT")
 
 	// Rutas de documentos (protegidas)
 	protected.HandleFunc("/documentos", documentosHandler.GetDocumentosEstudiante).Methods("GET")           // Para estudiantes
-	protected.HandleFunc("/documentos", documentosHandler.SubirDocumento).Methods("POST")                  // Para estudiantes
+	protected.HandleFunc("/documentos", documentosHandler.SubirDocumento).Methods("POST")                   // Para estudiantes
 	protected.HandleFunc("/documentos/programa", documentosHandler.GetDocumentosPorPrograma).Methods("GET") // Para jefatura
 	protected.HandleFunc("/documentos/{id}/revisar", documentosHandler.RevisarDocumento).Methods("PUT")     // Para jefatura
 
 	// Rutas de pensum (protegidas)
 	protected.HandleFunc("/pensum", pensumHandler.GetPensumEstudiante).Methods("GET") // Para estudiantes
+	protected.HandleFunc("/estudiante/datos", estudianteHandler.GetDatosEstudiante).Methods("GET")
+	protected.HandleFunc("/estudiante/datos", estudianteHandler.UpdateDatosEstudiante).Methods("PUT")
+	protected.HandleFunc("/estudiante/foto", estudianteHandler.SubirFotoEstudiante).Methods("POST")
 	log.Println("✅ Ruta /api/pensum registrada correctamente")
 
 	// Rutas de matrícula (protegidas)
-	protected.HandleFunc("/matricula/validar-inscripcion", matriculaHandler.ValidarInscripcion).Methods("GET") // Para estudiantes
+	protected.HandleFunc("/matricula/validar-inscripcion", matriculaHandler.ValidarInscripcion).Methods("GET")            // Para estudiantes
 	protected.HandleFunc("/matricula/asignaturas-disponibles", matriculaHandler.GetAsignaturasDisponibles).Methods("GET") // Para estudiantes (temporal - retorna vacío)
-	protected.HandleFunc("/matricula/horario-actual", matriculaHandler.GetHorarioActual).Methods("GET") // Para estudiantes
+	protected.HandleFunc("/matricula/horario-actual", matriculaHandler.GetHorarioActual).Methods("GET")                   // Para estudiantes
 	protected.HandleFunc("/matricula/asignaturas/{id}/grupos", matriculaHandler.GetGruposAsignatura).Methods("GET")
 	protected.HandleFunc("/matricula/inscribir", matriculaHandler.InscribirAsignaturas).Methods("POST")
 

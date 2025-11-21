@@ -412,4 +412,3 @@ func hasApprovedEntry(historial map[int][]historyRecord, asignaturaID int) bool 
 func periodOrdinal(year, semestre int) int {
 	return year*2 + (semestre - 1)
 }
-

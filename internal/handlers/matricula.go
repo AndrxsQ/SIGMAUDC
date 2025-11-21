@@ -452,9 +452,7 @@ func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *h
 		})
 	}
 
-	mensajes := []string{
-		fmt.Sprintf("Solo se listan las asignaturas del semestre %d de tu pensum %q.", ctx.Semestre, ctx.PensumNombre),
-	}
+	mensajes := []string{}
 
 	if len(result) == 0 {
 		mensajes = append(mensajes, "Tu semestre actual no tiene asignaturas nuevas disponibles para inscribir. Espera a la apertura de nuevos grupos o consulta con tu asesor.")
