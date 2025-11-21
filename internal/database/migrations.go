@@ -140,6 +140,48 @@ func RunMigrations(db *sql.DB) error {
 			END IF;
 		END $$;
 		`,
+		`
+		ALTER TABLE estudiante
+		ADD COLUMN IF NOT EXISTS sexo VARCHAR(10) NOT NULL DEFAULT 'otro'
+		`,
+		`
+		ALTER TABLE estudiante
+		ADD COLUMN IF NOT EXISTS foto_perfil TEXT
+		`,
+		`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint
+				WHERE conname = 'chk_estudiante_sexo'
+				AND conrelid = 'estudiante'::regclass
+			) THEN
+				ALTER TABLE estudiante
+				ADD CONSTRAINT chk_estudiante_sexo CHECK (sexo IN ('masculino','femenino','otro'));
+			END IF;
+		END $$;
+		`,
+		`
+		ALTER TABLE jefe_departamental
+		ADD COLUMN IF NOT EXISTS sexo VARCHAR(10) NOT NULL DEFAULT 'otro'
+		`,
+		`
+		ALTER TABLE jefe_departamental
+		ADD COLUMN IF NOT EXISTS foto_perfil TEXT
+		`,
+		`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint
+				WHERE conname = 'chk_jefe_sexo'
+				AND conrelid = 'jefe_departamental'::regclass
+			) THEN
+				ALTER TABLE jefe_departamental
+				ADD CONSTRAINT chk_jefe_sexo CHECK (sexo IN ('masculino','femenino','otro'));
+			END IF;
+		END $$;
+		`,
 	}
 
 	for _, stmt := range statements {

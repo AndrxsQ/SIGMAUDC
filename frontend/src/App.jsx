@@ -7,7 +7,6 @@ import SetPassword from "./components/common/SetPassword";
 
 // Componentes de estudiantes
 import Sidebar from "./components/estudiante/Sidebar";
-import HojaDeVida from "./components/estudiante/HojaDeVida";
 import Subir from "./components/estudiante/Subir";
 import PensumVisual from "./components/estudiante/PensumVisual";
 
@@ -18,6 +17,7 @@ import SidebarJefe from "./components/jefe/SidebarJefe";
 import Home from "./pages/estudiante/Home";
 import InscribirAsignaturas from "./pages/estudiante/InscribirAsignaturas";
 import ConsultarMatricula from "./pages/estudiante/ConsultarMatricula";
+import DatosEstudiante from "./pages/estudiante/DatosEstudiante";
 
 // Páginas de jefes
 import HomeJefe from "./pages/jefe/HomeJefe";
@@ -242,7 +242,7 @@ function AppContent() {
                     }
                   />
                   <Route path="/subir" element={renderRoleProtected(<Subir />, () => userRole !== "jefe_departamental")} />
-                  <Route path="/hoja" element={renderRoleProtected(<HojaDeVida />, () => userRole !== "jefe_departamental")} />
+                  <Route path="/hoja" element={renderRoleProtected(<DatosEstudiante />, () => userRole !== "jefe_departamental")} />
                   <Route path="/pensul" element={renderRoleProtected(<PensumVisual />, () => userRole !== "jefe_departamental")} />
                   <Route path="/inscribir" element={renderRoleProtected(<InscribirAsignaturas />, () => userRole !== "jefe_departamental")} />
                   <Route path="/prueba" element={renderRoleProtected(<ConsultarMatricula />, () => userRole !== "jefe_departamental")} />
