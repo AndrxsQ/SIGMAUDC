@@ -174,6 +174,65 @@
   margin: 0;
 }
 
+/* Alert card elegante */
+.alert-card {
+  margin: 40px auto;
+  max-width: 600px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(250, 244, 233, 0.95));
+  border-radius: 18px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: var(--horario-shadow-lg);
+  border: 1px solid rgba(201, 162, 63, 0.25);
+}
+
+.alert-card.error {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(255, 229, 229, 0.92));
+  border-color: rgba(255, 59, 48, 0.4);
+}
+
+.alert-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 59, 48, 0.08);
+  color: #ff3b30;
+  flex-shrink: 0;
+}
+
+.alert-body h2 {
+  margin: 0;
+  font-size: 22px;
+  color: var(--horario-text-primary);
+  font-weight: 700;
+}
+
+.alert-body p {
+  margin: 8px 0 16px;
+  color: var(--horario-text-secondary);
+  font-size: 15px;
+}
+
+.alert-primary {
+  background: #ff3b30;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.alert-primary:hover {
+  transform: translateY(-1px);
+}
+
 /* ============================================
    RESUMEN DE ASIGNATURAS
    ============================================ */
@@ -258,8 +317,8 @@
 }
 
 /* ============================================
-   HORARIO VISUAL
-   ============================================ */
+  HORARIO VISUAL
+  ============================================ */
 .horario-visual-container {
   margin-bottom: 32px;
 }
@@ -282,155 +341,92 @@
 }
 
 .horario-grid {
+  width: 100%;
+}
+
+.tabla-franjas {
   display: grid;
-  grid-template-columns: 80px repeat(6, 1fr);
-  min-width: 800px;
+  grid-template-columns: 150px repeat(6, minmax(0, 1fr));
   gap: 0;
+  border: 1px solid var(--horario-border);
+  border-radius: 12px;
+  overflow: hidden;
 }
 
-/* Header del horario */
-.horario-header-row {
+.fila-franja {
   display: contents;
 }
 
-.horario-time-col-header {
-  grid-column: 1;
-  padding: 12px 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--horario-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom: 2px solid var(--horario-border);
-  position: sticky;
-  left: 0;
-  background: var(--horario-bg-card);
-  z-index: 10;
+.fila-franja.header {
+  background: #fefefe;
+  box-shadow: inset 0 -1px 0 var(--horario-border);
 }
 
-.horario-day-col-header {
-  padding: 12px 8px;
+.celda-franja-label {
+  padding: 12px;
+  font-weight: 600;
   font-size: 14px;
-  font-weight: 600;
-  color: var(--horario-text-primary);
+  background: var(--horario-bg-card);
+  border-right: 1px solid var(--horario-border);
+}
+
+.celda-franja-header {
+  padding: 12px;
   text-align: center;
-  border-bottom: 2px solid var(--horario-border);
-  background: var(--horario-bg-card);
-}
-
-/* Cuerpo del horario */
-.horario-body {
-  display: contents;
-}
-
-.horario-row {
-  display: contents;
-}
-
-.horario-time-cell {
-  grid-column: 1;
-  padding: 8px;
   font-size: 13px;
+  font-weight: 600;
   color: var(--horario-text-secondary);
-  font-weight: 500;
   border-right: 1px solid var(--horario-border);
+}
+
+.celda-franja {
+  min-height: 100px;
   border-bottom: 1px solid var(--horario-border);
-  position: sticky;
-  left: 0;
-  background: var(--horario-bg-card);
-  z-index: 5;
-  min-height: 60px;
+  border-right: 1px solid var(--horario-border);
+  padding: 10px;
+  background: #fff;
   display: flex;
-  align-items: flex-start;
-  padding-top: 12px;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.horario-cell {
-  border-right: 1px solid var(--horario-border);
-  border-bottom: 1px solid var(--horario-border);
-  min-height: 60px;
-  position: relative;
-  padding: 2px;
+.celda-franja:nth-child(6n) {
+  border-right: none;
 }
 
-/* Bloque de asignatura */
-.horario-block {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  right: 2px;
-  border-radius: 8px;
+.celda-franja-block {
+  background: #f8f8fb;
+  border-radius: 10px;
   padding: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  cursor: pointer;
-  overflow: hidden;
-}
-
-.horario-block:hover {
-  transform: scale(1.02);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  z-index: 20;
-}
-
-.horario-block-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  height: 100%;
-}
-
-.horario-block-title {
+  border: 1px solid rgba(0, 0, 0, 0.05);
   font-size: 12px;
-  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.celda-franja-title {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 4px;
   color: var(--horario-text-primary);
-  letter-spacing: 0.3px;
-  line-height: 1.2;
 }
 
-.horario-block-subtitle {
-  font-size: 11px;
-  color: var(--horario-text-secondary);
-  font-weight: 500;
-  line-height: 1.3;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.horario-block-details {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-top: auto;
-}
-
-.horario-block-group,
-.horario-block-profesor,
-.horario-block-salon {
+.celda-franja-meta {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
   color: var(--horario-text-secondary);
-  font-weight: 500;
 }
 
-.horario-block-group svg,
-.horario-block-profesor svg,
-.horario-block-salon svg {
-  flex-shrink: 0;
+.celda-franja-meta svg {
+  color: var(--horario-primary-gold);
 }
 
-.horario-block-time {
-  font-size: 10px;
-  color: var(--horario-text-secondary);
+.celda-franja-time {
   font-weight: 600;
-  margin-top: 4px;
-  padding-top: 4px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 11px;
+  color: var(--horario-text-secondary);
+  margin-top: 6px;
+  display: block;
 }
 
 /* ============================================

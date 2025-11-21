@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import documentosService from "../../services/documentos";
 import "../../styles/Subir.css";
-import { FaUpload, FaFileAlt, FaCheckCircle, FaTimesCircle, FaSpinner } from "react-icons/fa";
+import { FaUpload, FaFileAlt, FaCheckCircle, FaTimesCircle, FaSpinner, FaExclamationTriangle } from "react-icons/fa";
 import { FaFileUpload } from "react-icons/fa";
 
 const SubirDocumentos = () => {
@@ -14,6 +14,7 @@ const SubirDocumentos = () => {
   const [uploading, setUploading] = useState({});
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [plazoMensaje, setPlazoMensaje] = useState("");
 
   // Estados locales para archivos seleccionados
   const [pagoFile, setPagoFile] = useState(null);
@@ -30,6 +31,10 @@ const SubirDocumentos = () => {
       setDocumentos(response.documentos || []);
       setPeriodoActivo(response.periodoActivo || response.periodo_activo);
       setPuedeSubir(response.puedeSubir !== undefined ? response.puedeSubir : (response.puede_subir || false));
+      const mensaje = response.plazoMensaje || response.plazo_mensaje
+        || (!response.periodoActivo && "No hay un periodo académico activo para subir documentos.")
+        || "El plazo para subir documentos está inactivo.";
+      setPlazoMensaje(mensaje);
       setError(null);
     } catch (err) {
       console.error("Error loading documentos:", err);
@@ -158,8 +163,17 @@ const SubirDocumentos = () => {
 
         {/* Mensajes de estado */}
         {!puedeSubir && (
-          <div className="alert-info">
-            <p>El plazo para subir documentos no está activo en este momento.</p>
+          <div className="alert-card warning">
+            <div className="alert-card-icon">
+              <FaExclamationTriangle />
+            </div>
+            <div className="alert-card-body">
+              <h2>Plazo para documentos inactivo</h2>
+              <p>{plazoMensaje}</p>
+              <small>
+                Solo podrás subir documentos cuando la administración active el periodo y habilite el plazo.
+              </small>
+            </div>
           </div>
         )}
         {error && (

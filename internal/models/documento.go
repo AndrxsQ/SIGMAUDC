@@ -73,5 +73,6 @@ type DocumentosEstudianteResponse struct {
 	PlazoDocumentos    bool                  `json:"plazo_documentos"`     // Si el plazo está activo
 	PuedeSubir         bool                  `json:"puede_subir"`           // Si puede subir documentos
 	DocumentosAprobados bool                 `json:"documentos_aprobados"` // Si todos los documentos están aprobados
+	PlazoMensaje       string                `json:"plazo_mensaje,omitempty"`
 }
 

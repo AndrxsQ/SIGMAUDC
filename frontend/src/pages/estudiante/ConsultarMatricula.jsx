@@ -1,19 +1,37 @@
 import React, { useState, useEffect } from "react";
 import { matriculaService } from "../../services/matricula";
-import { FaCalendarAlt, FaClock, FaUser, FaMapMarkerAlt, FaBook } from "react-icons/fa";
+import { FaCalendarAlt, FaUser, FaMapMarkerAlt, FaBook, FaExclamationTriangle } from "react-icons/fa";
 import "../../styles/ConsultarMatricula.css";
+
+const FRANJAS = [
+  { label: "7:00 - 7:50", start: "07:00", end: "07:50" },
+  { label: "7:50 - 8:40", start: "07:50", end: "08:40" },
+  { label: "8:40 - 9:30", start: "08:40", end: "09:30" },
+  { label: "9:30 - 10:20", start: "09:30", end: "10:20" },
+  { label: "10:20 - 11:10", start: "10:20", end: "11:10" },
+  { label: "11:10 - 12:00", start: "11:10", end: "12:00" },
+  { label: "12:00 - 12:50", start: "12:00", end: "12:50" },
+  { label: "13:00 - 13:50", start: "13:00", end: "13:50" },
+  { label: "13:50 - 14:40", start: "13:50", end: "14:40" },
+  { label: "14:40 - 15:30", start: "14:40", end: "15:30" },
+  { label: "15:30 - 16:20", start: "15:30", end: "16:20" },
+  { label: "16:20 - 17:10", start: "16:20", end: "17:10" },
+  { label: "17:10 - 18:00", start: "17:10", end: "18:00" },
+];
+
+const diasSemana = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+const diasCortos = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+
+const timeToMinutes = (hora) => {
+  if (!hora) return null;
+  const [h, m] = hora.split(":").map(Number);
+  return h * 60 + (m || 0);
+};
 
 const ConsultarMatricula = () => {
   const [loading, setLoading] = useState(true);
   const [horarioData, setHorarioData] = useState(null);
   const [error, setError] = useState(null);
-
-  // Días de la semana
-  const diasSemana = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
-  const diasCortos = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  
-  // Horas del día (7am - 10pm)
-  const horas = Array.from({ length: 16 }, (_, i) => 7 + i);
 
   useEffect(() => {
     loadHorario();
@@ -33,66 +51,58 @@ const ConsultarMatricula = () => {
     }
   };
 
-  // Formatear hora (HH:MM -> H:MM AM/PM)
-  const formatearHora = (hora) => {
-    if (!hora) return "";
-    const [h, m] = hora.split(':');
-    const horas = parseInt(h);
-    const minutos = m || "00";
-    if (horas === 0) return `12:${minutos} AM`;
-    if (horas < 12) return `${horas}:${minutos} AM`;
-    if (horas === 12) return `12:${minutos} PM`;
-    return `${horas - 12}:${minutos} PM`;
+  const buildMatrix = () => {
+    if (!horarioData?.clases) return null;
+    const matrix = {};
+    diasSemana.forEach((dia) => {
+      matrix[dia] = FRANJAS.map(() => []);
+    });
+
+    horarioData.clases.forEach((clase) => {
+      if (!clase.dia || !clase.hora_inicio) return;
+      const startMin = timeToMinutes(clase.hora_inicio);
+      const slotIndex = FRANJAS.findIndex((slot) => {
+        const slotStart = timeToMinutes(slot.start);
+        const slotEnd = timeToMinutes(slot.end);
+        if (slotStart === null || slotEnd === null || startMin === null) return false;
+        return startMin >= slotStart && startMin < slotEnd;
+      });
+      const index = slotIndex !== -1 ? slotIndex : 0;
+      if (matrix[clase.dia]) {
+        matrix[clase.dia][index].push(clase);
+      }
+    });
+
+    return matrix;
   };
 
-  // Obtener posición y duración de un bloque de horario
-  const obtenerPosicionHorario = (horaInicio, horaFin) => {
-    const [hInicio, mInicio] = horaInicio.split(':').map(Number);
-    const [hFin, mFin] = horaFin.split(':').map(Number);
-    
-    const inicioMinutos = hInicio * 60 + mInicio;
-    const finMinutos = hFin * 60 + mFin;
-    const duracion = finMinutos - inicioMinutos;
-    
-    // Posición desde las 7:00 AM (420 minutos)
-    const posicion = inicioMinutos - 420;
-    
-    return {
-      top: posicion,
-      duracion: duracion / 60, // en horas
-    };
-  };
-
-  // Obtener color para asignatura (basado en código)
-  const obtenerColorAsignatura = (codigo) => {
-    const colores = [
-      "rgba(201, 162, 63, 0.15)", // Gold
-      "rgba(60, 158, 228, 0.15)", // Blue
-      "rgba(52, 199, 89, 0.15)",  // Green
-      "rgba(255, 149, 0, 0.15)",  // Orange
-      "rgba(175, 82, 222, 0.15)", // Purple
-      "rgba(255, 59, 48, 0.15)",  // Red
-      "rgba(0, 199, 190, 0.15)",  // Teal
-      "rgba(255, 204, 0, 0.15)",  // Yellow
-    ];
-    const hash = codigo.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return colores[hash % colores.length];
-  };
-
-  // Obtener borde color para asignatura
-  const obtenerBordeColor = (codigo) => {
-    const colores = [
-      "#C9A23F", // Gold
-      "#3C9EE4", // Blue
-      "#34C759", // Green
-      "#FF9500", // Orange
-      "#AF52DE", // Purple
-      "#FF3B30", // Red
-      "#00C7BE", // Teal
-      "#FFCC00", // Yellow
-    ];
-    const hash = codigo.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return colores[hash % colores.length];
+  const renderSlot = (dia, franja, index, matrix) => {
+    const clases = matrix?.[dia]?.[index] || [];
+    if (clases.length === 0) {
+      return <div className="celda-franja" key={`${dia}-${index}`}></div>;
+    }
+    return (
+      <div className="celda-franja" key={`${dia}-${index}`}>
+        {clases.map((clase, idx) => (
+          <div key={`${dia}-${franja.label}-${idx}`} className="celda-franja-block">
+            <div className="celda-franja-title">{clase.asignatura_nombre}</div>
+            <div className="celda-franja-meta">
+              <FaUser size={12} />
+              <span>{clase.docente || "Docente asignado"}</span>
+            </div>
+            {clase.salon && (
+              <div className="celda-franja-meta">
+                <FaMapMarkerAlt size={12} />
+                <span>{clase.salon}</span>
+              </div>
+            )}
+            <div className="celda-franja-time">
+              {clase.hora_inicio} - {clase.hora_fin}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   if (loading) {
@@ -109,28 +119,45 @@ const ConsultarMatricula = () => {
   if (error) {
     return (
       <div className="consultar-matricula-container">
-        <div className="error-container">
-          <p>{error}</p>
+        <div className="horario-header">
+          <div className="header-content">
+            <div className="udc-logo-container">
+              <img src="/logo-udc.png" alt="Logo Universidad" className="udc-logo" />
+            </div>
+            <div className="header-info">
+              <h1>Consultar Matrícula</h1>
+              <p>Aquí te mostramos cuánto falta para inscribir tus materias.</p>
+            </div>
+          </div>
+        </div>
+        <div className="alert-card error">
+          <div className="alert-icon">
+            <FaExclamationTriangle size={24} />
+          </div>
+          <div className="alert-body">
+            <h2>Plazo inactivo</h2>
+            <p>{error}</p>
+            <button className="alert-primary" onClick={loadHorario}>
+              Reintentar
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!horarioData || !horarioData.asignaturas || horarioData.asignaturas.length === 0) {
+  const hasClases = horarioData && horarioData.clases && horarioData.clases.length > 0;
+  if (!hasClases) {
     return (
       <div className="consultar-matricula-container">
         <div className="horario-header">
           <div className="header-content">
             <div className="udc-logo-container">
-              <img 
-                src="/logo-udc.png" 
-                alt="Logo Universidad" 
-                className="udc-logo"
-              />
+              <img src="/logo-udc.png" alt="Logo Universidad" className="udc-logo" />
             </div>
             <div className="header-info">
               <h1>Consultar Matrícula</h1>
-              {horarioData?.periodo?.id ? (
+              {horarioData?.periodo ? (
                 <p>Periodo {horarioData.periodo.year}-{horarioData.periodo.semestre}</p>
               ) : (
                 <p>No hay periodo activo</p>
@@ -147,17 +174,14 @@ const ConsultarMatricula = () => {
     );
   }
 
+  const matrix = buildMatrix();
+
   return (
     <div className="consultar-matricula-container">
-      {/* Header */}
       <div className="horario-header">
         <div className="header-content">
           <div className="udc-logo-container">
-            <img 
-              src="/logo-udc.png" 
-              alt="Logo Universidad" 
-              className="udc-logo"
-            />
+            <img src="/logo-udc.png" alt="Logo Universidad" className="udc-logo" />
           </div>
           <div className="header-info">
             <h1>Consultar Matrícula</h1>
@@ -168,140 +192,52 @@ const ConsultarMatricula = () => {
         </div>
       </div>
 
-      {/* Horario Visual */}
       <div className="horario-visual-container">
-        <h2>Horario Semanal</h2>
+        <h2>Horario por franjas horarias</h2>
         <div className="horario-grid-wrapper">
-          <div className="horario-grid">
-            {/* Header con días */}
-            <div className="horario-header-row">
-              <div className="horario-time-col-header">Hora</div>
-              {diasSemana.map((dia, idx) => (
-                <div key={dia} className="horario-day-col-header">
-                  {diasCortos[idx]}
+          <div className="horario-grid tabla-franjas">
+            <div className="fila-franja header">
+              <div className="celda-franja-label">Franja</div>
+              {diasCortos.map((dia, idx) => (
+                <div key={dia} className="celda-franja-header">
+                  {dia}
                 </div>
               ))}
             </div>
-
-            {/* Cuerpo del horario */}
-            <div className="horario-body">
-              {horas.map((hora) => (
-                <div key={hora} className="horario-row">
-                  <div className="horario-time-cell">
-                    {hora}:00
-                  </div>
-                  {diasSemana.map((dia) => {
-                    // Buscar asignaturas que ocupen esta hora en este día
-                    const asignaturasEnHora = horarioData.asignaturas.filter((asig) =>
-                      asig.horarios.some((hor) => {
-                        const horaInicio = parseInt(hor.hora_inicio.split(':')[0]);
-                        const horaFin = parseInt(hor.hora_fin.split(':')[0]);
-                        return hor.dia === dia && horaInicio <= hora && horaFin > hora;
-                      })
-                    );
-
-                    // Solo mostrar el bloque en la hora de inicio
-                    const bloqueInicio = asignaturasEnHora.find((asig) => {
-                      const hor = asig.horarios.find((h) => h.dia === dia);
-                      if (!hor) return false;
-                      const horaInicio = parseInt(hor.hora_inicio.split(':')[0]);
-                      return horaInicio === hora;
-                    });
-
-                    if (bloqueInicio) {
-                      const horarioDia = bloqueInicio.horarios.find((h) => h.dia === dia);
-                      const pos = obtenerPosicionHorario(horarioDia.hora_inicio, horarioDia.hora_fin);
-                      
-                      return (
-                        <div key={dia} className="horario-cell">
-                          <div
-                            className="horario-block"
-                            style={{
-                              backgroundColor: obtenerColorAsignatura(bloqueInicio.asignatura_codigo),
-                              borderLeft: `3px solid ${obtenerBordeColor(bloqueInicio.asignatura_codigo)}`,
-                              height: `${pos.duracion * 60}px`,
-                              minHeight: `${pos.duracion * 60}px`,
-                            }}
-                          >
-                            <div className="horario-block-content">
-                              <div className="horario-block-title">
-                                {bloqueInicio.asignatura_codigo}
-                              </div>
-                              <div className="horario-block-subtitle">
-                                {bloqueInicio.asignatura_nombre.length > 25
-                                  ? bloqueInicio.asignatura_nombre.substring(0, 25) + "..."
-                                  : bloqueInicio.asignatura_nombre}
-                              </div>
-                              <div className="horario-block-details">
-                                <div className="horario-block-group">
-                                  <FaUser size={10} />
-                                  <span>G{bloqueInicio.grupo_codigo}</span>
-                                </div>
-                                {bloqueInicio.docente && bloqueInicio.docente.trim() !== "" && (
-                                  <div className="horario-block-profesor">
-                                    <FaUser size={10} />
-                                    <span>{bloqueInicio.docente.length > 20
-                                      ? bloqueInicio.docente.substring(0, 20) + "..."
-                                      : bloqueInicio.docente}</span>
-                                  </div>
-                                )}
-                                {horarioDia.salon && (
-                                  <div className="horario-block-salon">
-                                    <FaMapMarkerAlt size={10} />
-                                    <span>{horarioDia.salon}</span>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="horario-block-time">
-                                {formatearHora(horarioDia.hora_inicio)} - {formatearHora(horarioDia.hora_fin)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    return <div key={dia} className="horario-cell"></div>;
-                  })}
+            {FRANJAS.map((franja, index) => (
+              <div key={franja.label} className="fila-franja">
+                <div className="celda-franja-label">
+                  <strong>{franja.label}</strong>
                 </div>
-              ))}
-            </div>
+                {diasSemana.map((dia) => renderSlot(dia, franja, index, matrix))}
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Resumen de asignaturas */}
       <div className="asignaturas-resumen">
-        <h2>Asignaturas Matriculadas ({horarioData.asignaturas.length})</h2>
+        <h2>Asignaturas Matriculadas ({horarioData.clases.length})</h2>
         <div className="asignaturas-grid">
-          {horarioData.asignaturas.map((asignatura) => (
-            <div key={asignatura.asignatura_id} className="asignatura-card">
+          {horarioData.clases.map((clase, idx) => (
+            <div key={`${clase.asignatura_id}-${idx}`} className="asignatura-card">
               <div className="asignatura-header">
-                <span className="asignatura-codigo">{asignatura.asignatura_codigo}</span>
-                <span className="asignatura-creditos">{asignatura.creditos} créditos</span>
+                <span className="asignatura-codigo">{clase.asignatura_codigo}</span>
+                <span className="asignatura-creditos">G{clase.grupo_codigo}</span>
               </div>
-              <h3 className="asignatura-nombre">{asignatura.asignatura_nombre}</h3>
+              <h3 className="asignatura-nombre">{clase.asignatura_nombre}</h3>
               <div className="asignatura-details">
                 <div className="detail-item">
                   <FaUser size={14} />
-                  <span>Grupo {asignatura.grupo_codigo}</span>
+                  <span>{clase.docente || "Docente no asignado"}</span>
                 </div>
-                {asignatura.docente && asignatura.docente.trim() !== "" && (
-                  <div className="detail-item">
-                    <FaUser size={14} />
-                    <span>{asignatura.docente}</span>
-                  </div>
-                )}
                 <div className="detail-item">
-                  <FaClock size={14} />
-                  <span>
-                    {asignatura.horarios.map((h, idx) => (
-                      <span key={idx}>
-                        {h.dia.substring(0, 3)} {formatearHora(h.hora_inicio)}-{formatearHora(h.hora_fin)}
-                        {idx < asignatura.horarios.length - 1 && ", "}
-                      </span>
-                    ))}
-                  </span>
+                  <FaMapMarkerAlt size={14} />
+                  <span>{clase.salon || "Salón pendiente"}</span>
+                </div>
+                <div className="detail-item">
+                  <FaCalendarAlt size={14} />
+                  <span>{clase.dia} · {clase.hora_inicio} - {clase.hora_fin}</span>
                 </div>
               </div>
             </div>
