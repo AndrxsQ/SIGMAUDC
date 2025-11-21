@@ -87,6 +87,7 @@ type GetAsignaturasResponse struct {
 	EstadoEstudiante     string                   `json:"estado_estudiante"`
 	ObligatoriasSinGrupo []ObligatoriaInfo        `json:"obligatorias_sin_grupo"`
 	Asignaturas          []AsignaturaDisponible   `json:"asignaturas"`
+	Mensajes             []string                 `json:"mensajes"`
 }
 
 type InscribirRequest struct {
@@ -374,6 +375,9 @@ func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *h
 	obligatoriasSinGrupo := []ObligatoriaInfo{}
 
 	for _, asig := range asignaturas {
+		if asig.Semestre != ctx.Semestre {
+			continue
+		}
 		rawPrereqs := prereqMap[asig.ID]
 		prereqs := make([]models.Prerequisito, 0, len(rawPrereqs))
 		prereqsFalt := make([]models.Prerequisito, 0, len(rawPrereqs))
@@ -441,12 +445,25 @@ func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *h
 		})
 	}
 
+	mensajes := []string{
+		fmt.Sprintf("Solo se listan las asignaturas del semestre %d de tu pensum %q.", ctx.Semestre, ctx.PensumNombre),
+	}
+
+	if len(result) == 0 {
+		mensajes = append(mensajes, "Tu semestre actual no tiene asignaturas nuevas disponibles para inscribir. Espera a la apertura de nuevos grupos o consulta con tu asesor.")
+	}
+
+	if len(obligatoriasSinGrupo) > 0 {
+		mensajes = append(mensajes, "Actualmente hay asignaturas en repetición obligatoria sin cupo habilitado; priorízalas o contacta soporte académico para liberar espacios.")
+	}
+
 	response := GetAsignaturasResponse{
 		Periodo:              ctx.Periodo,
 		Creditos:             ResumenCreditos{Maximo: creditosMax, Inscritos: creditosInscritos, Disponibles: creditosDisponibles},
 		EstadoEstudiante:     ctx.Estado,
 		ObligatoriasSinGrupo: obligatoriasSinGrupo,
 		Asignaturas:          result,
+		Mensajes:             mensajes,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

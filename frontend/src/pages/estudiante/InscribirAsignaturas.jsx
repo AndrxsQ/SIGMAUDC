@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { plazosService } from "../../services/plazos";
-import documentosService from "../../services/documentos";
 import { matriculaService } from "../../services/matricula";
 import "../../styles/InscribirAsignaturas.css";
 
@@ -14,6 +12,9 @@ const InscribirAsignaturas = () => {
   const [horario, setHorario] = useState([]);
   const [conflictos, setConflictos] = useState(new Set());
   const [resumen, setResumen] = useState(null);
+  const [mensajes, setMensajes] = useState([]);
+  const [dialog, setDialog] = useState(null);
+  const [creditosSeleccionados, setCreditosSeleccionados] = useState(0);
 
   // Días de la semana
   const diasSemana = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
@@ -26,6 +27,33 @@ const InscribirAsignaturas = () => {
   };
 
   const formatEstado = (estado) => estadoLabels[estado] || estado || "Desconocido";
+
+  const openDialog = (title, body, onClose) => {
+    setDialog({ title, body, onClose });
+  };
+
+  const closeDialog = () => {
+    if (!dialog) return;
+    const callback = dialog.onClose;
+    setDialog(null);
+    if (callback) {
+      callback();
+    }
+  };
+
+  const getErrorReason = (error, fallback) => {
+    let reason = fallback;
+    if (error?.response?.data) {
+      if (error.response.data.razon) {
+        reason = error.response.data.razon;
+      } else if (error.response.data.error) {
+        reason = error.response.data.error;
+      }
+    } else if (error?.message) {
+      reason = error.message;
+    }
+    return reason;
+  };
 
   // Horas del día (7am - 10pm)
   const horas = Array.from({ length: 16 }, (_, i) => 7 + i);
@@ -42,10 +70,12 @@ const InscribirAsignaturas = () => {
       const validacionData = await matriculaService.validarInscripcion();
       
       if (!validacionData.puede_inscribir) {
+        const razon = validacionData.razon || "No puedes inscribir asignaturas en este momento.";
         setValidacion({
           puedeInscribir: false,
-          razon: validacionData.razon || "No puedes inscribir asignaturas en este momento.",
+          razon,
         });
+        openDialog("Inscripción bloqueada", razon);
         setLoading(false);
         return;
       }
@@ -55,13 +85,12 @@ const InscribirAsignaturas = () => {
 
       try {
         const asignaturasData = await matriculaService.getAsignaturasDisponibles();
-        let payload = Array.isArray(asignaturasData)
+        const payload = Array.isArray(asignaturasData)
           ? { asignaturas: asignaturasData }
           : asignaturasData || {};
-        const nuevasAsignaturas = payload.asignaturas?.length
-          ? payload.asignaturas
-          : generarDatosMock();
+        const nuevasAsignaturas = payload.asignaturas || [];
         setAsignaturas(nuevasAsignaturas);
+        setMensajes(payload.mensajes || []);
         if (payload.periodo || payload.creditos || payload.estado_estudiante) {
           setResumen({
             periodo: payload.periodo,
@@ -71,110 +100,25 @@ const InscribirAsignaturas = () => {
           });
         }
       } catch (error) {
-        console.warn("Endpoint no disponible, usando datos mock:", error);
-        setAsignaturas(generarDatosMock());
+        const razonCarga = "No pudimos cargar la oferta de asignaturas en este momento.";
+        openDialog("Oferta temporalmente indisponible", razonCarga);
+        console.warn("Error cargando asignaturas:", error);
+        setAsignaturas([]);
+        setMensajes([]);
         setResumen(null);
       }
     } catch (error) {
       console.error("Error validando inscripción:", error);
       // Intentar extraer el mensaje de error del backend
-      let razonError = "Error al validar los requisitos de inscripción. Por favor, intenta más tarde.";
-      if (error.response?.data) {
-        if (error.response.data.razon) {
-          razonError = error.response.data.razon;
-        } else if (error.response.data.error) {
-          razonError = error.response.data.error;
-        }
-      } else if (error.message) {
-        razonError = error.message;
-      }
+      const razonError = getErrorReason(error, "Error al validar los requisitos de inscripción. Por favor, intenta más tarde.");
       setValidacion({
         puedeInscribir: false,
         razon: razonError,
       });
+      openDialog("Inscripción bloqueada", razonError);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Función para generar datos mock (solo para prototipo)
-  const generarDatosMock = () => {
-    return [
-      {
-        id: 1,
-        codigo: "MAT101",
-        nombre: "Cálculo I",
-        creditos: 4,
-        estado: "activa",
-        obligatoria_repeticion: false,
-        grupos: [
-          {
-            id: 1,
-            codigo: "G01",
-            docente: "Dr. Juan Pérez",
-            cupo_disponible: 25,
-            cupo_max: 30,
-            horarios: [
-              { dia: "LUNES", hora_inicio: "08:00", hora_fin: "10:00", salon: "A-101" },
-              { dia: "MIERCOLES", hora_inicio: "08:00", hora_fin: "10:00", salon: "A-101" },
-            ],
-          },
-          {
-            id: 2,
-            codigo: "G02",
-            docente: "Dra. María García",
-            cupo_disponible: 15,
-            cupo_max: 30,
-            horarios: [
-              { dia: "MARTES", hora_inicio: "14:00", hora_fin: "16:00", salon: "B-205" },
-              { dia: "JUEVES", hora_inicio: "14:00", hora_fin: "16:00", salon: "B-205" },
-            ],
-          },
-        ],
-      },
-      {
-        id: 2,
-        codigo: "FIS101",
-        nombre: "Física I",
-        creditos: 3,
-        estado: "activa",
-        obligatoria_repeticion: false,
-        grupos: [
-          {
-            id: 3,
-            codigo: "G01",
-            docente: "Dr. Carlos López",
-            cupo_disponible: 20,
-            cupo_max: 25,
-            horarios: [
-              { dia: "LUNES", hora_inicio: "10:00", hora_fin: "12:00", salon: "C-301" },
-              { dia: "MIERCOLES", hora_inicio: "10:00", hora_fin: "12:00", salon: "C-301" },
-            ],
-          },
-        ],
-      },
-      {
-        id: 3,
-        codigo: "PROG101",
-        nombre: "Programación I",
-        creditos: 4,
-        estado: "obligatoria_repeticion",
-        obligatoria_repeticion: true,
-        grupos: [
-          {
-            id: 4,
-            codigo: "G01",
-            docente: "Ing. Ana Martínez",
-            cupo_disponible: 10,
-            cupo_max: 30,
-            horarios: [
-              { dia: "MARTES", hora_inicio: "08:00", hora_fin: "10:00", salon: "LAB-1" },
-              { dia: "JUEVES", hora_inicio: "08:00", hora_fin: "10:00", salon: "LAB-1" },
-            ],
-          },
-        ],
-      },
-    ];
   };
 
   const verificarConflicto = (grupoId, horariosGrupo) => {
@@ -230,9 +174,17 @@ const InscribirAsignaturas = () => {
     const grupo = asignatura.grupos?.find((g) => g.id === grupoId);
     if (!grupo) return;
 
+    const otroGrupoSeleccionado = asignatura.grupos?.some(
+      (g) => g.id !== grupoId && gruposSeleccionados.has(g.id)
+    );
+    if (otroGrupoSeleccionado) {
+      openDialog("Grupo duplicado", "Solo puedes inscribir un grupo por asignatura.");
+      return;
+    }
+
     // Verificar cupo
     if (grupo.cupo_disponible <= 0) {
-      alert("Este grupo no tiene cupo disponible.");
+      openDialog("Sin cupo", "Este grupo ya no tiene cupos disponibles en este momento.");
       return;
     }
 
@@ -242,11 +194,21 @@ const InscribirAsignaturas = () => {
       nuevosSeleccionados.delete(grupoId);
       setGruposSeleccionados(nuevosSeleccionados);
       actualizarHorario(nuevosSeleccionados);
+      setCreditosSeleccionados((prev) => Math.max(prev - asignatura.creditos, 0));
     } else {
       // Verificar conflicto antes de marcar
       if (verificarConflicto(grupoId, grupo.horarios || [])) {
         setConflictos(new Set([...conflictos, grupoId]));
-        alert("Este grupo tiene conflicto de horario con otra asignatura seleccionada.");
+        openDialog("Conflicto de horario", "Este grupo tiene un choque con otra asignatura que ya seleccionaste.");
+        return;
+      }
+
+      const creditosDisponibles = resumen?.creditos?.disponibles ?? 0;
+      if (creditosSeleccionados + asignatura.creditos > creditosDisponibles) {
+        openDialog(
+          "Límite de créditos excedido",
+          "Seleccionaste más créditos de los que permite tu semestre actual."
+        );
         return;
       }
 
@@ -255,6 +217,7 @@ const InscribirAsignaturas = () => {
       setGruposSeleccionados(nuevosSeleccionados);
       actualizarHorario(nuevosSeleccionados);
       setConflictos(new Set([...conflictos].filter((id) => id !== grupoId)));
+      setCreditosSeleccionados((prev) => prev + asignatura.creditos);
     }
   };
 
@@ -311,6 +274,8 @@ const InscribirAsignaturas = () => {
   };
 
   const bloqueoObligatorias = resumen?.obligatoriasSinGrupo?.length > 0;
+  const creditosDisponiblesBackend = resumen?.creditos?.disponibles ?? 0;
+  const creditosDisponiblesActual = Math.max(creditosDisponiblesBackend - creditosSeleccionados, 0);
 
   if (loading) {
     return (
@@ -462,10 +427,16 @@ const InscribirAsignaturas = () => {
                   <div>
                     <span className="resumen-label">Créditos inscritos</span>
                     <strong className="resumen-value">{resumen.creditos?.inscritos ?? 0}</strong>
+                    {creditosSeleccionados > 0 && (
+                      <span className="resumen-sub">+{creditosSeleccionados} en selección</span>
+                    )}
                   </div>
                   <div>
                     <span className="resumen-label">Créditos disponibles</span>
-                    <strong className="resumen-value">{resumen.creditos?.disponibles ?? 0}</strong>
+                    <strong className="resumen-value">{creditosDisponiblesActual}</strong>
+                    <span className="resumen-sub">
+                      {creditosDisponiblesBackend} disponibles, {creditosSeleccionados} seleccionados
+                    </span>
                   </div>
                 </div>
                 {resumen.obligatoriasSinGrupo?.length > 0 && (
@@ -484,6 +455,16 @@ const InscribirAsignaturas = () => {
                 Mientras no se abra cupo para las asignaturas en repetición obligatoria, no puedes inscribir
                 otras materias. Contacta a tu asesor académico si necesitas ayuda.
               </p>
+            </div>
+          )}
+          {mensajes.length > 0 && (
+            <div className="inscribir-feedback">
+              {mensajes.map((mensaje, idx) => (
+                <div key={idx} className="feedback-mensaje">
+                  <h4>Actualización de matrícula</h4>
+                  <p>{mensaje}</p>
+                </div>
+              ))}
             </div>
           )}
             <div className="asignaturas-list">
@@ -594,10 +575,16 @@ const InscribirAsignaturas = () => {
                   onClick={async () => {
                     try {
                       await matriculaService.inscribirAsignaturas(Array.from(gruposSeleccionados));
-                      alert("Inscripción realizada exitosamente.");
-                      navigate("/");
+                      setGruposSeleccionados(new Set());
+                      openDialog(
+                        "Inscripción confirmada",
+                        "Tus materias han quedado matriculadas. Verifica tu horario y revisa el resumen de créditos.",
+                        () => navigate("/"),
+                      );
                     } catch (error) {
-                      alert("Error al realizar la inscripción. Por favor, intenta nuevamente.");
+                      const razon =
+                        getErrorReason(error, "Error al realizar la inscripción. Por favor, intenta nuevamente.");
+                      openDialog("No se pudo inscribir", razon);
                     }
                   }}
                 >
@@ -608,6 +595,17 @@ const InscribirAsignaturas = () => {
           </div>
         </div>
       </div>
+      {dialog && (
+        <div className="dialog-overlay" role="presentation">
+          <div className="dialog-card">
+            <p className="dialog-title">{dialog.title}</p>
+            <p className="dialog-body">{dialog.body}</p>
+            <button className="dialog-close" onClick={closeDialog}>
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
