@@ -13,10 +13,20 @@ const InscribirAsignaturas = () => {
   const [gruposSeleccionados, setGruposSeleccionados] = useState(new Set());
   const [horario, setHorario] = useState([]);
   const [conflictos, setConflictos] = useState(new Set());
+  const [resumen, setResumen] = useState(null);
 
   // Días de la semana
   const diasSemana = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
   
+  const estadoLabels = {
+    activa: "Activa",
+    cursada: "Aprobada",
+    pendiente_repeticion: "Pendiente repetición",
+    obligatoria_repeticion: "Repetición obligatoria",
+  };
+
+  const formatEstado = (estado) => estadoLabels[estado] || estado || "Desconocido";
+
   // Horas del día (7am - 10pm)
   const horas = Array.from({ length: 16 }, (_, i) => 7 + i);
 
@@ -42,14 +52,28 @@ const InscribirAsignaturas = () => {
 
       // Si pasa las validaciones, cargar asignaturas disponibles
       setValidacion({ puedeInscribir: true });
-      
-      // Cargar asignaturas disponibles (mock por ahora si no existe el endpoint)
+
       try {
         const asignaturasData = await matriculaService.getAsignaturasDisponibles();
-        setAsignaturas(asignaturasData || generarDatosMock());
+        let payload = Array.isArray(asignaturasData)
+          ? { asignaturas: asignaturasData }
+          : asignaturasData || {};
+        const nuevasAsignaturas = payload.asignaturas?.length
+          ? payload.asignaturas
+          : generarDatosMock();
+        setAsignaturas(nuevasAsignaturas);
+        if (payload.periodo || payload.creditos || payload.estado_estudiante) {
+          setResumen({
+            periodo: payload.periodo,
+            creditos: payload.creditos,
+            estadoEstudiante: payload.estado_estudiante,
+            obligatoriasSinGrupo: payload.obligatorias_sin_grupo || [],
+          });
+        }
       } catch (error) {
         console.warn("Endpoint no disponible, usando datos mock:", error);
         setAsignaturas(generarDatosMock());
+        setResumen(null);
       }
     } catch (error) {
       console.error("Error validando inscripción:", error);
@@ -195,6 +219,9 @@ const InscribirAsignaturas = () => {
   };
 
   const toggleGrupo = (grupoId, asignatura) => {
+    if (asignatura.estado === "cursada") {
+      return;
+    }
     // Si es obligatoria por repetición, no permitir desmarcar
     if (asignatura.obligatoria_repeticion && gruposSeleccionados.has(grupoId)) {
       return;
@@ -282,6 +309,8 @@ const InscribirAsignaturas = () => {
     ];
     return colors[hash % colors.length];
   };
+
+  const bloqueoObligatorias = resumen?.obligatoriasSinGrupo?.length > 0;
 
   if (loading) {
     return (
@@ -407,93 +436,148 @@ const InscribirAsignaturas = () => {
         <div className="asignaturas-column">
           <div className="asignaturas-card">
             <h2>Asignaturas Disponibles</h2>
+          {resumen && (
+            <div className="inscribir-resumen">
+              <div className="resumen-card">
+                <div className="resumen-header">
+                  <div>
+                    <p className="resumen-label">Periodo activo</p>
+                    <p className="resumen-value">
+                      {resumen.periodo
+                        ? `${resumen.periodo.year}-${resumen.periodo.semestre}`
+                        : "Pendiente"}
+                    </p>
+                  </div>
+                  {resumen.estadoEstudiante && (
+                    <span className={`resumen-estado resumen-estado-${resumen.estadoEstudiante?.toLowerCase()}`}>
+                      {resumen.estadoEstudiante}
+                    </span>
+                  )}
+                </div>
+                <div className="resumen-grid">
+                  <div>
+                    <span className="resumen-label">Créditos máximo</span>
+                    <strong className="resumen-value">{resumen.creditos?.maximo ?? "-"}</strong>
+                  </div>
+                  <div>
+                    <span className="resumen-label">Créditos inscritos</span>
+                    <strong className="resumen-value">{resumen.creditos?.inscritos ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span className="resumen-label">Créditos disponibles</span>
+                    <strong className="resumen-value">{resumen.creditos?.disponibles ?? 0}</strong>
+                  </div>
+                </div>
+                {resumen.obligatoriasSinGrupo?.length > 0 && (
+                  <p className="resumen-warning">
+                    💡 Debes matricular las asignaturas en repetición obligatoria ({resumen.obligatoriasSinGrupo
+                      .map((a) => a.codigo)
+                      .join(", ")}) antes de agregar otras materias.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          {resumen?.obligatoriasSinGrupo?.length > 0 && (
+            <div className="inscribir-alert">
+              <p>
+                Mientras no se abra cupo para las asignaturas en repetición obligatoria, no puedes inscribir
+                otras materias. Contacta a tu asesor académico si necesitas ayuda.
+              </p>
+            </div>
+          )}
             <div className="asignaturas-list">
               {asignaturas.length === 0 ? (
                 <div className="asignaturas-empty">
                   <p>No hay asignaturas disponibles para inscripción en este momento.</p>
                 </div>
               ) : (
-                asignaturas.map((asignatura) => (
-                  <div key={asignatura.id} className="asignatura-item">
-                    <div className="asignatura-header">
-                      <div className="asignatura-info">
-                        <h3>{asignatura.nombre}</h3>
-                        <div className="asignatura-meta">
-                          <span className="asignatura-codigo">{asignatura.codigo}</span>
-                          <span className="asignatura-creditos">{asignatura.creditos} créditos</span>
+                asignaturas.map((asignatura) => {
+                  const estadoClass = asignatura.estado ? `estado-${asignatura.estado}` : "";
+                  const esCursada = asignatura.estado === "cursada";
+                  return (
+                    <div key={asignatura.id} className={`asignatura-item ${estadoClass}`}>
+                      <div className="asignatura-header">
+                        <div className="asignatura-info">
+                          <h3>{asignatura.nombre}</h3>
+                          <div className="asignatura-meta">
+                            <span className="asignatura-codigo">{asignatura.codigo}</span>
+                            <span className="asignatura-creditos">{asignatura.creditos} créditos</span>
+                          </div>
                         </div>
+                        <span className="asignatura-state">{formatEstado(asignatura.estado)}</span>
+                        {asignatura.obligatoria_repeticion && (
+                          <div className="asignatura-badge-obligatoria">
+                            🔒 Repetición obligatoria
+                          </div>
+                        )}
                       </div>
-                      {asignatura.obligatoria_repeticion && (
-                        <div className="asignatura-badge-obligatoria">
-                          🔒 Repetición obligatoria
+
+                      {asignatura.grupos && asignatura.grupos.length > 0 ? (
+                        <div className="grupos-list">
+                          {asignatura.grupos.map((grupo) => {
+                            const estaSeleccionado = gruposSeleccionados.has(grupo.id);
+                            const tieneConflicto = conflictos.has(grupo.id);
+                            const sinCupo = grupo.cupo_disponible <= 0;
+                            const esObligatorio = asignatura.obligatoria_repeticion;
+
+                            return (
+                              <div
+                                key={grupo.id}
+                                className={`grupo-item ${estaSeleccionado ? "seleccionado" : ""} ${tieneConflicto ? "conflicto" : ""} ${sinCupo ? "sin-cupo" : ""} ${esObligatorio ? "obligatorio" : ""}`}
+                              >
+                                <label className="grupo-checkbox-label">
+                                  <input
+                                    type="checkbox"
+                                    checked={estaSeleccionado}
+                                    disabled={esCursada || esObligatorio || sinCupo}
+                                    onChange={() => toggleGrupo(grupo.id, asignatura)}
+                                    className="grupo-checkbox"
+                                  />
+                                  <div className="grupo-content">
+                                    <div className="grupo-header">
+                                      <span className="grupo-codigo">{grupo.codigo}</span>
+                                      <span className="grupo-cupo">
+                                        {grupo.cupo_disponible}/{grupo.cupo_max} cupos
+                                      </span>
+                                    </div>
+                                    <div className="grupo-docente">{grupo.docente}</div>
+                                    <div className="grupo-horario">
+                                      {grupo.horarios?.map((hor, idx) => (
+                                        <span key={idx} className="horario-badge">
+                                          {hor.dia.substring(0, 3)} {formatearHora(hor.hora_inicio)}-{formatearHora(hor.hora_fin)} {hor.salon}
+                                        </span>
+                                      ))}
+                                    </div>
+                                    {esObligatorio && estaSeleccionado && (
+                                      <div className="grupo-obligatorio-text">
+                                        Repetición obligatoria – debe matricularse en este periodo
+                                      </div>
+                                    )}
+                                    {sinCupo && (
+                                      <div className="grupo-sin-cupo-text">
+                                        Sin cupo disponible
+                                      </div>
+                                    )}
+                                    {tieneConflicto && (
+                                      <div className="grupo-conflicto-text">
+                                        Conflicto de horario
+                                      </div>
+                                    )}
+                                  </div>
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="grupos-empty">
+                          <p>No hay grupos disponibles para esta asignatura.</p>
                         </div>
                       )}
                     </div>
-
-                    {asignatura.grupos && asignatura.grupos.length > 0 ? (
-                      <div className="grupos-list">
-                        {asignatura.grupos.map((grupo) => {
-                          const estaSeleccionado = gruposSeleccionados.has(grupo.id);
-                          const tieneConflicto = conflictos.has(grupo.id);
-                          const sinCupo = grupo.cupo_disponible <= 0;
-                          const esObligatorio = asignatura.obligatoria_repeticion;
-
-                          return (
-                            <div
-                              key={grupo.id}
-                              className={`grupo-item ${estaSeleccionado ? "seleccionado" : ""} ${tieneConflicto ? "conflicto" : ""} ${sinCupo ? "sin-cupo" : ""} ${esObligatorio ? "obligatorio" : ""}`}
-                            >
-                              <label className="grupo-checkbox-label">
-                                <input
-                                  type="checkbox"
-                                  checked={estaSeleccionado}
-                                  disabled={esObligatorio || sinCupo}
-                                  onChange={() => toggleGrupo(grupo.id, asignatura)}
-                                  className="grupo-checkbox"
-                                />
-                                <div className="grupo-content">
-                                  <div className="grupo-header">
-                                    <span className="grupo-codigo">{grupo.codigo}</span>
-                                    <span className="grupo-cupo">
-                                      {grupo.cupo_disponible}/{grupo.cupo_max} cupos
-                                    </span>
-                                  </div>
-                                  <div className="grupo-docente">{grupo.docente}</div>
-                                  <div className="grupo-horario">
-                                    {grupo.horarios?.map((hor, idx) => (
-                                      <span key={idx} className="horario-badge">
-                                        {hor.dia.substring(0, 3)} {formatearHora(hor.hora_inicio)}-{formatearHora(hor.hora_fin)} {hor.salon}
-                                      </span>
-                                    ))}
-                                  </div>
-                                  {esObligatorio && estaSeleccionado && (
-                                    <div className="grupo-obligatorio-text">
-                                      Repetición obligatoria – debe matricularse en este periodo
-                                    </div>
-                                  )}
-                                  {sinCupo && (
-                                    <div className="grupo-sin-cupo-text">
-                                      Sin cupo disponible
-                                    </div>
-                                  )}
-                                  {tieneConflicto && (
-                                    <div className="grupo-conflicto-text">
-                                      Conflicto de horario
-                                    </div>
-                                  )}
-                                </div>
-                              </label>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="grupos-empty">
-                        <p>No hay grupos disponibles para esta asignatura.</p>
-                      </div>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -501,6 +585,12 @@ const InscribirAsignaturas = () => {
               <div className="inscribir-actions">
                 <button
                   className="btn-inscribir"
+                  disabled={bloqueoObligatorias}
+                  title={
+                    bloqueoObligatorias
+                      ? "Debes matricular primero las asignaturas en repetición obligatoria"
+                      : undefined
+                  }
                   onClick={async () => {
                     try {
                       await matriculaService.inscribirAsignaturas(Array.from(gruposSeleccionados));

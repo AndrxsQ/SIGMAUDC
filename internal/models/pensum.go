@@ -37,6 +37,7 @@ type Prerequisito struct {
 	Nombre          string `json:"nombre"`
 	Completado      bool   `json:"completado"`      // Si el prerrequisito está aprobado
 	Semestre        int    `json:"semestre"`        // Semestre del prerrequisito para visualización
+	Tipo            string `json:"tipo"`
 	PosicionX       *float64 `json:"posicion_x,omitempty"` // Posición X para visualización
 	PosicionY       *float64 `json:"posicion_y,omitempty"` // Posición Y para visualización
 }

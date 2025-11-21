@@ -90,6 +90,8 @@ func main() {
 	protected.HandleFunc("/matricula/validar-inscripcion", matriculaHandler.ValidarInscripcion).Methods("GET") // Para estudiantes
 	protected.HandleFunc("/matricula/asignaturas-disponibles", matriculaHandler.GetAsignaturasDisponibles).Methods("GET") // Para estudiantes (temporal - retorna vacío)
 	protected.HandleFunc("/matricula/horario-actual", matriculaHandler.GetHorarioActual).Methods("GET") // Para estudiantes
+	protected.HandleFunc("/matricula/asignaturas/{id}/grupos", matriculaHandler.GetGruposAsignatura).Methods("GET")
+	protected.HandleFunc("/matricula/inscribir", matriculaHandler.InscribirAsignaturas).Methods("POST")
 
 	// Servir archivos estáticos (uploads) - soporta estructura de carpetas periodo/programa/
 	r.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads/"))))
