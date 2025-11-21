@@ -16,11 +16,14 @@
 .datos-page {
   width: 100%;
   min-height: 100vh;
-  padding: 28px 20px 52px;
-  background: var(--home-bg-primary);
+  padding: 16px 16px 32px;
+  background: #ffffff;
   font-family: var(--home-font-family);
   color: var(--home-text-primary);
   box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .datos-card {
@@ -31,16 +34,35 @@
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
+.datos-main-card {
+  width: 100%;
+  max-width: 920px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0;
+}
+
 .datos-hero {
   background: linear-gradient(135deg, rgba(201, 162, 63, 0.15), rgba(255, 255, 255, 0.85));
   border-radius: 26px;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 24px;
+  padding: 20px;
   box-shadow: var(--home-shadow-md);
-  margin-bottom: 32px;
+  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
+}
+
+.datos-main-header {
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  background: none;
+  padding: 0;
+  box-shadow: none;
+  gap: 8px;
 }
 
 .datos-hero-top {
@@ -200,7 +222,7 @@
 
 .datos-main-grid {
   display: flex;
-  gap: 28px;
+  gap: 20px;
   align-items: center;
   flex-wrap: wrap;
 }
@@ -246,6 +268,45 @@
   font-size: 13px;
   margin: 0;
   text-align: left;
+}
+
+.datos-record-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.datos-record-card {
+  background: #fdfdfd;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  padding: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04);
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.datos-record-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--home-text-secondary);
+  margin: 0;
+}
+
+.datos-record-value {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--home-text-primary);
+}
+
+.datos-record-helper {
+  font-size: 11px;
+  color: var(--home-text-secondary);
+  margin: 0;
 }
 
 .summary-note,

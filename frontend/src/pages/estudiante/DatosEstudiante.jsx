@@ -55,14 +55,32 @@ const DatosEstudiante = () => {
   const formatPromedio = () => (perfil?.promedio == null ? "Pendiente" : perfil.promedio.toFixed(2));
   const nombreCompleto = `${perfil?.nombre || ""} ${perfil?.apellido || ""}`.trim() || "Sin datos";
 
-  const datosRows = [
-    { label: "Nombre completo", value: nombreCompleto },
-    { label: "Programa", value: perfil?.programa },
-    { label: "Semestre", value: perfil?.semestre ?? "Sin datos" },
-    { label: "Estado", value: perfil?.estado },
-    { label: "Sexo", value: perfil?.sexo },
-    { label: "Promedio acumulado", value: formatPromedio() },
-    { label: "Correo institucional", value: perfil?.email },
+  const recordCards = [
+    {
+      title: "Programa",
+      value: perfil?.programa || "Sin datos",
+      helper: "Plan de estudios asignado",
+    },
+    {
+      title: "Semestre",
+      value: perfil?.semestre ? `Semestre ${perfil.semestre}` : "Sin datos",
+      helper: "Avance acumulado",
+    },
+    {
+      title: "Estado académico",
+      value: perfil?.estado || "Sin datos",
+      helper: "Situación actual (NORMAL / PSE)",
+    },
+    {
+      title: "Promedio acumulado",
+      value: formatPromedio(),
+      helper: "Notas registradas",
+    },
+    {
+      title: "Sexo",
+      value: perfil?.sexo || "Sin datos",
+      helper: "Dato registrado",
+    },
   ];
 
   if (loading) {
@@ -76,93 +94,68 @@ const DatosEstudiante = () => {
 
   return (
     <div className="datos-page">
-      <header className="datos-hero">
-        <div className="datos-hero-logo">
-          <img src="/logo-udc.png" alt="UDC" />
-          <span>Universidad de Cartagena</span>
+      <article className="datos-card datos-main-card">
+        <div className="datos-hero datos-main-header">
+          <div className="datos-hero-logo">
+            <img src="/logo-udc.png" alt="UDC" />
+            <span>Universidad de Cartagena</span>
+          </div>
+          <div className="datos-hero-text">
+            <h1>Datos del estudiante</h1>
+            <p className="datos-hero-caption">
+              Mantén la información actualizada para que el sistema muestre siempre tu estado académico real.
+            </p>
+          </div>
         </div>
-        <div className="datos-hero-text">
-          <h1>Datos del estudiante</h1>
-          <p className="datos-hero-caption">
-            Mantén la información actualizada para que el sistema muestre siempre tu estado académico real.
-          </p>
-        </div>
-      </header>
 
-      <section className="datos-panel">
-        <article className="datos-card datos-main-card">
-          <div className="datos-main-grid">
-            <div className="perfil-photo" onClick={handlePhotoAreaClick}>
-              <div className="perfil-photo-frame">
-                {preview ? (
-                  <img src={preview} alt="Foto de perfil" />
-                ) : (
-                  <div className="perfil-placeholder">
-                    <span>{perfil?.nombre?.[0] || "U"}{perfil?.apellido?.[0] || "D"}</span>
-                  </div>
-                )}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png"
-                style={{ display: "none" }}
-                onChange={handleFotoSelect}
-              />
-              <p className="perfil-photo-hint">{uploading ? "Subiendo..." : "Haz clic en la foto para actualizar"}</p>
+        <div className="datos-main-grid">
+          <div className="perfil-photo" onClick={handlePhotoAreaClick}>
+            <div className="perfil-photo-frame">
+              {preview ? (
+                <img src={preview} alt="Foto de perfil" />
+              ) : (
+                <div className="perfil-placeholder">
+                  <span>{perfil?.nombre?.[0] || "U"}{perfil?.apellido?.[0] || "D"}</span>
+                </div>
+              )}
             </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              style={{ display: "none" }}
+              onChange={handleFotoSelect}
+            />
+            <p className="perfil-photo-hint">{uploading ? "Subiendo..." : "Haz clic en la foto para actualizar"}</p>
+          </div>
 
-            <div className="perfil-info">
-              <div className="perfil-info-row">
-                <div>
-                  <p className="perfil-label">Código institucional</p>
-                  <p className="perfil-value">{perfil?.codigo || "Sin datos"}</p>
-                </div>
-                <div>
-                  <p className="perfil-label">Correo institucional</p>
-                  <p className="perfil-value">{perfil?.email || "Sin datos"}</p>
-                </div>
+          <div className="perfil-info">
+            <div className="perfil-info-row">
+              <div>
+                <p className="perfil-label">Código institucional</p>
+                <p className="perfil-value">{perfil?.codigo || "Sin datos"}</p>
               </div>
-              <div className="perfil-meta">
-                <div>
-                  <span>Programa</span>
-                  <strong>{perfil?.programa || "Sin datos"}</strong>
-                </div>
-                <div>
-                  <span>Semestre</span>
-                  <strong>{perfil?.semestre ?? "Sin datos"}</strong>
-                </div>
-                <div>
-                  <span>Estado</span>
-                  <strong>{perfil?.estado || "Sin datos"}</strong>
-                </div>
-              </div>
-              <div className="perfil-meta">
-                <div>
-                  <span>Promedio</span>
-                  <strong>{formatPromedio()}</strong>
-                </div>
-                <div>
-                  <span>Sexo</span>
-                  <strong>{perfil?.sexo || "Sin datos"}</strong>
-                </div>
+              <div>
+                <p className="perfil-label">Correo institucional</p>
+                <p className="perfil-value">{perfil?.email || "Sin datos"}</p>
               </div>
             </div>
           </div>
+        </div>
 
-          {infoMessage && <p className="perfil-note">{infoMessage}</p>}
-          {error && <p className="form-error">{error}</p>}
+        <div className="datos-record-grid">
+          {recordCards.map((card) => (
+            <div className="datos-record-card" key={card.title}>
+              <p className="datos-record-title">{card.title}</p>
+              <strong className="datos-record-value">{card.value}</strong>
+              <p className="datos-record-helper">{card.helper}</p>
+            </div>
+          ))}
+        </div>
 
-          <div className="datos-detail-grid">
-            {datosRows.map((row) => (
-              <div className="datos-detail-row" key={row.label}>
-                <span>{row.label}</span>
-                <strong>{row.value || "Sin datos"}</strong>
-              </div>
-            ))}
-          </div>
-        </article>
-      </section>
+        {infoMessage && <p className="perfil-note">{infoMessage}</p>}
+        {error && <p className="form-error">{error}</p>}
+      </article>
     </div>
   );
 };
