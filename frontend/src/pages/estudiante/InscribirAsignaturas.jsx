@@ -459,16 +459,6 @@ const InscribirAsignaturas = () => {
               </p>
             </div>
           )}
-          {mensajes.length > 0 && (
-            <div className="inscribir-feedback">
-              {mensajes.map((mensaje, idx) => (
-                <div key={idx} className="feedback-mensaje">
-                  <h4>Actualización de matrícula</h4>
-                  <p>{mensaje}</p>
-                </div>
-              ))}
-            </div>
-          )}
             <div className="asignaturas-list">
               {asignaturas.length === 0 ? (
                 <div className="asignaturas-empty">
