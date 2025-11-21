@@ -253,13 +253,12 @@ const InscribirAsignaturas = () => {
     
     const inicioMin = hInicio * 60 + mInicio;
     const finMin = hFin * 60 + mFin;
-    
-    const inicioHora = Math.floor(inicioMin / 60);
-    const finHora = Math.ceil(finMin / 60);
+    const duracionMinutos = Math.max(finMin - inicioMin, 15);
+    const offsetDentroHora = inicioMin % 60;
     
     return {
-      inicio: inicioHora - 7,
-      duracion: finHora - inicioHora,
+      duracionMinutos,
+      offsetDentroHora,
     };
   };
 
@@ -368,13 +367,16 @@ const InscribirAsignaturas = () => {
                             const pos = obtenerPosicionHorario(horarioDia.hora_inicio, horarioDia.hora_fin);
                             if (parseInt(horarioDia.hora_inicio.split(':')[0]) !== hora) return null;
                             
+                            const bloqueAltura = Math.max(pos.duracionMinutos - 4, 28);
+                            const bloqueTop = 4 + Math.min(pos.offsetDentroHora, 52);
                             return (
                               <div
                                 key={idx}
                                 className="horario-block"
                                 style={{
                                   backgroundColor: obtenerColorAsignatura(h.codigo),
-                                  height: `${pos.duracion * 60}px`,
+                                  height: `${bloqueAltura}px`,
+                                  top: `${bloqueTop}px`,
                                 }}
                                 title={`${h.asignatura} - ${h.grupoCodigo}\n${h.docente}\n${horarioDia.salon}\n${formatearHora(horarioDia.hora_inicio)} - ${formatearHora(horarioDia.hora_fin)}`}
                               >

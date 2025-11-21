@@ -39,39 +39,39 @@ type HorarioDisponible struct {
 }
 
 type GrupoDisponible struct {
-	ID             int                `json:"id"`
-	Codigo         string             `json:"codigo"`
-	Docente        string             `json:"docente"`
-	CupoDisponible int                `json:"cupo_disponible"`
-	CupoMax        int                `json:"cupo_max"`
+	ID             int                 `json:"id"`
+	Codigo         string              `json:"codigo"`
+	Docente        string              `json:"docente"`
+	CupoDisponible int                 `json:"cupo_disponible"`
+	CupoMax        int                 `json:"cupo_max"`
 	Horarios       []HorarioDisponible `json:"horarios"`
 }
 
 type AsignaturaDisponible struct {
-	ID                     int                     `json:"id"`
-	Codigo                 string                  `json:"codigo"`
-	Nombre                 string                  `json:"nombre"`
-	Creditos               int                     `json:"creditos"`
-	Semestre               int                     `json:"semestre"`
-	Categoria              string                  `json:"categoria"`
-	Estado                 string                  `json:"estado"`
-	Nota                   *float64                `json:"nota,omitempty"`
-	Repeticiones           int                     `json:"repeticiones"`
-	PendienteRepeticion    bool                    `json:"pendiente_repeticion"`
-	ObligatoriaRepeticion  bool                    `json:"obligatoria_repeticion"`
-	Cursada                bool                    `json:"cursada"`
-	Prerequisitos          []models.Prerequisito   `json:"prerequisitos"`
-	PrerequisitosFaltantes []models.Prerequisito   `json:"prerequisitos_faltantes"`
-	Correquisitos          []models.Prerequisito   `json:"correquisitos"`
-	CorrequisitosFaltantes []models.Prerequisito   `json:"correquisitos_faltantes"`
-	Grupos                 []GrupoDisponible       `json:"grupos"`
-	TieneLaboratorio       bool                    `json:"tiene_laboratorio"`
-	PeriodoCursada         *string                 `json:"periodo_cursada,omitempty"`
+	ID                     int                   `json:"id"`
+	Codigo                 string                `json:"codigo"`
+	Nombre                 string                `json:"nombre"`
+	Creditos               int                   `json:"creditos"`
+	Semestre               int                   `json:"semestre"`
+	Categoria              string                `json:"categoria"`
+	Estado                 string                `json:"estado"`
+	Nota                   *float64              `json:"nota,omitempty"`
+	Repeticiones           int                   `json:"repeticiones"`
+	PendienteRepeticion    bool                  `json:"pendiente_repeticion"`
+	ObligatoriaRepeticion  bool                  `json:"obligatoria_repeticion"`
+	Cursada                bool                  `json:"cursada"`
+	Prerequisitos          []models.Prerequisito `json:"prerequisitos"`
+	PrerequisitosFaltantes []models.Prerequisito `json:"prerequisitos_faltantes"`
+	Correquisitos          []models.Prerequisito `json:"correquisitos"`
+	CorrequisitosFaltantes []models.Prerequisito `json:"correquisitos_faltantes"`
+	Grupos                 []GrupoDisponible     `json:"grupos"`
+	TieneLaboratorio       bool                  `json:"tiene_laboratorio"`
+	PeriodoCursada         *string               `json:"periodo_cursada,omitempty"`
 }
 
 type ResumenCreditos struct {
-	Maximo     int `json:"maximo"`
-	Inscritos  int `json:"inscritos"`
+	Maximo      int `json:"maximo"`
+	Inscritos   int `json:"inscritos"`
 	Disponibles int `json:"disponibles"`
 }
 
@@ -424,6 +424,10 @@ func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *h
 				Nombre: asig.Nombre,
 			})
 		}
+		// No mostrar materias que ya están aprobadas o que se encuentran en estado de repetición por reprobada.
+		if state == "cursada" || state == "pendiente_repeticion" || state == "obligatoria_repeticion" {
+			continue
+		}
 
 		result = append(result, AsignaturaDisponible{
 			ID:                     asig.ID,
@@ -729,10 +733,10 @@ func (h *MatriculaHandler) InscribirAsignaturas(w http.ResponseWriter, r *http.R
 				}
 				continue
 			}
-				if !hasApprovedEntry(historialMap, prereq.PrerequisitoID) {
-					http.Error(w, fmt.Sprintf("Te falta aprobar %s para inscribir %s.", assignmentDisplay(prereq.PrerequisitoID, asignaturaMap), asignaturaMap[asignaturaID].Nombre), http.StatusBadRequest)
-					return
-				}
+			if !hasApprovedEntry(historialMap, prereq.PrerequisitoID) {
+				http.Error(w, fmt.Sprintf("Te falta aprobar %s para inscribir %s.", assignmentDisplay(prereq.PrerequisitoID, asignaturaMap), asignaturaMap[asignaturaID].Nombre), http.StatusBadRequest)
+				return
+			}
 		}
 	}
 
@@ -1209,4 +1213,3 @@ func assignmentDisplay(id int, asigMap map[int]models.AsignaturaCompleta) string
 	}
 	return fmt.Sprintf("asignatura %d", id)
 }
-
