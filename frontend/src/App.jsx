@@ -16,6 +16,7 @@ import SidebarJefe from "./components/jefe/SidebarJefe";
 // Páginas de estudiantes
 import Home from "./pages/estudiante/Home";
 import InscribirAsignaturas from "./pages/estudiante/InscribirAsignaturas";
+import ModificarMatricula from "./pages/estudiante/ModificarMatricula";
 import ConsultarMatricula from "./pages/estudiante/ConsultarMatricula";
 import DatosEstudiante from "./pages/estudiante/DatosEstudiante";
 
@@ -23,6 +24,7 @@ import DatosEstudiante from "./pages/estudiante/DatosEstudiante";
 import HomeJefe from "./pages/jefe/HomeJefe";
 import Plazos from "./pages/jefe/Plazos";
 import VerificarDocumentos from "./pages/jefe/VerificarDocumentos";
+import DatosJefe from "./pages/jefe/DatosJefe";
 import { authService } from "./services/auth";
 
 // Botón hamburguesa para móviles
@@ -114,7 +116,7 @@ function AppContent() {
     } else if (path === "/verificar-documentos") {
       setActivePage("verificar-documentos");
     } else if (path === "/modificaciones") {
-      setActivePage("modificaciones");
+      setActivePage("modificar");
     } else if (path === "/plan-estudio") {
       setActivePage("plan-estudio");
     } else if (path === "/perfil") {
@@ -131,6 +133,12 @@ function AppContent() {
     setActivePage(page);
     if (page === "home") {
       navigate("/");
+    } else if (page === "modificar") {
+      navigate("/modificaciones");
+    } else if (page === "prueba") {
+      navigate("/prueba");
+    } else if (page === "Consultar") {
+      navigate("/prueba");
     } else {
       navigate(`/${page}`);
     }
@@ -250,7 +258,7 @@ function AppContent() {
                   <Route path="/verificar-documentos" element={renderRoleProtected(<VerificarDocumentos />, () => userRole === "jefe_departamental")} />
                   <Route
                     path="/modificaciones"
-                    element={renderRoleProtected(<div>Modificaciones (En desarrollo)</div>, () => userRole === "jefe_departamental")}
+                    element={renderRoleProtected(<ModificarMatricula />, () => userRole !== "jefe_departamental")}
                   />
                   <Route
                     path="/plan-estudio"
@@ -258,7 +266,7 @@ function AppContent() {
                   />
                   <Route
                     path="/perfil"
-                    element={renderRoleProtected(<div>Mi Información (En desarrollo)</div>, () => userRole === "jefe_departamental")}
+                    element={renderRoleProtected(<DatosJefe />, () => userRole === "jefe_departamental")}
                   />
                   
                   <Route path="*" element={roleLoading ? renderRouteLoading() : <Navigate to="/" replace />} />

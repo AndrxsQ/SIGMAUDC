@@ -32,5 +32,33 @@ export const matriculaService = {
     const response = await api.get('/api/matricula/horario-actual');
     return response.data;
   },
+
+  // Validar si el estudiante puede realizar modificaciones
+  async validarModificaciones() {
+    const response = await api.get('/api/matricula/validar-modificaciones');
+    return response.data;
+  },
+
+  // Obtener datos de modificaciones (materias matriculadas y disponibles)
+  async getModificacionesData() {
+    const response = await api.get('/api/matricula/modificaciones');
+    return response.data;
+  },
+
+  // Retirar una materia
+  async retirarMateria(historialId) {
+    const response = await api.post('/api/matricula/retirar-materia', {
+      historial_id: historialId,
+    });
+    return response.data;
+  },
+
+  // Agregar una materia en modificaciones
+  async agregarMateriaModificaciones(gruposIds) {
+    const response = await api.post('/api/matricula/agregar-materia', {
+      grupos_ids: gruposIds,
+    });
+    return response.data;
+  },
 };
 

@@ -771,3 +771,34 @@
   }
 }
 
+/* Botón retirar materia */
+.btn-retirar {
+  background: linear-gradient(135deg, #dc3545 0%, #ff6b6b 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(220, 53, 69, 0.25);
+  margin-top: 8px;
+}
+
+.btn-retirar:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.35);
+  background: linear-gradient(135deg, #c82333 0%, #e55a6b 100%);
+}
+
+.btn-retirar:active {
+  transform: translateY(0);
+}
+
+.btn-retirar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+

@@ -15,15 +15,15 @@ import (
 	"github.com/andrxsq/SIGMAUDC/internal/models"
 )
 
-type EstudianteHandler struct {
+type JefeHandler struct {
 	db *sql.DB
 }
 
-func NewEstudianteHandler(db *sql.DB) *EstudianteHandler {
-	return &EstudianteHandler{db: db}
+func NewJefeHandler(db *sql.DB) *JefeHandler {
+	return &JefeHandler{db: db}
 }
 
-func (h *EstudianteHandler) getClaims(r *http.Request) (*models.JWTClaims, error) {
+func (h *JefeHandler) getClaims(r *http.Request) (*models.JWTClaims, error) {
 	claims, ok := middleware.GetClaimsFromContext(r.Context())
 	if !ok {
 		return nil, errors.New("unauthorized")
@@ -31,117 +31,103 @@ func (h *EstudianteHandler) getClaims(r *http.Request) (*models.JWTClaims, error
 	return claims, nil
 }
 
-func (h *EstudianteHandler) getEstudianteID(usuarioID int) (int, error) {
-	var estudianteID int
-	err := h.db.QueryRow(`SELECT id FROM estudiante WHERE usuario_id = $1`, usuarioID).Scan(&estudianteID)
+func (h *JefeHandler) getJefeID(usuarioID int) (int, error) {
+	var jefeID int
+	err := h.db.QueryRow(`SELECT id FROM jefe_departamental WHERE usuario_id = $1`, usuarioID).Scan(&jefeID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, errors.New("estudiante no encontrado")
+			return 0, errors.New("jefe departamental no encontrado")
 		}
 		return 0, err
 	}
-	return estudianteID, nil
+	return jefeID, nil
 }
 
-type EstudianteDatosResponse struct {
-	EstudianteID int      `json:"estudiante_id"`
-	Codigo       string   `json:"codigo"`
-	Nombre       string   `json:"nombre"`
-	Apellido     string   `json:"apellido"`
-	Email        string   `json:"email"`
-	Programa     string   `json:"programa"`
-	Semestre     int      `json:"semestre"`
-	Promedio     *float64 `json:"promedio,omitempty"`
-	Estado       string   `json:"estado"`
-	Sexo         string   `json:"sexo"`
-	FotoPerfil   string   `json:"foto_perfil"`
+type JefeDatosResponse struct {
+	JefeID      int    `json:"jefe_id"`
+	Codigo      string `json:"codigo"`
+	Nombre      string `json:"nombre"`
+	Apellido    string `json:"apellido"`
+	Email       string `json:"email"`
+	Programa    string `json:"programa"`
+	Sexo        string `json:"sexo"`
+	FotoPerfil  string `json:"foto_perfil"`
 }
 
-func (h *EstudianteHandler) GetDatosEstudiante(w http.ResponseWriter, r *http.Request) {
+func (h *JefeHandler) GetDatosJefe(w http.ResponseWriter, r *http.Request) {
 	claims, err := h.getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Rol != "estudiante" {
+	if claims.Rol != "jefe_departamental" {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
 	query := `
 		SELECT
-			e.id,
+			jd.id,
 			u.codigo,
-			COALESCE(e.nombre, ''),
-			COALESCE(e.apellido, ''),
+			COALESCE(jd.nombre, ''),
+			COALESCE(jd.apellido, ''),
 			u.email,
 			COALESCE(p.nombre, '') AS programa,
-			e.semestre,
-			e.promedio,
-			e.estado,
-			COALESCE(e.sexo, 'otro'),
-			COALESCE(e.foto_perfil, '')
+			COALESCE(jd.sexo, 'otro'),
+			COALESCE(jd.foto_perfil, '')
 		FROM usuario u
-		JOIN estudiante e ON e.usuario_id = u.id
+		JOIN jefe_departamental jd ON jd.usuario_id = u.id
 		LEFT JOIN programa p ON p.id = u.programa_id
 		WHERE u.id = $1
 	`
-	var datos EstudianteDatosResponse
-	var promedio sql.NullFloat64
+	var datos JefeDatosResponse
 	err = h.db.QueryRow(query, claims.Sub).Scan(
-		&datos.EstudianteID,
+		&datos.JefeID,
 		&datos.Codigo,
 		&datos.Nombre,
 		&datos.Apellido,
 		&datos.Email,
 		&datos.Programa,
-		&datos.Semestre,
-		&promedio,
-		&datos.Estado,
 		&datos.Sexo,
 		&datos.FotoPerfil,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
+			http.Error(w, "Jefe departamental no encontrado", http.StatusNotFound)
 			return
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	if promedio.Valid {
-		datos.Promedio = &promedio.Float64
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(datos)
 }
 
-type UpdateDatosRequest struct {
+type UpdateDatosJefeRequest struct {
 	Nombre   string `json:"nombre"`
 	Apellido string `json:"apellido"`
 	Sexo     string `json:"sexo"`
 }
 
-var allowedSexos = map[string]struct{}{
+var allowedSexosJefe = map[string]struct{}{
 	"masculino": {},
 	"femenino":  {},
 	"otro":      {},
 }
 
-func (h *EstudianteHandler) UpdateDatosEstudiante(w http.ResponseWriter, r *http.Request) {
+func (h *JefeHandler) UpdateDatosJefe(w http.ResponseWriter, r *http.Request) {
 	claims, err := h.getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Rol != "estudiante" {
+	if claims.Rol != "jefe_departamental" {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
-	var payload UpdateDatosRequest
+	var payload UpdateDatosJefeRequest
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "Payload inválido", http.StatusBadRequest)
 		return
@@ -151,7 +137,7 @@ func (h *EstudianteHandler) UpdateDatosEstudiante(w http.ResponseWriter, r *http
 	if sexo == "" {
 		sexo = "otro"
 	}
-	if _, ok := allowedSexos[sexo]; !ok {
+	if _, ok := allowedSexosJefe[sexo]; !ok {
 		http.Error(w, "Valor de sexo inválido", http.StatusBadRequest)
 		return
 	}
@@ -163,14 +149,14 @@ func (h *EstudianteHandler) UpdateDatosEstudiante(w http.ResponseWriter, r *http
 	}
 	defer tx.Rollback()
 
-	estudianteID, err := h.getEstudianteID(claims.Sub)
+	jefeID, err := h.getJefeID(claims.Sub)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	updateEstudiante := `UPDATE estudiante SET nombre = $1, apellido = $2, sexo = $3 WHERE id = $4`
-	if _, err := tx.Exec(updateEstudiante, payload.Nombre, payload.Apellido, sexo, estudianteID); err != nil {
+	updateJefe := `UPDATE jefe_departamental SET nombre = $1, apellido = $2, sexo = $3 WHERE id = $4`
+	if _, err := tx.Exec(updateJefe, payload.Nombre, payload.Apellido, sexo, jefeID); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -183,13 +169,13 @@ func (h *EstudianteHandler) UpdateDatosEstudiante(w http.ResponseWriter, r *http
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *EstudianteHandler) SubirFotoEstudiante(w http.ResponseWriter, r *http.Request) {
+func (h *JefeHandler) SubirFotoJefe(w http.ResponseWriter, r *http.Request) {
 	claims, err := h.getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Rol != "estudiante" {
+	if claims.Rol != "jefe_departamental" {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -212,13 +198,13 @@ func (h *EstudianteHandler) SubirFotoEstudiante(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	estudianteID, err := h.getEstudianteID(claims.Sub)
+	jefeID, err := h.getJefeID(claims.Sub)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	dir := filepath.Join("uploads", "profiles", fmt.Sprintf("%d", estudianteID))
+	dir := filepath.Join("uploads", "profiles", "jefes", fmt.Sprintf("%d", jefeID))
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		http.Error(w, "No se pudo crear carpeta de usuario", http.StatusInternalServerError)
 		return
@@ -239,9 +225,9 @@ func (h *EstudianteHandler) SubirFotoEstudiante(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	photoURL := fmt.Sprintf("/uploads/profiles/%d/%s", estudianteID, filename)
-	update := `UPDATE estudiante SET foto_perfil = $1 WHERE id = $2`
-	if _, err := h.db.Exec(update, photoURL, estudianteID); err != nil {
+	photoURL := fmt.Sprintf("/uploads/profiles/jefes/%d/%s", jefeID, filename)
+	update := `UPDATE jefe_departamental SET foto_perfil = $1 WHERE id = $2`
+	if _, err := h.db.Exec(update, photoURL, jefeID); err != nil {
 		http.Error(w, "No se pudo guardar la ruta en la base de datos", http.StatusInternalServerError)
 		return
 	}
@@ -250,3 +236,4 @@ func (h *EstudianteHandler) SubirFotoEstudiante(w http.ResponseWriter, r *http.R
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"foto_perfil": photoURL})
 }
+
