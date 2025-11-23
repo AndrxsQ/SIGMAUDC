@@ -5,7 +5,7 @@
 * Incluye banderas de activación visual (botones activos) y modo colapsable.
 */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
 // Importación de íconos desde react-icons (representan cada opción del menú)
 import {
   FaBars,
@@ -24,11 +24,22 @@ import "../../styles/Sidebar.css";
 
 // Componente principal Sidebar
 // Recibe como props el estado actual de la página activa y la función que permite cambiarla.
-const Sidebar = ({ activePage, setActivePage, onLogout }) => {
+const Sidebar = forwardRef(({ activePage, setActivePage, onLogout }, ref) => {
   // Estado local para controlar si la barra lateral está abierta o cerrada.
   const [isOpen, setIsOpen] = useState(false);
   const pageChangeCountRef = React.useRef(0);
   const autoCloseTimerRef = React.useRef(null);
+  
+  // Exponer métodos al componente padre (para sincronización con botón hamburguesa)
+  useImperativeHandle(ref, () => ({
+    toggle: () => {
+      toggleSidebar();
+    },
+    close: () => {
+      closeSidebar();
+    },
+    isOpen: () => isOpen
+  }));
   
   // Función que alterna entre los estados abierto/cerrado del menú lateral.
   const toggleSidebar = () => {
@@ -81,6 +92,11 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
           pageChangeCountRef.current = 0;
         }, 600); // Delay elegante de 600ms
       }
+    } else {
+      // En móviles, cerrar automáticamente al cambiar de página
+      if (isOpen) {
+        closeSidebar();
+      }
     }
   }, [activePage]);
 
@@ -102,8 +118,30 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
     }
   }, [isOpen]);
 
-  // Inicializar estado del sidebar en desktop
+  // Inicializar estado del sidebar y manejar resize
   useEffect(() => {
+    const handleResize = () => {
+      const sidebar = document.querySelector('.sidebar');
+      if (!sidebar) return;
+      
+      if (window.innerWidth >= 1025) {
+        // En desktop, mantener estado actual pero asegurar que backdrop esté oculto
+        const backdrop = document.querySelector('.sidebar-backdrop');
+        if (backdrop) backdrop.classList.remove('active');
+      } else {
+        // En móviles, asegurar que sidebar esté cerrado si se cambia de tamaño
+        // Leer estado actual del DOM en lugar de depender de la captura de isOpen
+        if (sidebar.classList.contains('open')) {
+          setIsOpen(false);
+          document.documentElement.classList.remove('sidebar-open');
+          document.documentElement.classList.add('sidebar-closed');
+          const backdrop = document.querySelector('.sidebar-backdrop');
+          if (backdrop) backdrop.classList.remove('active');
+        }
+      }
+    };
+    
+    // Configurar estado inicial
     if (window.innerWidth >= 1025) {
       // En desktop, sidebar cerrado por defecto para mejor experiencia
       document.documentElement.classList.remove('sidebar-open');
@@ -116,11 +154,15 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
       setIsOpen(false);
     }
     
-    // Cleanup timer al desmontar
+    // Agregar listener para resize
+    window.addEventListener('resize', handleResize);
+    
+    // Cleanup timer y listener al desmontar
     return () => {
       if (autoCloseTimerRef.current) {
         clearTimeout(autoCloseTimerRef.current);
       }
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
@@ -232,6 +274,8 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
       </div>
     </div>
   );
-};
+});
+
+Sidebar.displayName = 'Sidebar';
 
 export default Sidebar;
