@@ -58,6 +58,7 @@ function AppContent() {
   const [roleLoading, setRoleLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const sidebarRef = React.useRef(null);
 
   // Cargar rol del usuario (al montar y cuando cambia la ruta)
   useEffect(() => {
@@ -195,19 +196,9 @@ function AppContent() {
               <MobileMenuButton 
                 userRole={userRole}
                 onToggle={() => {
-                  const sidebar = document.querySelector('.sidebar');
-                  const backdrop = document.querySelector('.sidebar-backdrop');
-                  if (sidebar) {
-                    const isOpen = sidebar.classList.contains('open');
-                    if (isOpen) {
-                      sidebar.classList.remove('open');
-                      sidebar.classList.add('closed');
-                      if (backdrop) backdrop.classList.remove('active');
-                    } else {
-                      sidebar.classList.remove('closed');
-                      sidebar.classList.add('open');
-                      if (backdrop) backdrop.classList.add('active');
-                    }
+                  // Usar el ref para sincronizar con el estado interno del sidebar
+                  if (sidebarRef.current) {
+                    sidebarRef.current.toggle();
                   }
                 }}
               />
@@ -215,12 +206,14 @@ function AppContent() {
               {/* Mostrar Sidebar según el rol */}
               {userRole === "jefe_departamental" ? (
                 <SidebarJefe 
+                  ref={sidebarRef}
                   activePage={activePage} 
                   setActivePage={handlePageChange}
                   onLogout={handleLogout}
                 />
               ) : (
                 <Sidebar 
+                  ref={sidebarRef}
                   activePage={activePage} 
                   setActivePage={handlePageChange}
                   onLogout={handleLogout}
