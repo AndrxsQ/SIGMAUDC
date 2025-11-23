@@ -194,7 +194,7 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
 
         {/* Opción: Modificar matrícula */}
         <div className="icon-content">
-          <button className={activePage === "Modificar" ? "active" : ""} onClick={() => setActivePage("modificar")}>
+          <button className={activePage === "modificar" ? "active" : ""} onClick={() => setActivePage("modificar")}>
             <FaEdit /> <span>Modificar matrícula</span>
           </button>
           {!isOpen && <span className="tooltip">Modificar matrícula</span>}

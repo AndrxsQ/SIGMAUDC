@@ -97,6 +97,12 @@ func main() {
 	protected.HandleFunc("/matricula/asignaturas/{id}/grupos", matriculaHandler.GetGruposAsignatura).Methods("GET")
 	protected.HandleFunc("/matricula/inscribir", matriculaHandler.InscribirAsignaturas).Methods("POST")
 
+	// Rutas de modificaciones estudiantiles (protegidas)
+	protected.HandleFunc("/matricula/validar-modificaciones", matriculaHandler.ValidarModificaciones).Methods("GET")
+	protected.HandleFunc("/matricula/modificaciones", matriculaHandler.GetModificacionesData).Methods("GET")
+	protected.HandleFunc("/matricula/retirar-materia", matriculaHandler.RetirarMateria).Methods("POST")
+	protected.HandleFunc("/matricula/agregar-materia", matriculaHandler.AgregarMateriaModificaciones).Methods("POST")
+
 	// Servir archivos estáticos (uploads) - soporta estructura de carpetas periodo/programa/
 	r.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads/"))))
 
