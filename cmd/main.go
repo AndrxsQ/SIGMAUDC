@@ -46,6 +46,7 @@ func main() {
 	pensumHandler := handlers.NewPensumHandler(db)
 	matriculaHandler := handlers.NewMatriculaHandler(db)
 	estudianteHandler := handlers.NewEstudianteHandler(db)
+	jefeHandler := handlers.NewJefeHandler(db)
 
 	// Configurar router
 	r := mux.NewRouter()
@@ -88,6 +89,11 @@ func main() {
 	protected.HandleFunc("/estudiante/datos", estudianteHandler.GetDatosEstudiante).Methods("GET")
 	protected.HandleFunc("/estudiante/datos", estudianteHandler.UpdateDatosEstudiante).Methods("PUT")
 	protected.HandleFunc("/estudiante/foto", estudianteHandler.SubirFotoEstudiante).Methods("POST")
+	
+	// Rutas de jefe departamental (protegidas)
+	protected.HandleFunc("/jefe/datos", jefeHandler.GetDatosJefe).Methods("GET")
+	protected.HandleFunc("/jefe/datos", jefeHandler.UpdateDatosJefe).Methods("PUT")
+	protected.HandleFunc("/jefe/foto", jefeHandler.SubirFotoJefe).Methods("POST")
 	log.Println("✅ Ruta /api/pensum registrada correctamente")
 
 	// Rutas de matrícula (protegidas)

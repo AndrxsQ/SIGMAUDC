@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/andrxsq/SIGMAUDC/internal/middleware"
 	"github.com/andrxsq/SIGMAUDC/internal/models"
 	"github.com/gorilla/mux"
 	"github.com/lib/pq"
@@ -125,8 +126,8 @@ func NewMatriculaHandler(db *sql.DB) *MatriculaHandler {
 }
 
 func (h *MatriculaHandler) getClaims(r *http.Request) (*models.JWTClaims, error) {
-	claims, ok := r.Context().Value("claims").(*models.JWTClaims)
-	if !ok || claims == nil {
+	claims, ok := middleware.GetClaimsFromContext(r.Context())
+	if !ok {
 		return nil, errors.New("unauthorized")
 	}
 	return claims, nil

@@ -24,6 +24,7 @@ import DatosEstudiante from "./pages/estudiante/DatosEstudiante";
 import HomeJefe from "./pages/jefe/HomeJefe";
 import Plazos from "./pages/jefe/Plazos";
 import VerificarDocumentos from "./pages/jefe/VerificarDocumentos";
+import DatosJefe from "./pages/jefe/DatosJefe";
 import { authService } from "./services/auth";
 
 // Botón hamburguesa para móviles
@@ -265,7 +266,7 @@ function AppContent() {
                   />
                   <Route
                     path="/perfil"
-                    element={renderRoleProtected(<div>Mi Información (En desarrollo)</div>, () => userRole === "jefe_departamental")}
+                    element={renderRoleProtected(<DatosJefe />, () => userRole === "jefe_departamental")}
                   />
                   
                   <Route path="*" element={roleLoading ? renderRouteLoading() : <Navigate to="/" replace />} />

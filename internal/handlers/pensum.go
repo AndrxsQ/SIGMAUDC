@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/andrxsq/SIGMAUDC/internal/middleware"
 	"github.com/andrxsq/SIGMAUDC/internal/models"
 )
 
@@ -22,8 +23,8 @@ func NewPensumHandler(db *sql.DB) *PensumHandler {
 }
 
 func (h *PensumHandler) getClaims(r *http.Request) (*models.JWTClaims, error) {
-	claims, ok := r.Context().Value("claims").(*models.JWTClaims)
-	if !ok || claims == nil {
+	claims, ok := middleware.GetClaimsFromContext(r.Context())
+	if !ok {
 		return nil, errors.New("unauthorized")
 	}
 	return claims, nil
