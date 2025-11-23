@@ -10,17 +10,16 @@ import React, { useState, useEffect } from "react";
 import {
   FaBars,
   FaBookOpen,
-  FaClipboardList,
   FaEdit,
   FaSearch,
-  FaFileAlt,
-  FaChartBar,
-  FaCalendarAlt,
-  FaSignOutAlt
+  FaSignOutAlt,
+  FaFileUpload,
+  FaUser,
+  FaGraduationCap,
+  FaClipboardCheck,
+  FaExchangeAlt
 } from "react-icons/fa";
-import { FaFileUpload } from "react-icons/fa";
 import { GoHomeFill } from "react-icons/go";
-import { MdOutlineUploadFile } from "react-icons/md";
 import "../../styles/Sidebar.css";
 
 // Componente principal Sidebar
@@ -150,17 +149,17 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
         {/* Opción: Pensul académico */}
         <div className="icon-content">
           <button className={activePage === "pensul" ? "active" : ""} onClick={() => setActivePage("pensul")}>
-            <FaCalendarAlt size={23} />
-            <span>Pensul</span>
+            <FaGraduationCap size={23} />
+            <span>Pensum Académico</span>
           </button>
 
-          {!isOpen && <span className="tooltip">Pensul</span>}
+          {!isOpen && <span className="tooltip">Pensum Académico</span>}
         </div>
         
         {/* Opción: Guía de matrícula */}
         <div className="icon-content">
           <button  className={activePage === "guia" ? "active" : ""} onClick={() => setActivePage("guia")}>
-            <FaBookOpen /> 
+            <FaBookOpen size={23} /> 
             <span>Guía de matrícula</span>
           </button>
           {!isOpen && <span className="tooltip">Guía de matrícula</span>}
@@ -169,7 +168,7 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
         {/* Opción: Datos del estudiante */}
         <div className="icon-content">
           <button className={activePage === "hoja" ? "active" : ""} onClick={() => setActivePage("hoja")}>
-            <FaFileAlt /> <span>Datos del estudiante</span>
+            <FaUser size={23} /> <span>Datos del estudiante</span>
           </button>
           {!isOpen && <span className="tooltip">Datos del estudiante</span>}
         </div>
@@ -179,7 +178,7 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
         {/* Opción: Subir documentos */}
         <div className="icon-content">
           <button className={activePage === "Subir" ? "active" : ""} onClick={() => setActivePage("subir")}>
-            <FaFileUpload /> <span>Subir documentos</span>
+            <FaFileUpload size={23} /> <span>Subir documentos</span>
           </button>
           {!isOpen && <span className="tooltip">Subir documentos</span>}
         </div>
@@ -187,7 +186,7 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
         {/* Opción: Inscribir asignaturas */}
         <div className="icon-content">
           <button className={activePage === "inscribir" ? "active" : ""} onClick={() => setActivePage("inscribir")}>
-            <FaClipboardList /> <span>Inscribir asignaturas</span>
+            <FaClipboardCheck size={23} /> <span>Inscribir asignaturas</span>
           </button>
           {!isOpen && <span className="tooltip">Inscribir asignaturas</span>}
         </div>
@@ -195,7 +194,7 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
         {/* Opción: Modificar matrícula */}
         <div className="icon-content">
           <button className={activePage === "modificar" ? "active" : ""} onClick={() => setActivePage("modificar")}>
-            <FaEdit /> <span>Modificar matrícula</span>
+            <FaExchangeAlt size={23} /> <span>Modificar matrícula</span>
           </button>
           {!isOpen && <span className="tooltip">Modificar matrícula</span>}
         </div>
@@ -203,7 +202,7 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
         {/* Opción: Consultar matrícula */}
         <div className="icon-content">
           <button className={activePage === "Consultar" ? "active" : ""} onClick={() => setActivePage("prueba")}>
-            <FaSearch /> <span>Consultar matrícula</span>
+            <FaSearch size={23} /> <span>Consultar matrícula</span>
           </button>
           {!isOpen && <span className="tooltip">Consultar matrícula</span>}
         </div>
