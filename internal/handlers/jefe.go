@@ -110,7 +110,7 @@ type UpdateDatosJefeRequest struct {
 	Sexo     string `json:"sexo"`
 }
 
-var allowedSexos = map[string]struct{}{
+var allowedSexosJefe = map[string]struct{}{
 	"masculino": {},
 	"femenino":  {},
 	"otro":      {},
@@ -137,7 +137,7 @@ func (h *JefeHandler) UpdateDatosJefe(w http.ResponseWriter, r *http.Request) {
 	if sexo == "" {
 		sexo = "otro"
 	}
-	if _, ok := allowedSexos[sexo]; !ok {
+	if _, ok := allowedSexosJefe[sexo]; !ok {
 		http.Error(w, "Valor de sexo inválido", http.StatusBadRequest)
 		return
 	}
