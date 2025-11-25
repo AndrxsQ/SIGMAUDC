@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/andrxsq/SIGMAUDC/internal/middleware"
 	"github.com/andrxsq/SIGMAUDC/internal/models"
 	"github.com/andrxsq/SIGMAUDC/internal/utils"
 	"github.com/golang-jwt/jwt/v5"
@@ -297,7 +298,7 @@ func (h *AuthHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	// El usuario viene del contexto del middleware JWT
-	claims, ok := r.Context().Value("claims").(*models.JWTClaims)
+	claims, ok := middleware.GetClaimsFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -351,7 +352,8 @@ func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) generateJWT(usuario models.Usuario) (string, error) {
-	expirationTime := time.Now().Add(1 * time.Hour)
+	// Token expira en 24 horas (más apropiado para una aplicación web)
+	expirationTime := time.Now().Add(24 * time.Hour)
 	claims := &models.JWTClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   strconv.Itoa(usuario.ID),

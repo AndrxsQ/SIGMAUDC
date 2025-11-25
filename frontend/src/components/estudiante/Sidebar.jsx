@@ -5,31 +5,41 @@
 * Incluye banderas de activación visual (botones activos) y modo colapsable.
 */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
 // Importación de íconos desde react-icons (representan cada opción del menú)
 import {
   FaBars,
   FaBookOpen,
-  FaClipboardList,
   FaEdit,
   FaSearch,
-  FaFileAlt,
-  FaChartBar,
-  FaCalendarAlt,
-  FaSignOutAlt
+  FaSignOutAlt,
+  FaFileUpload,
+  FaUser,
+  FaGraduationCap,
+  FaClipboardCheck,
+  FaExchangeAlt
 } from "react-icons/fa";
-import { FaFileUpload } from "react-icons/fa";
 import { GoHomeFill } from "react-icons/go";
-import { MdOutlineUploadFile } from "react-icons/md";
 import "../../styles/Sidebar.css";
 
 // Componente principal Sidebar
 // Recibe como props el estado actual de la página activa y la función que permite cambiarla.
-const Sidebar = ({ activePage, setActivePage, onLogout }) => {
+const Sidebar = forwardRef(({ activePage, setActivePage, onLogout }, ref) => {
   // Estado local para controlar si la barra lateral está abierta o cerrada.
   const [isOpen, setIsOpen] = useState(false);
   const pageChangeCountRef = React.useRef(0);
   const autoCloseTimerRef = React.useRef(null);
+  
+  // Exponer métodos al componente padre (para sincronización con botón hamburguesa)
+  useImperativeHandle(ref, () => ({
+    toggle: () => {
+      toggleSidebar();
+    },
+    close: () => {
+      closeSidebar();
+    },
+    isOpen: () => isOpen
+  }));
   
   // Función que alterna entre los estados abierto/cerrado del menú lateral.
   const toggleSidebar = () => {
@@ -82,6 +92,11 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
           pageChangeCountRef.current = 0;
         }, 600); // Delay elegante de 600ms
       }
+    } else {
+      // En móviles, cerrar automáticamente al cambiar de página
+      if (isOpen) {
+        closeSidebar();
+      }
     }
   }, [activePage]);
 
@@ -103,8 +118,30 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
     }
   }, [isOpen]);
 
-  // Inicializar estado del sidebar en desktop
+  // Inicializar estado del sidebar y manejar resize
   useEffect(() => {
+    const handleResize = () => {
+      const sidebar = document.querySelector('.sidebar');
+      if (!sidebar) return;
+      
+      if (window.innerWidth >= 1025) {
+        // En desktop, mantener estado actual pero asegurar que backdrop esté oculto
+        const backdrop = document.querySelector('.sidebar-backdrop');
+        if (backdrop) backdrop.classList.remove('active');
+      } else {
+        // En móviles, asegurar que sidebar esté cerrado si se cambia de tamaño
+        // Leer estado actual del DOM en lugar de depender de la captura de isOpen
+        if (sidebar.classList.contains('open')) {
+          setIsOpen(false);
+          document.documentElement.classList.remove('sidebar-open');
+          document.documentElement.classList.add('sidebar-closed');
+          const backdrop = document.querySelector('.sidebar-backdrop');
+          if (backdrop) backdrop.classList.remove('active');
+        }
+      }
+    };
+    
+    // Configurar estado inicial
     if (window.innerWidth >= 1025) {
       // En desktop, sidebar cerrado por defecto para mejor experiencia
       document.documentElement.classList.remove('sidebar-open');
@@ -117,11 +154,15 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
       setIsOpen(false);
     }
     
-    // Cleanup timer al desmontar
+    // Agregar listener para resize
+    window.addEventListener('resize', handleResize);
+    
+    // Cleanup timer y listener al desmontar
     return () => {
       if (autoCloseTimerRef.current) {
         clearTimeout(autoCloseTimerRef.current);
       }
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
@@ -149,18 +190,27 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
 
         {/* Opción: Pensum académico */}
         <div className="icon-content">
+<<<<<<< HEAD
           <button className={activePage === "pensum" ? "active" : ""} onClick={() => setActivePage("pensum")}>
             <FaCalendarAlt size={23} />
             <span>Pensum</span>
           </button>
 
           {!isOpen && <span className="tooltip">Pensum</span>}
+=======
+          <button className={activePage === "pensul" ? "active" : ""} onClick={() => setActivePage("pensul")}>
+            <FaGraduationCap size={23} />
+            <span>Pensum Académico</span>
+          </button>
+
+          {!isOpen && <span className="tooltip">Pensum Académico</span>}
+>>>>>>> ff058f16ba3210512aad1f0c9e96148ae77fa34a
         </div>
         
         {/* Opción: Guía de matrícula */}
         <div className="icon-content">
           <button  className={activePage === "guia" ? "active" : ""} onClick={() => setActivePage("guia")}>
-            <FaBookOpen /> 
+            <FaBookOpen size={23} /> 
             <span>Guía de matrícula</span>
           </button>
           {!isOpen && <span className="tooltip">Guía de matrícula</span>}
@@ -169,7 +219,7 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
         {/* Opción: Datos del estudiante */}
         <div className="icon-content">
           <button className={activePage === "hoja" ? "active" : ""} onClick={() => setActivePage("hoja")}>
-            <FaFileAlt /> <span>Datos del estudiante</span>
+            <FaUser size={23} /> <span>Datos del estudiante</span>
           </button>
           {!isOpen && <span className="tooltip">Datos del estudiante</span>}
         </div>
@@ -179,7 +229,7 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
         {/* Opción: Subir documentos */}
         <div className="icon-content">
           <button className={activePage === "Subir" ? "active" : ""} onClick={() => setActivePage("subir")}>
-            <FaFileUpload /> <span>Subir documentos</span>
+            <FaFileUpload size={23} /> <span>Subir documentos</span>
           </button>
           {!isOpen && <span className="tooltip">Subir documentos</span>}
         </div>
@@ -187,15 +237,15 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
         {/* Opción: Inscribir asignaturas */}
         <div className="icon-content">
           <button className={activePage === "inscribir" ? "active" : ""} onClick={() => setActivePage("inscribir")}>
-            <FaClipboardList /> <span>Inscribir asignaturas</span>
+            <FaClipboardCheck size={23} /> <span>Inscribir asignaturas</span>
           </button>
           {!isOpen && <span className="tooltip">Inscribir asignaturas</span>}
         </div>
 
         {/* Opción: Modificar matrícula */}
         <div className="icon-content">
-          <button className={activePage === "Modificar" ? "active" : ""} onClick={() => setActivePage("modificar")}>
-            <FaEdit /> <span>Modificar matrícula</span>
+          <button className={activePage === "modificar" ? "active" : ""} onClick={() => setActivePage("modificar")}>
+            <FaExchangeAlt size={23} /> <span>Modificar matrícula</span>
           </button>
           {!isOpen && <span className="tooltip">Modificar matrícula</span>}
         </div>
@@ -203,7 +253,7 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
         {/* Opción: Consultar matrícula */}
         <div className="icon-content">
           <button className={activePage === "Consultar" ? "active" : ""} onClick={() => setActivePage("prueba")}>
-            <FaSearch /> <span>Consultar matrícula</span>
+            <FaSearch size={23} /> <span>Consultar matrícula</span>
           </button>
           {!isOpen && <span className="tooltip">Consultar matrícula</span>}
         </div>
@@ -233,6 +283,8 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
       </div>
     </div>
   );
-};
+});
+
+Sidebar.displayName = 'Sidebar';
 
 export default Sidebar;

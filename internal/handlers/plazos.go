@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/andrxsq/SIGMAUDC/internal/middleware"
 	"github.com/andrxsq/SIGMAUDC/internal/models"
 	"github.com/andrxsq/SIGMAUDC/internal/utils"
 	"github.com/gorilla/mux"
@@ -25,8 +26,8 @@ func NewPlazosHandler(db *sql.DB) *PlazosHandler {
 }
 
 func (h *PlazosHandler) getClaims(r *http.Request) (*models.JWTClaims, error) {
-	claims, ok := r.Context().Value("claims").(*models.JWTClaims)
-	if !ok || claims == nil {
+	claims, ok := middleware.GetClaimsFromContext(r.Context())
+	if !ok {
 		return nil, errors.New("unauthorized")
 	}
 	return claims, nil

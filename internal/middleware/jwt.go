@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"strings"
 
@@ -10,13 +9,16 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Tipo específico para la clave del contexto (mejor práctica que usar string)
+type contextKey string
+
+const ClaimsContextKey contextKey = "jwt_claims"
+
 func JWTAuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("🔍 Middleware JWT - Ruta: %s %s", r.Method, r.URL.Path)
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
-				log.Printf("❌ Middleware JWT - No Authorization header en %s", r.URL.Path)
 				http.Error(w, "Authorization header required", http.StatusUnauthorized)
 				return
 			}
@@ -41,16 +43,29 @@ func JWTAuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 			})
 
 			if err != nil || !token.Valid {
-				log.Printf("❌ Middleware JWT - Token inválido o expirado en %s: %v", r.URL.Path, err)
 				http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
 				return
 			}
 
-			log.Printf("✅ Middleware JWT - Token válido, pasando a handler para %s", r.URL.Path)
-			// Agregar los claims al contexto
-			ctx := context.WithValue(r.Context(), "claims", claims)
+			// Validar que los claims no estén vacíos
+			if claims == nil || claims.Sub == 0 {
+				http.Error(w, "Invalid token claims", http.StatusUnauthorized)
+				return
+			}
+
+			// Agregar los claims al contexto usando tipo específico
+			ctx := context.WithValue(r.Context(), ClaimsContextKey, claims)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// GetClaimsFromContext es una función helper para obtener los claims del contexto
+func GetClaimsFromContext(ctx context.Context) (*models.JWTClaims, bool) {
+	claims, ok := ctx.Value(ClaimsContextKey).(*models.JWTClaims)
+	if !ok || claims == nil || claims.Sub == 0 {
+		return nil, false
+	}
+	return claims, ok
 }
 

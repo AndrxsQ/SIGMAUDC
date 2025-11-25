@@ -46,6 +46,7 @@ func main() {
 	pensumHandler := handlers.NewPensumHandler(db)
 	matriculaHandler := handlers.NewMatriculaHandler(db)
 	estudianteHandler := handlers.NewEstudianteHandler(db)
+	jefeHandler := handlers.NewJefeHandler(db)
 
 	// Configurar router
 	r := mux.NewRouter()
@@ -88,6 +89,11 @@ func main() {
 	protected.HandleFunc("/estudiante/datos", estudianteHandler.GetDatosEstudiante).Methods("GET")
 	protected.HandleFunc("/estudiante/datos", estudianteHandler.UpdateDatosEstudiante).Methods("PUT")
 	protected.HandleFunc("/estudiante/foto", estudianteHandler.SubirFotoEstudiante).Methods("POST")
+	
+	// Rutas de jefe departamental (protegidas)
+	protected.HandleFunc("/jefe/datos", jefeHandler.GetDatosJefe).Methods("GET")
+	protected.HandleFunc("/jefe/datos", jefeHandler.UpdateDatosJefe).Methods("PUT")
+	protected.HandleFunc("/jefe/foto", jefeHandler.SubirFotoJefe).Methods("POST")
 	log.Println("✅ Ruta /api/pensum registrada correctamente")
 
 	// Rutas de matrícula (protegidas)
@@ -97,10 +103,18 @@ func main() {
 	protected.HandleFunc("/matricula/asignaturas/{id}/grupos", matriculaHandler.GetGruposAsignatura).Methods("GET")
 	protected.HandleFunc("/matricula/inscribir", matriculaHandler.InscribirAsignaturas).Methods("POST")
 
+<<<<<<< HEAD
 	// Rutas de modificaciones (para jefatura)
 	protected.HandleFunc("/modificaciones/estudiante", matriculaHandler.GetStudentMatricula).Methods("GET")
 	protected.HandleFunc("/modificaciones/estudiante/{id}/inscribir", matriculaHandler.JefeInscribirAsignaturas).Methods("POST")
 	protected.HandleFunc("/modificaciones/estudiante/{id}/desmatricular", matriculaHandler.JefeDesmatricularGrupo).Methods("POST")
+=======
+	// Rutas de modificaciones estudiantiles (protegidas)
+	protected.HandleFunc("/matricula/validar-modificaciones", matriculaHandler.ValidarModificaciones).Methods("GET")
+	protected.HandleFunc("/matricula/modificaciones", matriculaHandler.GetModificacionesData).Methods("GET")
+	protected.HandleFunc("/matricula/retirar-materia", matriculaHandler.RetirarMateria).Methods("POST")
+	protected.HandleFunc("/matricula/agregar-materia", matriculaHandler.AgregarMateriaModificaciones).Methods("POST")
+>>>>>>> ff058f16ba3210512aad1f0c9e96148ae77fa34a
 
 	// Servir archivos estáticos (uploads) - soporta estructura de carpetas periodo/programa/
 	r.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads/"))))

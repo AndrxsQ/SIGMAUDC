@@ -39,6 +39,7 @@ export const matriculaService = {
     return response.data;
   },
 
+<<<<<<< HEAD
   // Obtener matrícula / horario de un estudiante (para jefatura)
   async getStudentMatricula(params) {
     // params: { codigo } or { id }
@@ -49,10 +50,36 @@ export const matriculaService = {
   // Jefatura: inscribir asignaturas en nombre de un estudiante
   async jefeInscribir(estudianteId, gruposIds) {
     const response = await api.post(`/api/modificaciones/estudiante/${estudianteId}/inscribir`, {
+=======
+  // Validar si el estudiante puede realizar modificaciones
+  async validarModificaciones() {
+    const response = await api.get('/api/matricula/validar-modificaciones');
+    return response.data;
+  },
+
+  // Obtener datos de modificaciones (materias matriculadas y disponibles)
+  async getModificacionesData() {
+    const response = await api.get('/api/matricula/modificaciones');
+    return response.data;
+  },
+
+  // Retirar una materia
+  async retirarMateria(historialId) {
+    const response = await api.post('/api/matricula/retirar-materia', {
+      historial_id: historialId,
+    });
+    return response.data;
+  },
+
+  // Agregar una materia en modificaciones
+  async agregarMateriaModificaciones(gruposIds) {
+    const response = await api.post('/api/matricula/agregar-materia', {
+>>>>>>> ff058f16ba3210512aad1f0c9e96148ae77fa34a
       grupos_ids: gruposIds,
     });
     return response.data;
   },
+<<<<<<< HEAD
 
   // Jefatura: desmatricular un grupo de un estudiante
   async jefeDesmatricular(estudianteId, grupoId) {
@@ -61,5 +88,7 @@ export const matriculaService = {
     });
     return response.data;
   },
+=======
+>>>>>>> ff058f16ba3210512aad1f0c9e96148ae77fa34a
 };
 

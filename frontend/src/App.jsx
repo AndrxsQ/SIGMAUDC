@@ -16,6 +16,7 @@ import SidebarJefe from "./components/jefe/SidebarJefe";
 // Páginas de estudiantes
 import Home from "./pages/estudiante/Home";
 import InscribirAsignaturas from "./pages/estudiante/InscribirAsignaturas";
+import ModificarMatricula from "./pages/estudiante/ModificarMatricula";
 import ConsultarMatricula from "./pages/estudiante/ConsultarMatricula";
 import DatosEstudiante from "./pages/estudiante/DatosEstudiante";
 
@@ -24,6 +25,7 @@ import HomeJefe from "./pages/jefe/HomeJefe";
 import Plazos from "./pages/jefe/Plazos";
 import VerificarDocumentos from "./pages/jefe/VerificarDocumentos";
 import Modificaciones from "./pages/jefe/Modificaciones";
+import DatosJefe from "./pages/jefe/DatosJefe";
 import { authService } from "./services/auth";
 
 // Botón hamburguesa para móviles
@@ -57,6 +59,7 @@ function AppContent() {
   const [roleLoading, setRoleLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const sidebarRef = React.useRef(null);
 
   // Cargar rol del usuario (al montar y cuando cambia la ruta)
   useEffect(() => {
@@ -115,7 +118,7 @@ function AppContent() {
     } else if (path === "/verificar-documentos") {
       setActivePage("verificar-documentos");
     } else if (path === "/modificaciones") {
-      setActivePage("modificaciones");
+      setActivePage("modificar");
     } else if (path === "/plan-estudio") {
       setActivePage("plan-estudio");
     } else if (path === "/perfil") {
@@ -132,6 +135,12 @@ function AppContent() {
     setActivePage(page);
     if (page === "home") {
       navigate("/");
+    } else if (page === "modificar") {
+      navigate("/modificaciones");
+    } else if (page === "prueba") {
+      navigate("/prueba");
+    } else if (page === "Consultar") {
+      navigate("/prueba");
     } else {
       navigate(`/${page}`);
     }
@@ -188,19 +197,9 @@ function AppContent() {
               <MobileMenuButton 
                 userRole={userRole}
                 onToggle={() => {
-                  const sidebar = document.querySelector('.sidebar');
-                  const backdrop = document.querySelector('.sidebar-backdrop');
-                  if (sidebar) {
-                    const isOpen = sidebar.classList.contains('open');
-                    if (isOpen) {
-                      sidebar.classList.remove('open');
-                      sidebar.classList.add('closed');
-                      if (backdrop) backdrop.classList.remove('active');
-                    } else {
-                      sidebar.classList.remove('closed');
-                      sidebar.classList.add('open');
-                      if (backdrop) backdrop.classList.add('active');
-                    }
+                  // Usar el ref para sincronizar con el estado interno del sidebar
+                  if (sidebarRef.current) {
+                    sidebarRef.current.toggle();
                   }
                 }}
               />
@@ -208,12 +207,14 @@ function AppContent() {
               {/* Mostrar Sidebar según el rol */}
               {userRole === "jefe_departamental" ? (
                 <SidebarJefe 
+                  ref={sidebarRef}
                   activePage={activePage} 
                   setActivePage={handlePageChange}
                   onLogout={handleLogout}
                 />
               ) : (
                 <Sidebar 
+                  ref={sidebarRef}
                   activePage={activePage} 
                   setActivePage={handlePageChange}
                   onLogout={handleLogout}
@@ -259,7 +260,7 @@ function AppContent() {
                   />
                   <Route
                     path="/perfil"
-                    element={renderRoleProtected(<div>Mi Información (En desarrollo)</div>, () => userRole === "jefe_departamental")}
+                    element={renderRoleProtected(<DatosJefe />, () => userRole === "jefe_departamental")}
                   />
                   
                   <Route path="*" element={roleLoading ? renderRouteLoading() : <Navigate to="/" replace />} />
