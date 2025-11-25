@@ -147,14 +147,14 @@ const Sidebar = ({ activePage, setActivePage, onLogout }) => {
         {/* Sección de opciones básicas */}
         <p className="menu-title">Básicas</p>
 
-        {/* Opción: Pensul académico */}
+        {/* Opción: Pensum académico */}
         <div className="icon-content">
-          <button className={activePage === "pensul" ? "active" : ""} onClick={() => setActivePage("pensul")}>
+          <button className={activePage === "pensum" ? "active" : ""} onClick={() => setActivePage("pensum")}>
             <FaCalendarAlt size={23} />
-            <span>Pensul</span>
+            <span>Pensum</span>
           </button>
 
-          {!isOpen && <span className="tooltip">Pensul</span>}
+          {!isOpen && <span className="tooltip">Pensum</span>}
         </div>
         
         {/* Opción: Guía de matrícula */}
