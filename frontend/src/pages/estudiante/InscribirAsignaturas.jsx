@@ -16,8 +16,19 @@ const InscribirAsignaturas = () => {
   const [dialog, setDialog] = useState(null);
   const [creditosSeleccionados, setCreditosSeleccionados] = useState(0);
 
-  // Días de la semana
-  const diasSemana = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+  // Filtros de búsqueda
+  const [codigoFilter, setCodigoFilter] = useState('');
+  const [nombreFilter, setNombreFilter] = useState('');
+  const [programaFilter, setProgramaFilter] = useState(null);
+  const [creditosFilter, setCreditosFilter] = useState(null);
+  const [tipoFilter, setTipoFilter] = useState(null);
+
+  // Días de la semana (incluye domingo)
+  const diasSemana = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO'];
+
+  // Mostrar/ocultar horario y ocultar horas vacías
+  const [showHorario, setShowHorario] = useState(true);
+  const [hideEmptyHours, setHideEmptyHours] = useState(false);
   
   const estadoLabels = {
     activa: "Activa",
@@ -251,6 +262,16 @@ const InscribirAsignaturas = () => {
     setHorario(nuevoHorario);
   };
 
+  // Remove a group from the cart (deselect)
+  const removeFromCart = (grupoId) => {
+    const asignatura = asignaturas.find((a) => a.grupos?.some((g) => g.id === grupoId));
+    if (!asignatura) return;
+    // toggleGrupo already handles deselection when the grupo is selected
+    if (gruposSeleccionados.has(grupoId)) {
+      toggleGrupo(grupoId, asignatura);
+    }
+  };
+
   const formatearHora = (hora) => {
     const [h, m] = hora.split(':');
     return `${h}:${m}`;
@@ -280,6 +301,52 @@ const InscribirAsignaturas = () => {
     ];
     return colors[hash % colors.length];
   };
+
+  // Obtener horarios únicos de una asignatura (evita duplicados entre grupos)
+  const getHorariosAsignatura = (asignatura) => {
+    const vistos = new Set();
+    const lista = [];
+    asignatura.grupos?.forEach((g) => {
+      g.horarios?.forEach((h) => {
+        const key = `${h.dia}-${h.hora_inicio}-${h.hora_fin}-${h.salon}`;
+        if (!vistos.has(key)) {
+          vistos.add(key);
+          lista.push(h);
+        }
+      });
+    });
+    return lista;
+  };
+
+  // Derivar opciones para selects (según datos cargados)
+  const programasDisponibles = Array.from(
+    new Set(
+      asignaturas.map((a) => a.programa || a.programa_academico || a.facultad).filter(Boolean)
+    )
+  ).sort();
+
+  const creditosDisponibles = Array.from(
+    new Set(asignaturas.map((a) => a.creditos).filter((c) => c != null))
+  ).sort((x, y) => x - y);
+
+  const tiposDisponibles = Array.from(
+    new Set(asignaturas.map((a) => a.tipo || a.tipo_asignatura).filter(Boolean))
+  ).sort();
+
+  // Filtrado en frontend (se puede cambiar a backend llamando matriculaService.buscarAsignaturas)
+  const filteredAsignaturas = asignaturas.filter((a) => {
+    const codigo = (a.codigo || a.code || '').toString().toLowerCase();
+    const nombre = (a.nombre || a.name || '').toString().toLowerCase();
+    const programa = a.programa || a.programa_academico || a.facultad || '';
+    const tipo = a.tipo || a.tipo_asignatura || '';
+
+    if (codigoFilter && !codigo.includes(codigoFilter.trim().toLowerCase())) return false;
+    if (nombreFilter && !nombre.includes(nombreFilter.trim().toLowerCase())) return false;
+    if (programaFilter && programa !== programaFilter) return false;
+    if (creditosFilter != null && Number(a.creditos) !== Number(creditosFilter)) return false;
+    if (tipoFilter && tipo !== tipoFilter) return false;
+    return true;
+  });
 
   const asignaturasObligatorias = asignaturas.filter((asignatura) => asignatura.obligatoria_repeticion);
   const faltanObligatoriasSeleccionadas = asignaturasObligatorias.some((asignatura) => {
@@ -346,67 +413,120 @@ const InscribirAsignaturas = () => {
         {/* Columna Izquierda: Vista del Horario */}
         <div className="horario-column">
           <div className="horario-card">
-            <h2>Tu Horario</h2>
+            <div className="horario-card-header">
+              <h2>Tu Horario</h2>
+              <div className="horario-controls">
+                <label className="horario-hide-empty">
+                  <input
+                    type="checkbox"
+                    checked={hideEmptyHours}
+                    onChange={() => setHideEmptyHours((v) => !v)}
+                  />
+                  Ocultar horas sin asignaturas
+                </label>
+                <button
+                  className={`horario-toggle-arrow ${showHorario ? 'open' : ''}`}
+                  onClick={() => setShowHorario((s) => !s)}
+                  aria-label={showHorario ? 'Ocultar horario' : 'Mostrar horario'}
+                />
+              </div>
+            </div>
+
             <div className="horario-grid">
-              <div className="horario-header">
-                <div className="horario-time-col">Hora</div>
-                {diasSemana.map((dia) => (
-                  <div key={dia} className="horario-day-col">
-                    {dia.substring(0, 3)}
-                  </div>
-                ))}
-              </div>
-              <div className="horario-body">
-                {horas.map((hora) => (
-                  <div key={hora} className="horario-row">
-                    <div className="horario-time-cell">
-                      {hora}:00
-                    </div>
-                    {diasSemana.map((dia) => (
-                      <div key={`${hora}-${dia}`} className="horario-cell">
-                        {horario
-                          .filter((h) =>
-                            h.horarios.some(
-                              (hor) =>
-                                hor.dia === dia &&
-                                parseInt(hor.hora_inicio.split(':')[0]) <= hora &&
-                                parseInt(hor.hora_fin.split(':')[0]) > hora
-                            )
-                          )
-                          .map((h, idx) => {
-                            const horarioDia = h.horarios.find((hor) => hor.dia === dia);
-                            if (!horarioDia) return null;
-                            const pos = obtenerPosicionHorario(horarioDia.hora_inicio, horarioDia.hora_fin);
-                            if (parseInt(horarioDia.hora_inicio.split(':')[0]) !== hora) return null;
-                            
-                            const bloqueAltura = Math.max(pos.duracionMinutos - 4, 28);
-                            const bloqueTop = 4 + Math.min(pos.offsetDentroHora, 52);
-                            return (
-                              <div
-                                key={idx}
-                                className="horario-block"
-                                style={{
-                                  backgroundColor: obtenerColorAsignatura(h.codigo),
-                                  height: `${bloqueAltura}px`,
-                                  top: `${bloqueTop}px`,
-                                }}
-                                title={`${h.asignatura} - ${h.grupoCodigo}\n${h.docente}\n${horarioDia.salon}\n${formatearHora(horarioDia.hora_inicio)} - ${formatearHora(horarioDia.hora_fin)}`}
-                              >
-                                <div className="horario-block-content">
-                                  <div className="horario-block-title">{h.asignatura}</div>
-                                  <div className="horario-block-subtitle">{h.grupoCodigo} - {horarioDia.salon}</div>
-                                  <div className="horario-block-time">
-                                    {formatearHora(horarioDia.hora_inicio)} - {formatearHora(horarioDia.hora_fin)}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
+              {!showHorario ? (
+                <div className="horario-collapsed">Horario oculto. Pulsa "Mostrar horario" para expandir.</div>
+              ) : (
+                (() => {
+                  const horaTieneAsignatura = (hora) =>
+                    horario.some((h) =>
+                      h.horarios.some((hor) =>
+                        parseInt(hor.hora_inicio.split(':')[0]) <= hora && parseInt(hor.hora_fin.split(':')[0]) > hora
+                      )
+                    );
+
+                  // Si se pidió ocultar horas vacías y el carrito está vacío, mostrar mensaje y no el horario
+                  if (hideEmptyHours && gruposSeleccionados.size === 0) {
+                    return (
+                      <div className="horario-empty-message">Aún no se ha añadido ninguna asignatura al carrito.</div>
+                    );
+                  }
+
+                  // Si se pidió ocultar horas vacías y hay al menos 1 asignatura en el carrito,
+                  // mostrar únicamente las horas que realmente tienen clases.
+                  const visibleHoras = hideEmptyHours && gruposSeleccionados.size > 0
+                    ? horas.filter(horaTieneAsignatura)
+                    : horas;
+
+                  if (visibleHoras.length === 0) {
+                    return (
+                      <div className="horario-empty-message">Aún no se ha añadido ninguna asignatura al carrito.</div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      <div className="horario-header">
+                        <div className="horario-time-col">Hora</div>
+                        {diasSemana.map((dia) => (
+                          <div key={dia} className="horario-day-col">
+                            {dia.substring(0, 3)}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+
+                      <div className="horario-body">
+                        {visibleHoras.map((hora) => (
+                          <div key={hora} className="horario-row">
+                            <div className="horario-time-cell">{hora}:00</div>
+                            {diasSemana.map((dia) => (
+                              <div key={`${hora}-${dia}`} className="horario-cell">
+                                {horario
+                                  .filter((h) =>
+                                    h.horarios.some(
+                                      (hor) =>
+                                        hor.dia === dia &&
+                                        parseInt(hor.hora_inicio.split(':')[0]) <= hora &&
+                                        parseInt(hor.hora_fin.split(':')[0]) > hora
+                                    )
+                                  )
+                                  .map((h, idx) => {
+                                    const horarioDia = h.horarios.find((hor) => hor.dia === dia);
+                                    if (!horarioDia) return null;
+                                    const pos = obtenerPosicionHorario(horarioDia.hora_inicio, horarioDia.hora_fin);
+                                    if (parseInt(horarioDia.hora_inicio.split(':')[0]) !== hora) return null;
+
+                                    const bloqueAltura = Math.max(pos.duracionMinutos - 4, 28);
+                                    const bloqueTop = 4 + Math.min(pos.offsetDentroHora, 52);
+                                    return (
+                                      <div
+                                        key={idx}
+                                        className="horario-block"
+                                        style={{
+                                          backgroundColor: obtenerColorAsignatura(h.codigo),
+                                          height: `${bloqueAltura}px`,
+                                          top: `${bloqueTop}px`,
+                                        }}
+                                        title={`${h.asignatura} - ${h.grupoCodigo}\n${h.docente}\n${horarioDia.salon}\n${formatearHora(horarioDia.hora_inicio)} - ${formatearHora(horarioDia.hora_fin)}`}
+                                      >
+                                        <div className="horario-block-content">
+                                          <div className="horario-block-title">{h.asignatura}</div>
+                                          <div className="horario-block-subtitle">{h.grupoCodigo} - {horarioDia.salon}</div>
+                                          <div className="horario-block-time">
+                                            {formatearHora(horarioDia.hora_inicio)} - {formatearHora(horarioDia.hora_fin)}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()
+              )}
             </div>
           </div>
         </div>
@@ -429,7 +549,7 @@ const InscribirAsignaturas = () => {
                   </div>
                   {resumen.estadoEstudiante && (
                     <span className={`resumen-estado resumen-estado-${resumen.estadoEstudiante?.toLowerCase()}`}>
-                      {resumen.estadoEstudiante}
+                      Estado Académico: {resumen.estadoEstudiante}
                     </span>
                   )}
                 </div>
@@ -463,6 +583,121 @@ const InscribirAsignaturas = () => {
               </div>
             </div>
           )}
+          {/* Buscador / filtros para asignaturas */}
+          <div className="asignaturas-search">
+            <div className="search-row">
+              <div className="filter-item">
+                <label>Buscar por código</label>
+                <input
+                  type="text"
+                  placeholder="Ej. MAT101"
+                  value={typeof codigoFilter !== 'undefined' ? codigoFilter : ''}
+                  onChange={(e) => setCodigoFilter(e.target.value)}
+                />
+              </div>
+              <div className="filter-item">
+                <label>Buscar por nombre</label>
+                <input
+                  type="text"
+                  placeholder="Nombre de la asignatura"
+                  value={typeof nombreFilter !== 'undefined' ? nombreFilter : ''}
+                  onChange={(e) => setNombreFilter(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="search-row">
+              <div className="filter-item">
+                <label>Programa académico</label>
+                <select value={programaFilter || ''} onChange={(e) => setProgramaFilter(e.target.value || null)}>
+                  <option value="">Todos</option>
+                  {programasDisponibles.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="filter-item">
+                <label>Créditos</label>
+                <select value={creditosFilter || ''} onChange={(e) => setCreditosFilter(e.target.value ? Number(e.target.value) : null)}>
+                  <option value="">Todos</option>
+                  {creditosDisponibles.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="filter-item">
+                <label>Tipo</label>
+                <select value={tipoFilter || ''} onChange={(e) => setTipoFilter(e.target.value || null)}>
+                  <option value="">Todos</option>
+                  {tiposDisponibles.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="filter-actions">
+                <button className="btn-clear" onClick={() => { setCodigoFilter(''); setNombreFilter(''); setProgramaFilter(null); setCreditosFilter(null); setTipoFilter(null); }}>Limpiar</button>
+              </div>
+            </div>
+          </div>
+            {/* Carrito de asignaturas (estilo tienda) */}
+            <div className="carrito-card">
+              <h3 className="carrito-title">Carrito de Inscripción</h3>
+              <p className="carrito-sub">Las asignaturas que selecciones aparecerán aquí. Puedes eliminarlas antes de inscribir.</p>
+              <div className="carrito-list">
+                {Array.from(gruposSeleccionados).length === 0 ? (
+                  <div className="carrito-empty">No tienes asignaturas en el carrito.</div>
+                ) : (
+                  Array.from(gruposSeleccionados).map((gid) => {
+                    const grupo = encontrarGrupoPorId(gid);
+                    const asignatura = asignaturas.find((a) => a.grupos?.some((g) => g.id === gid));
+                    if (!grupo || !asignatura) return null;
+                    return (
+                      <div key={gid} className="carrito-item">
+                        <div className="carrito-item-info">
+                          <div className="carrito-item-title">{asignatura.nombre}</div>
+                          <div className="carrito-item-meta">{asignatura.codigo} • {asignatura.creditos} cr • Grupo {grupo.codigo}</div>
+                        </div>
+                        <div className="carrito-item-actions">
+                          <button className="carrito-remove" onClick={() => removeFromCart(gid)} aria-label={`Eliminar ${asignatura.nombre}`}>
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Botón de Inscribir dentro del carrito */}
+              <div className="carrito-actions">
+                <button
+                  className="carrito-inscribir"
+                  disabled={faltanObligatoriasSeleccionadas || gruposSeleccionados.size === 0}
+                  title={
+                    faltanObligatoriasSeleccionadas
+                      ? "Selecciona los grupos obligatorios antes de inscribir"
+                      : undefined
+                  }
+                  onClick={async () => {
+                    if (faltanObligatoriasSeleccionadas) return;
+                    try {
+                      await matriculaService.inscribirAsignaturas(Array.from(gruposSeleccionados));
+                      setGruposSeleccionados(new Set());
+                      openDialog(
+                        "Inscripción confirmada",
+                        "Tus materias han quedado matriculadas. Verifica tu horario y revisa el resumen de créditos.",
+                        () => navigate("/"),
+                      );
+                    } catch (error) {
+                      const razon =
+                        getErrorReason(error, "Error al realizar la inscripción. Por favor, intenta nuevamente.");
+                      openDialog("No se pudo inscribir", razon);
+                    }
+                  }}
+                >
+                  Inscribir {gruposSeleccionados.size} {gruposSeleccionados.size === 1 ? "grupo" : "grupos"}
+                </button>
+              </div>
+              </div>
           {resumen?.obligatoriasSinGrupo?.length > 0 && (
             <div className="inscribir-alert">
               <p>
@@ -477,7 +712,7 @@ const InscribirAsignaturas = () => {
                   <p>No hay asignaturas disponibles para inscripción en este momento.</p>
                 </div>
               ) : (
-                asignaturas.map((asignatura) => {
+                filteredAsignaturas.map((asignatura) => {
                   const estadoClass = asignatura.estado ? `estado-${asignatura.estado}` : "";
                   const esCursada = asignatura.estado === "cursada";
                   return (
@@ -486,9 +721,19 @@ const InscribirAsignaturas = () => {
                         <div className="asignatura-info">
                           <h3>{asignatura.nombre}</h3>
                           <div className="asignatura-meta">
-                            <span className="asignatura-codigo">{asignatura.codigo}</span>
-                            <span className="asignatura-creditos">{asignatura.creditos} créditos</span>
-                          </div>
+                                  <span className="asignatura-codigo">{asignatura.codigo}</span>
+                                  <span className="asignatura-creditos">{asignatura.creditos} créditos</span>
+                                </div>
+                                {/* Mostrar resumen del horario de la asignatura (entradas únicas) */}
+                                {asignatura.grupos && asignatura.grupos.length > 0 && (
+                                  <div className="asignatura-horarios">
+                                    {getHorariosAsignatura(asignatura).map((hor, i) => (
+                                      <span key={i} className="horario-badge">
+                                        {hor.dia.substring(0,3)} {formatearHora(hor.hora_inicio)}-{formatearHora(hor.hora_fin)} {hor.salon}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                         </div>
                         <span className="asignatura-state">{formatEstado(asignatura.estado)}</span>
                         {asignatura.obligatoria_repeticion && (
@@ -566,46 +811,10 @@ const InscribirAsignaturas = () => {
               )}
             </div>
 
-            {gruposSeleccionados.size > 0 && (
-              <div className="inscribir-actions">
-                {faltanObligatoriasSeleccionadas && (
-                  <p className="inscribir-warning">
-                    Debes tener al menos un grupo seleccionado por cada asignatura en repetición obligatoria antes de continuar.
-                  </p>
-                )}
-                <button
-                  className="btn-inscribir"
-                  disabled={faltanObligatoriasSeleccionadas}
-                  title={
-                    faltanObligatoriasSeleccionadas
-                      ? "Selecciona los grupos obligatorios antes de inscribir"
-                      : undefined
-                  }
-                  onClick={async () => {
-                    if (faltanObligatoriasSeleccionadas) {
-                      return;
-                    }
-                    try {
-                      await matriculaService.inscribirAsignaturas(Array.from(gruposSeleccionados));
-                      setGruposSeleccionados(new Set());
-                      openDialog(
-                        "Inscripción confirmada",
-                        "Tus materias han quedado matriculadas. Verifica tu horario y revisa el resumen de créditos.",
-                        () => navigate("/"),
-                      );
-                    } catch (error) {
-                      const razon =
-                        getErrorReason(error, "Error al realizar la inscripción. Por favor, intenta nuevamente.");
-                      openDialog("No se pudo inscribir", razon);
-                    }
-                  }}
-                >
-                  Inscribir {gruposSeleccionados.size} {gruposSeleccionados.size === 1 ? "grupo" : "grupos"}
-                </button>
-              </div>
-            )}
+            {/* El botón de inscripción se muestra ahora dentro del carrito */}
           </div>
         </div>
+        
       </div>
       {dialog && (
         <div className="dialog-overlay" role="presentation">
