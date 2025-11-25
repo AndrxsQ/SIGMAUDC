@@ -302,7 +302,7 @@ const HomeEstudiante = () => {
           </div>
 
           {/* Pensum visual */}
-          <div className="dashboard-card" onClick={() => navigate("/pensul")}>
+          <div className="dashboard-card" onClick={() => navigate("/pensum")}>
             <div className="card-gradient-overlay"></div>
             <div className="card-content">
               <div className="card-icon-wrapper">
