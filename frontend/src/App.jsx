@@ -23,6 +23,7 @@ import DatosEstudiante from "./pages/estudiante/DatosEstudiante";
 import HomeJefe from "./pages/jefe/HomeJefe";
 import Plazos from "./pages/jefe/Plazos";
 import VerificarDocumentos from "./pages/jefe/VerificarDocumentos";
+import Modificaciones from "./pages/jefe/Modificaciones";
 import { authService } from "./services/auth";
 
 // Botón hamburguesa para móviles
@@ -103,8 +104,8 @@ function AppContent() {
       setActivePage("subir");
     } else if (path === "/hoja") {
       setActivePage("hoja");
-    } else if (path === "/pensul") {
-      setActivePage("pensul");
+    } else if (path === "/pensum") {
+      setActivePage("pensum");
     } else if (path === "/inscribir") {
       setActivePage("inscribir");
     } else if (path === "/prueba") {
@@ -243,14 +244,14 @@ function AppContent() {
                   />
                   <Route path="/subir" element={renderRoleProtected(<Subir />, () => userRole !== "jefe_departamental")} />
                   <Route path="/hoja" element={renderRoleProtected(<DatosEstudiante />, () => userRole !== "jefe_departamental")} />
-                  <Route path="/pensul" element={renderRoleProtected(<PensumVisual />, () => userRole !== "jefe_departamental")} />
+                  <Route path="/pensum" element={renderRoleProtected(<PensumVisual />, () => userRole !== "jefe_departamental")} />
                   <Route path="/inscribir" element={renderRoleProtected(<InscribirAsignaturas />, () => userRole !== "jefe_departamental")} />
                   <Route path="/prueba" element={renderRoleProtected(<ConsultarMatricula />, () => userRole !== "jefe_departamental")} />
                   <Route path="/plazos" element={renderRoleProtected(<Plazos />, () => userRole === "jefe_departamental")} />
                   <Route path="/verificar-documentos" element={renderRoleProtected(<VerificarDocumentos />, () => userRole === "jefe_departamental")} />
                   <Route
                     path="/modificaciones"
-                    element={renderRoleProtected(<div>Modificaciones (En desarrollo)</div>, () => userRole === "jefe_departamental")}
+                    element={renderRoleProtected(<Modificaciones />, () => userRole === "jefe_departamental")}
                   />
                   <Route
                     path="/plan-estudio"
