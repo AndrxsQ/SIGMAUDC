@@ -355,9 +355,9 @@ func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Reques
 	programaFolder := strings.ReplaceAll(strings.ToLower(programaNombre), " ", "_")
 	programaFolder = fmt.Sprintf("%d_%s", claims.ProgramaID, programaFolder)
 	estudianteFolder := fmt.Sprintf("%d_%s", estudianteID, estudianteCodigo)
-	
+
 	uploadPath := filepath.Join(h.uploadDirectory, periodoFolder, programaFolder, estudianteFolder)
-	
+
 	// Crear directorios si no existen
 	if err := os.MkdirAll(uploadPath, 0755); err != nil {
 		log.Printf("Error creating directories: %v", err)
@@ -669,7 +669,7 @@ func (h *DocumentosHandler) RevisarDocumento(w http.ResponseWriter, r *http.Requ
 	// Registrar auditoría: jefatura revisa documento
 	ip := utils.GetIPAddress(r)
 	userAgent := r.UserAgent()
-	
+
 	// Obtener información del documento y estudiante para la descripción
 	var estudianteCodigo, tipoDocumento string
 	var periodoYear, periodoSemestre int
@@ -687,7 +687,7 @@ func (h *DocumentosHandler) RevisarDocumento(w http.ResponseWriter, r *http.Requ
 		if req.Estado == "rechazado" {
 			accion = "revision_documento_rechazado"
 		}
-		descripcion := fmt.Sprintf("Documento %s: %s - Estudiante: %s, Periodo: %d-%d", 
+		descripcion := fmt.Sprintf("Documento %s: %s - Estudiante: %s, Periodo: %d-%d",
 			req.Estado, tipoDocumento, estudianteCodigo, periodoYear, periodoSemestre)
 		if req.Estado == "rechazado" && strings.TrimSpace(req.Observacion) != "" {
 			descripcion += fmt.Sprintf(", Observación: %s", req.Observacion)
@@ -696,11 +696,11 @@ func (h *DocumentosHandler) RevisarDocumento(w http.ResponseWriter, r *http.Requ
 	}
 
 	response := map[string]interface{}{
-		"id":              docID,
-		"estado":          req.Estado,
-		"observacion":     req.Observacion,
-		"fecha_revision":  fechaRevision,
-		"message":         "Documento revisado exitosamente",
+		"id":             docID,
+		"estado":         req.Estado,
+		"observacion":    req.Observacion,
+		"fecha_revision": fechaRevision,
+		"message":        "Documento revisado exitosamente",
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
@@ -721,4 +721,3 @@ func (h *DocumentosHandler) registrarAuditoria(usuarioID int, accion, descripcio
 		log.Printf("Error registering audit: %v", err)
 	}
 }
-
