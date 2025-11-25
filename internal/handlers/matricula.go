@@ -2638,7 +2638,7 @@ func (h *MatriculaHandler) AgregarMateriaModificaciones(w http.ResponseWriter, r
 		queryMat := `SELECT COUNT(*) FROM historial_academico WHERE id_estudiante = $1 AND id_asignatura = $2 AND id_periodo = $3 AND estado = 'matriculada'`
 		err = h.db.QueryRow(queryMat, ctx.EstudianteID, reg.AsignaturaID, ctx.Periodo.ID).Scan(&yaMatriculado)
 		if err == nil && yaMatriculado > 0 {
-			http.Error(w, fmt.Sprintf("Ya estás matriculado en esta asignatura.", reg.Codigo), http.StatusConflict)
+			http.Error(w, fmt.Sprintf("Ya estás matriculado en la asignatura %s.", reg.Codigo), http.StatusConflict)
 			return
 		}
 
