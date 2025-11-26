@@ -89,7 +89,7 @@ func main() {
 	protected.HandleFunc("/estudiante/datos", estudianteHandler.GetDatosEstudiante).Methods("GET")
 	protected.HandleFunc("/estudiante/datos", estudianteHandler.UpdateDatosEstudiante).Methods("PUT")
 	protected.HandleFunc("/estudiante/foto", estudianteHandler.SubirFotoEstudiante).Methods("POST")
-	
+
 	// Rutas de jefe departamental (protegidas)
 	protected.HandleFunc("/jefe/datos", jefeHandler.GetDatosJefe).Methods("GET")
 	protected.HandleFunc("/jefe/datos", jefeHandler.UpdateDatosJefe).Methods("PUT")
@@ -103,6 +103,10 @@ func main() {
 	protected.HandleFunc("/matricula/asignaturas/{id}/grupos", matriculaHandler.GetGruposAsignatura).Methods("GET")
 	protected.HandleFunc("/matricula/inscribir", matriculaHandler.InscribirAsignaturas).Methods("POST")
 
+	// Rutas de modificaciones (para jefatura)
+	protected.HandleFunc("/modificaciones/estudiante", matriculaHandler.GetStudentMatricula).Methods("GET")
+	protected.HandleFunc("/modificaciones/estudiante/{id}/inscribir", matriculaHandler.JefeInscribirAsignaturas).Methods("POST")
+	protected.HandleFunc("/modificaciones/estudiante/{id}/desmatricular", matriculaHandler.JefeDesmatricularGrupo).Methods("POST")
 	// Rutas de modificaciones estudiantiles (protegidas)
 	protected.HandleFunc("/matricula/validar-modificaciones", matriculaHandler.ValidarModificaciones).Methods("GET")
 	protected.HandleFunc("/matricula/modificaciones", matriculaHandler.GetModificacionesData).Methods("GET")

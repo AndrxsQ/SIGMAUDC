@@ -170,7 +170,7 @@
 
 /* Columna de Horario */
 .horario-column {
-  order: 2;
+  order: 1;
 }
 
 .horario-card {
@@ -192,9 +192,114 @@
   overflow-x: auto;
 }
 
+.horario-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 12px 0;
+}
+
+/* Encabezado del card del horario: título a la izquierda, controles a la derecha */
+.horario-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.horario-card-header h2 {
+  margin: 0;
+}
+
+/* Flecha de desplegar/ocultar horario (botón pequeño al final) */
+.horario-toggle-arrow {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: transparent;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  transition: transform 0.18s ease, background 0.12s ease;
+}
+
+.horario-toggle-arrow::after {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--inscribir-text-primary);
+  border-bottom: 2px solid var(--inscribir-text-primary);
+  transform: rotate(45deg);
+  transition: transform 0.18s ease;
+}
+
+/* Cuando está abierto, girar la flecha hacia arriba */
+.horario-toggle-arrow.open::after {
+  transform: rotate(-135deg);
+}
+
+.horario-toggle-arrow:hover {
+  background: rgba(0,0,0,0.03);
+}
+
+/* Estilo para la opción de ocultar horas vacías: aspecto de 'pill' acorde con los controles */
+.horario-hide-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.7);
+  font-size: 13px;
+  color: var(--inscribir-text-secondary);
+}
+
+.horario-hide-empty input {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.horario-toggle {
+  background: transparent;
+  border: 1px solid rgba(0,0,0,0.06);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.horario-hide-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--inscribir-text-secondary);
+  font-size: 13px;
+}
+
+.horario-collapsed {
+  padding: 12px;
+  color: var(--inscribir-text-secondary);
+  font-size: 14px;
+}
+
+.horario-empty-message {
+  padding: 16px;
+  text-align: center;
+  color: var(--inscribir-text-secondary);
+  font-size: 14px;
+}
+
 .horario-header {
   display: grid;
-  grid-template-columns: 80px repeat(6, 1fr);
+  grid-template-columns: 80px repeat(7, 1fr);
   gap: 8px;
   margin-bottom: 8px;
   font-weight: 600;
@@ -222,7 +327,7 @@
 
 .horario-row {
   display: grid;
-  grid-template-columns: 80px repeat(6, 1fr);
+  grid-template-columns: 80px repeat(7, 1fr);
   gap: 8px;
   min-height: 60px;
 }
@@ -290,7 +395,7 @@
 
 /* Columna de Asignaturas */
 .asignaturas-column {
-  order: 1;
+  order: 2;
 }
 
 .asignaturas-card {
@@ -390,6 +495,176 @@
 
 .inscribir-resumen {
   margin-bottom: 16px;
+}
+
+/* Buscador y filtros de asignaturas */
+.asignaturas-search {
+  margin: 14px 0 18px 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid var(--inscribir-border);
+}
+
+.asignaturas-search .search-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+  align-items: end;
+}
+
+.asignaturas-search .filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 0;
+}
+
+.asignaturas-search input[type="text"],
+.asignaturas-search select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: #fff;
+  font-size: 13px;
+}
+
+.asignaturas-search .filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-clear {
+  background: transparent;
+  border: 1px solid rgba(0,0,0,0.06);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  .asignaturas-search .search-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Carrito - estilos tipo tienda para las asignaturas seleccionadas */
+.carrito-card {
+  border: 1px solid var(--inscribir-border);
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff9f3;
+  margin-bottom: 16px;
+}
+
+.carrito-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+  color: var(--inscribir-text-primary);
+}
+
+.carrito-sub {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: var(--inscribir-text-secondary);
+}
+
+.carrito-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.carrito-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--inscribir-text-secondary);
+  font-size: 14px;
+}
+
+.carrito-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(245,245,247,0.9), rgba(255,255,255,0.95));
+  border: 1px solid rgba(0,0,0,0.04);
+}
+
+.carrito-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.carrito-item-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--inscribir-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.carrito-item-meta {
+  font-size: 12px;
+  color: var(--inscribir-text-secondary);
+}
+
+.carrito-item-actions {
+  margin-left: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.carrito-remove {
+  background: transparent;
+  border: 1px solid rgba(0,0,0,0.06);
+  color: var(--inscribir-error);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.carrito-remove:hover {
+  background: rgba(255, 107, 107, 0.06);
+}
+
+/* Botón de inscribir dentro del carrito */
+.carrito-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.carrito-inscribir {
+  background: linear-gradient(135deg, var(--inscribir-primary-gold) 0%, var(--inscribir-secondary-gold) 100%);
+  color: #000;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 24px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(201, 162, 63, 0.18);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.carrito-inscribir:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(201, 162, 63, 0.28);
+}
+
+.carrito-inscribir:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .resumen-card {
@@ -520,6 +795,14 @@
 .asignatura-meta {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Horarios compactos mostrados bajo la descripción de la asignatura */
+.asignatura-horarios {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -741,7 +1024,8 @@
   }
 
   .inscribir-content {
-    grid-template-columns: 1fr 1fr;
+    /* Mantener una sola columna: horario arriba, asignaturas abajo */
+    grid-template-columns: 1fr;
     gap: 32px;
   }
 

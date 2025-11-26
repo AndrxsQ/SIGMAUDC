@@ -188,14 +188,14 @@ const Sidebar = forwardRef(({ activePage, setActivePage, onLogout }, ref) => {
         {/* Sección de opciones básicas */}
         <p className="menu-title">Básicas</p>
 
-        {/* Opción: Pensul académico */}
+        {/* Opción: Pensum académico */}
         <div className="icon-content">
-          <button className={activePage === "pensul" ? "active" : ""} onClick={() => setActivePage("pensul")}>
-            <FaGraduationCap size={23} />
-            <span>Pensum Académico</span>
+          <button className={activePage === "pensum" ? "active" : ""} onClick={() => setActivePage("pensum")}>
+            <FaCalendarAlt size={23} />
+            <span>Pensum</span>
           </button>
 
-          {!isOpen && <span className="tooltip">Pensum Académico</span>}
+          {!isOpen && <span className="tooltip">Pensum</span>}
         </div>
         
         {/* Opción: Guía de matrícula */}
