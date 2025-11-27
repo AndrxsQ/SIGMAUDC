@@ -26,7 +26,9 @@ import Plazos from "./pages/jefe/Plazos";
 import VerificarDocumentos from "./pages/jefe/VerificarDocumentos";
 import Modificaciones from "./pages/jefe/Modificaciones";
 import DatosJefe from "./pages/jefe/DatosJefe";
+import PlanDeEstudio from "./pages/jefe/PlanDeEstudio";
 import { authService } from "./services/auth";
+import ValidarSolicitudes from "./pages/jefe/ValidarSolicitudes";
 
 // Botón hamburguesa para móviles
 const MobileMenuButton = ({ userRole, onToggle }) => {
@@ -98,7 +100,7 @@ function AppContent() {
     loadUserRole();
   }, [location.pathname]);
 
-  // Sincronizar activePage con la ruta actual
+  // Sincronizar activePage con la ruta actual (agregar la nueva ruta)
   React.useEffect(() => {
     const path = location.pathname;
     if (path === "/" || path === "/home") {
@@ -119,10 +121,14 @@ function AppContent() {
       setActivePage("verificar-documentos");
     } else if (path === "/modificaciones") {
       setActivePage("modificar");
+    } else if (path === "/modificar-matricula") {  // Nueva ruta
+      setActivePage("modificar");
     } else if (path === "/plan-estudio") {
       setActivePage("plan-estudio");
     } else if (path === "/perfil") {
       setActivePage("perfil");
+    } else if (path === "/validar-solicitudes") {
+      setActivePage("validar-solicitudes");
     }
   }, [location]);
 
@@ -136,7 +142,12 @@ function AppContent() {
     if (page === "home") {
       navigate("/");
     } else if (page === "modificar") {
-      navigate("/modificaciones");
+      // Diferenciar entre estudiante y jefe
+      if (userRole === "jefe_departamental") {
+        navigate("/modificaciones");
+      } else {
+        navigate("/modificar-matricula");
+      }
     } else if (page === "prueba") {
       navigate("/prueba");
     } else if (page === "Consultar") {
@@ -248,6 +259,10 @@ function AppContent() {
                   <Route path="/pensum" element={renderRoleProtected(<PensumVisual />, () => userRole !== "jefe_departamental")} />
                   <Route path="/inscribir" element={renderRoleProtected(<InscribirAsignaturas />, () => userRole !== "jefe_departamental")} />
                   <Route path="/prueba" element={renderRoleProtected(<ConsultarMatricula />, () => userRole !== "jefe_departamental")} />
+                  
+                  {/* Nueva ruta para modificar matrícula del estudiante */}
+                  <Route path="/modificar-matricula" element={renderRoleProtected(<ModificarMatricula />, () => userRole !== "jefe_departamental")} />
+                  
                   <Route path="/plazos" element={renderRoleProtected(<Plazos />, () => userRole === "jefe_departamental")} />
                   <Route path="/verificar-documentos" element={renderRoleProtected(<VerificarDocumentos />, () => userRole === "jefe_departamental")} />
                   <Route
@@ -256,12 +271,13 @@ function AppContent() {
                   />
                   <Route
                     path="/plan-estudio"
-                    element={renderRoleProtected(<div>Modificar Plan de Estudio (En desarrollo)</div>, () => userRole === "jefe_departamental")}
+                    element={renderRoleProtected(<PlanDeEstudio />, () => userRole === "jefe_departamental")}
                   />
                   <Route
                     path="/perfil"
                     element={renderRoleProtected(<DatosJefe />, () => userRole === "jefe_departamental")}
                   />
+                  <Route path="/validar-solicitudes" element={renderRoleProtected(<ValidarSolicitudes />, () => userRole === "jefe_departamental")} />
                   
                   <Route path="*" element={roleLoading ? renderRouteLoading() : <Navigate to="/" replace />} />
                 </Routes>

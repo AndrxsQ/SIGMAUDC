@@ -54,6 +54,14 @@ export const matriculaService = {
     return response.data;
   },
 
+  // Jefatura: inscribir usando códigos de grupo en lugar de IDs
+  async jefeInscribirByCodigo(estudianteId, gruposCodigos) {
+    const response = await api.post(`/api/modificaciones/estudiante/${estudianteId}/inscribir`, {
+      grupos_codigos: gruposCodigos,
+    });
+    return response.data;
+  },
+
   // Validar si el estudiante puede realizar modificaciones
   async validarModificaciones() {
     const response = await api.get('/api/matricula/validar-modificaciones');
@@ -63,6 +71,12 @@ export const matriculaService = {
   // Obtener datos de modificaciones (materias matriculadas y disponibles)
   async getModificacionesData() {
     const response = await api.get('/api/matricula/modificaciones');
+    return response.data;
+  },
+
+  // Jefatura: obtener asignaturas disponibles para modificaciones para un estudiante específico
+  async getAsignaturasDisponiblesForEstudiante(estudianteId) {
+    const response = await api.get(`/api/modificaciones/estudiante/${estudianteId}/disponibles`);
     return response.data;
   },
 
@@ -86,6 +100,43 @@ export const matriculaService = {
   async jefeDesmatricular(estudianteId, grupoId) {
     const response = await api.post(`/api/modificaciones/estudiante/${estudianteId}/desmatricular`, {
       grupo_id: grupoId,
+    });
+    return response.data;
+  },
+
+  // Actualizar horarios de un grupo (jefatura)
+  async updateGrupoHorario(grupoId, horarios, docente = null) {
+    const payload = { horarios };
+    if (docente !== null) {
+      payload.docente = docente;
+    }
+    const response = await api.put(`/api/grupo/${grupoId}/horario`, payload);
+    return response.data;
+  },
+
+  // Obtener solicitudes de modificación del estudiante
+  async getSolicitudesModificacion() {
+    const response = await api.get('/api/matricula/solicitudes-modificacion');
+    return response.data;
+  },
+
+  // Crear solicitud de modificación
+  async crearSolicitudModificacion(payload) {
+    const response = await api.post('/api/matricula/solicitudes-modificacion', payload);
+    return response.data;
+  },
+
+  // Jefe: obtener todas las solicitudes de modificación por programa
+  async getSolicitudesPorPrograma() {
+    const response = await api.get('/api/jefe/solicitudes-modificacion');
+    return response.data;
+  },
+
+  // Jefe: validar (aprobar/rechazar) una solicitud de modificación
+  async validarSolicitud(solicitudId, estado, observacion) {
+    const response = await api.put(`/api/jefe/solicitudes-modificacion/${solicitudId}`, {
+      estado,
+      observacion,
     });
     return response.data;
   },

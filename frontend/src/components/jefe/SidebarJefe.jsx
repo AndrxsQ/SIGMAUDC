@@ -4,7 +4,7 @@ import {
   FaSignOutAlt,
   FaCalendarAlt,
   FaClipboardCheck,
-  FaEdit,
+  FaSearch,
   FaBook,
   FaUser
 } from "react-icons/fa";
@@ -187,28 +187,40 @@ const SidebarJefe = forwardRef(({ activePage, setActivePage, onLogout }, ref) =>
           {!isOpen && <span className="tooltip">Administración de Plazos</span>}
         </div>
 
-        {/* Opción: Verificar Documentos */}
+        {/* Opción: Validar Documentos */}
         <div className="icon-content">
           <button 
             className={activePage === "verificar-documentos" ? "active" : ""} 
             onClick={() => setActivePage("verificar-documentos")}
           >
             <FaClipboardCheck size={23} />
-            <span>Verificar Documentos</span>
+            <span>Validar Documentos</span>
           </button>
-          {!isOpen && <span className="tooltip">Verificar Documentos</span>}
+          {!isOpen && <span className="tooltip">Validar Documentos</span>}
         </div>
 
-        {/* Opción: Modificaciones */}
+        {/* Opción: Validar Solicitudes */}
+        <div className="icon-content">
+          <button 
+            className={activePage === "validar-solicitudes" ? "active" : ""} 
+            onClick={() => setActivePage("validar-solicitudes")}
+          >
+            <FaClipboardCheck size={23} />
+            <span>Validar Solicitudes</span>
+          </button>
+          {!isOpen && <span className="tooltip">Validar Solicitudes</span>}
+        </div>
+
+        {/* Opción: Consultar Estudiante */}
         <div className="icon-content">
           <button 
             className={activePage === "modificaciones" ? "active" : ""} 
             onClick={() => setActivePage("modificaciones")}
           >
-            <FaEdit size={23} />
-            <span>Modificaciones</span>
+            <FaSearch size={23} />
+            <span>Consultar Matrícula</span>
           </button>
-          {!isOpen && <span className="tooltip">Modificaciones</span>}
+          {!isOpen && <span className="tooltip">Consultar Matrícula</span>}
         </div>
 
         {/* Opción: Modificar Plan de Estudio */}

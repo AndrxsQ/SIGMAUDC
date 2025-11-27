@@ -231,55 +231,6 @@ func (h *MatriculaHandler) prepareInscripcionContext(claims *models.JWTClaims) (
 		return nil, "El plazo de inscripción no está activo para tu programa en este periodo.", nil
 	}
 
-	queryDocumentos := `SELECT tipo_documento, estado FROM documentos_estudiante WHERE estudiante_id = $1 AND periodo_id = $2`
-	rows, err := h.db.Query(queryDocumentos, estudianteID, periodo.ID)
-	if err != nil {
-		return nil, "", err
-	}
-	defer rows.Close()
-
-	documentosPendientes := []string{}
-	documentosRechazados := []string{}
-	count := 0
-	for rows.Next() {
-		var tipo, estadoDoc string
-		if err := rows.Scan(&tipo, &estadoDoc); err != nil {
-			log.Printf("Error scanning documento: %v", err)
-			continue
-		}
-		count++
-		switch estadoDoc {
-		case "pendiente":
-			documentosPendientes = append(documentosPendientes, tipo)
-		case "rechazado":
-			documentosRechazados = append(documentosRechazados, tipo)
-		}
-	}
-
-	if count == 0 {
-		return nil, "No has subido los documentos requeridos para este periodo. Debes tener todos los documentos aprobados para inscribir asignaturas.", nil
-	}
-
-	if len(documentosPendientes) > 0 || len(documentosRechazados) > 0 {
-		var razon string
-		if len(documentosPendientes) > 0 && len(documentosRechazados) > 0 {
-			razon = "Tienes documentos pendientes y rechazados. Debes tener todos los documentos aprobados para inscribir asignaturas."
-		} else if len(documentosPendientes) > 0 {
-			razon = "Tienes documentos pendientes de revisión. Debes tener todos los documentos aprobados para inscribir asignaturas."
-		} else {
-			razon = "Tienes documentos rechazados. Debes tener todos los documentos aprobados para inscribir asignaturas."
-		}
-
-		if len(documentosPendientes) > 0 {
-			razon += " Documentos pendientes: " + joinDocumentos(documentosPendientes)
-		}
-		if len(documentosRechazados) > 0 {
-			razon += " Documentos rechazados: " + joinDocumentos(documentosRechazados)
-		}
-
-		return nil, razon, nil
-	}
-
 	return &inscripcionContext{
 		EstudianteID:   estudianteID,
 		Semestre:       semestre,
@@ -590,6 +541,156 @@ func (h *MatriculaHandler) GetGruposAsignatura(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(response)
 }
 
+// UpdateGrupoHorario permite a la jefatura actualizar los horarios y docente de un grupo
+// Endpoint: PUT /api/grupo/{id}/horario
+func (h *MatriculaHandler) UpdateGrupoHorario(w http.ResponseWriter, r *http.Request) {
+	claims, err := h.getClaims(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if claims.Rol != "jefe_departamental" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	idStr := mux.Vars(r)["id"]
+	grupoID, err := strconv.Atoi(idStr)
+	if err != nil || grupoID <= 0 {
+		http.Error(w, "ID de grupo inválido", http.StatusBadRequest)
+		return
+	}
+
+	payload := struct {
+		Docente  *string `json:"docente"` // Nuevo campo opcional para docente
+		Horarios []struct {
+			Dia        string `json:"dia"`
+			HoraInicio string `json:"hora_inicio"`
+			HoraFin    string `json:"hora_fin"`
+			Salon      string `json:"salon"`
+		} `json:"horarios"`
+	}{}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "Payload inválido", http.StatusBadRequest)
+		return
+	}
+
+	tx, err := h.db.Begin()
+	if err != nil {
+		log.Printf("Error iniciando transacción para UpdateGrupoHorario: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Actualizar docente si se envió
+	if payload.Docente != nil {
+		if _, err = tx.Exec(`UPDATE grupo SET docente = $1 WHERE id = $2`, *payload.Docente, grupoID); err != nil {
+			log.Printf("Error actualizando docente para grupo %d: %v", grupoID, err)
+			tx.Rollback()
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Obtener los días que ya tienen horario para este grupo
+	existingDays := make(map[string]int) // dia -> id del registro
+	rows, err := tx.Query(`SELECT id, dia FROM horario_grupo WHERE grupo_id = $1`, grupoID)
+	if err != nil {
+		log.Printf("Error obteniendo horarios existentes para grupo %d: %v", grupoID, err)
+		tx.Rollback()
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	for rows.Next() {
+		var id int
+		var dia string
+		if err := rows.Scan(&id, &dia); err != nil {
+			rows.Close()
+			tx.Rollback()
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		existingDays[dia] = id
+	}
+	rows.Close()
+
+	// Consolidar horarios por día (un solo horario por día)
+	horariosPorDia := make(map[string]struct {
+		HoraInicio string
+		HoraFin    string
+		Salon      string
+	})
+	for _, hItem := range payload.Horarios {
+		horariosPorDia[hItem.Dia] = struct {
+			HoraInicio string
+			HoraFin    string
+			Salon      string
+		}{
+			HoraInicio: hItem.HoraInicio,
+			HoraFin:    hItem.HoraFin,
+			Salon:      hItem.Salon,
+		}
+	}
+
+	// Procesar cada horario del payload
+	for dia, hItem := range horariosPorDia {
+		if existingID, exists := existingDays[dia]; exists {
+			// UPDATE: el día ya existe, actualizar horas y salón
+			_, err := tx.Exec(`UPDATE horario_grupo SET hora_inicio = $1, hora_fin = $2, salon = $3 WHERE id = $4`,
+				hItem.HoraInicio, hItem.HoraFin, hItem.Salon, existingID)
+			if err != nil {
+				log.Printf("Error actualizando horario para grupo %d, día %s: %v", grupoID, dia, err)
+				tx.Rollback()
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			delete(existingDays, dia) // Marcar como procesado
+		} else {
+			// INSERT: el día no existe, insertar nuevo horario
+			_, err := tx.Exec(`INSERT INTO horario_grupo (grupo_id, dia, hora_inicio, hora_fin, salon) VALUES ($1, $2, $3, $4, $5)`,
+				grupoID, dia, hItem.HoraInicio, hItem.HoraFin, hItem.Salon)
+			if err != nil {
+				log.Printf("Error insertando horario para grupo %d, día %s: %v", grupoID, dia, err)
+				tx.Rollback()
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	// DELETE: eliminar los días que ya no están en el payload
+	for dia, existingID := range existingDays {
+		_, err := tx.Exec(`DELETE FROM horario_grupo WHERE id = $1`, existingID)
+		if err != nil {
+			log.Printf("Error eliminando horario para grupo %d, día %s: %v", grupoID, dia, err)
+			tx.Rollback()
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		log.Printf("Error haciendo commit en UpdateGrupoHorario para grupo %d: %v", grupoID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Responder con los datos aplicados
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"grupo_id": grupoID,
+		"docente":  payload.Docente,
+		"horarios": payload.Horarios,
+	})
+}
+
 // InscribirAsignaturas procesa la matrícula provisional de un estudiante
 func (h *MatriculaHandler) InscribirAsignaturas(w http.ResponseWriter, r *http.Request) {
 	claims, err := h.getClaims(r)
@@ -603,13 +704,18 @@ func (h *MatriculaHandler) InscribirAsignaturas(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var req InscribirRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// Accept payloads with either numeric IDs (`grupos_ids`) or group codes (`grupos_codigos`)
+	payload := struct {
+		GrupoIDs     []int    `json:"grupos_ids"`
+		GrupoCodigos []string `json:"grupos_codigos"`
+	}{}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "Payload inválido", http.StatusBadRequest)
 		return
 	}
 
-	if len(req.GrupoIDs) == 0 {
+	if len(payload.GrupoIDs) == 0 && len(payload.GrupoCodigos) == 0 {
 		http.Error(w, "Debes seleccionar al menos un grupo para inscribir", http.StatusBadRequest)
 		return
 	}
@@ -629,19 +735,77 @@ func (h *MatriculaHandler) InscribirAsignaturas(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	uniqueGrupoIDs := make([]int, 0, len(req.GrupoIDs))
-	seenGrupos := make(map[int]struct{})
-	for _, id := range req.GrupoIDs {
-		if id <= 0 {
-			http.Error(w, "ID de grupo inválido", http.StatusBadRequest)
+	uniqueGrupoIDs := make([]int, 0)
+	// If caller provided group codes, resolve them to IDs
+	if len(payload.GrupoCodigos) > 0 {
+		// Normalize and dedupe codes
+		codes := make([]string, 0, len(payload.GrupoCodigos))
+		seenCodes := make(map[string]struct{})
+		for _, c := range payload.GrupoCodigos {
+			if c == "" {
+				continue
+			}
+			if _, ok := seenCodes[c]; ok {
+				continue
+			}
+			seenCodes[c] = struct{}{}
+			codes = append(codes, c)
+		}
+		if len(codes) == 0 {
+			http.Error(w, "Lista de códigos de grupo vacía", http.StatusBadRequest)
 			return
 		}
-		if _, ok := seenGrupos[id]; ok {
-			http.Error(w, "No puedes inscribir el mismo grupo dos veces", http.StatusBadRequest)
+
+		// Only allow a single group code per request when using codes
+		if len(codes) > 1 {
+			http.Error(w, "Solo se permite inscribir un grupo por solicitud cuando se usan códigos", http.StatusBadRequest)
 			return
 		}
-		seenGrupos[id] = struct{}{}
-		uniqueGrupoIDs = append(uniqueGrupoIDs, id)
+
+		// Query DB to get IDs for these codes within the active periodo
+		rowsCodes, err := h.db.Query(`SELECT id, codigo FROM grupo WHERE periodo_id = $1 AND codigo = ANY($2)`, ctx.Periodo.ID, pq.Array(codes))
+		if err != nil {
+			log.Printf("Error buscando grupos por código: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		defer rowsCodes.Close()
+
+		codeToID := make(map[string]int)
+		for rowsCodes.Next() {
+			var id int
+			var code string
+			if err := rowsCodes.Scan(&id, &code); err != nil {
+				log.Printf("Error escaneando grupo por código: %v", err)
+				continue
+			}
+			codeToID[code] = id
+		}
+
+		// Ensure all requested codes were found
+		for _, c := range codes {
+			id, ok := codeToID[c]
+			if !ok {
+				http.Error(w, fmt.Sprintf("El código de grupo %s no existe en el periodo activo", c), http.StatusBadRequest)
+				return
+			}
+			uniqueGrupoIDs = append(uniqueGrupoIDs, id)
+		}
+	} else {
+		// Use numeric IDs provided directly
+		seenGrupos := make(map[int]struct{})
+		for _, id := range payload.GrupoIDs {
+			if id <= 0 {
+				http.Error(w, "ID de grupo inválido", http.StatusBadRequest)
+				return
+			}
+			if _, ok := seenGrupos[id]; ok {
+				http.Error(w, "No puedes inscribir el mismo grupo dos veces", http.StatusBadRequest)
+				return
+			}
+			seenGrupos[id] = struct{}{}
+			uniqueGrupoIDs = append(uniqueGrupoIDs, id)
+		}
 	}
 
 	pensumHandler := &PensumHandler{db: h.db}
@@ -1258,13 +1422,18 @@ func (h *MatriculaHandler) JefeInscribirAsignaturas(w http.ResponseWriter, r *ht
 		return
 	}
 
-	var req InscribirRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// Accept payloads with either numeric IDs (`grupos_ids`) or group codes (`grupos_codigos`)
+	payload := struct {
+		GrupoIDs     []int    `json:"grupos_ids"`
+		GrupoCodigos []string `json:"grupos_codigos"`
+	}{}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "Payload inválido", http.StatusBadRequest)
 		return
 	}
 
-	if len(req.GrupoIDs) == 0 {
+	if len(payload.GrupoIDs) == 0 && len(payload.GrupoCodigos) == 0 {
 		http.Error(w, "Debes seleccionar al menos un grupo para inscribir", http.StatusBadRequest)
 		return
 	}
@@ -1300,20 +1469,75 @@ func (h *MatriculaHandler) JefeInscribirAsignaturas(w http.ResponseWriter, r *ht
 	// For simplicity reuse portions from InscribirAsignaturas: check cupos, prerrequisitos, conflictos, creditos
 	// This implementation is simplified: it will attempt to insert as in InscribirAsignaturas but acting on estudianteID
 
-	// Validate requested groups exist and have cupo
-	uniqueGrupoIDs := make([]int, 0, len(req.GrupoIDs))
-	seenGrupos := make(map[int]struct{})
-	for _, id := range req.GrupoIDs {
-		if id <= 0 {
-			http.Error(w, "ID de grupo inválido", http.StatusBadRequest)
+	// We'll resolve payload (IDs or códigos) to numeric IDs after we determine the active periodo
+
+	uniqueGrupoIDs := make([]int, 0)
+	// If caller provided group codes, resolve them to IDs (scoped to the active periodo)
+	if len(payload.GrupoCodigos) > 0 {
+		codes := make([]string, 0, len(payload.GrupoCodigos))
+		seenCodes := make(map[string]struct{})
+		for _, c := range payload.GrupoCodigos {
+			if c == "" {
+				continue
+			}
+			if _, ok := seenCodes[c]; ok {
+				continue
+			}
+			seenCodes[c] = struct{}{}
+			codes = append(codes, c)
+		}
+		if len(codes) == 0 {
+			http.Error(w, "Lista de códigos de grupo vacía", http.StatusBadRequest)
 			return
 		}
-		if _, ok := seenGrupos[id]; ok {
-			http.Error(w, "No puedes inscribir el mismo grupo dos veces", http.StatusBadRequest)
+
+		rowsCodes, err := h.db.Query(`SELECT id, codigo FROM grupo WHERE periodo_id = $1 AND codigo = ANY($2)`, periodo.ID, pq.Array(codes))
+		if err != nil {
+			log.Printf("Error buscando grupos por código (jefe): %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		seenGrupos[id] = struct{}{}
-		uniqueGrupoIDs = append(uniqueGrupoIDs, id)
+		defer rowsCodes.Close()
+
+		codeToID := make(map[string]int)
+		for rowsCodes.Next() {
+			var id int
+			var code string
+			if err := rowsCodes.Scan(&id, &code); err != nil {
+				log.Printf("Error escaneando grupo por código (jefe): %v", err)
+				continue
+			}
+			codeToID[code] = id
+		}
+
+		for _, c := range codes {
+			id, ok := codeToID[c]
+			if !ok {
+				http.Error(w, fmt.Sprintf("El código de grupo %s no existe en el periodo activo", c), http.StatusBadRequest)
+				return
+			}
+			uniqueGrupoIDs = append(uniqueGrupoIDs, id)
+		}
+
+		// Only allow a single group code per jefe request when using codes
+		if len(codes) > 1 {
+			http.Error(w, "Solo se permite inscribir un grupo por solicitud cuando se usan códigos", http.StatusBadRequest)
+			return
+		}
+	} else {
+		seenGrupos := make(map[int]struct{})
+		for _, id := range payload.GrupoIDs {
+			if id <= 0 {
+				http.Error(w, "ID de grupo inválido", http.StatusBadRequest)
+				return
+			}
+			if _, ok := seenGrupos[id]; ok {
+				http.Error(w, "No puedes inscribir el mismo grupo dos veces", http.StatusBadRequest)
+				return
+			}
+			seenGrupos[id] = struct{}{}
+			uniqueGrupoIDs = append(uniqueGrupoIDs, id)
+		}
 	}
 
 	query := `
@@ -1507,6 +1731,9 @@ func (h *MatriculaHandler) JefeDesmatricularGrupo(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Debug log: who is calling and what they are trying to desmatricular
+	log.Printf("JefeDesmatricularGrupo called by user=%d role=%s estudianteID=%d grupoID=%d", claims.Sub, claims.Rol, estudianteID, payload.GrupoID)
+
 	// Find the historial record and delete it, increment cupo
 	tx, err := h.db.Begin()
 	if err != nil {
@@ -1524,6 +1751,7 @@ func (h *MatriculaHandler) JefeDesmatricularGrupo(w http.ResponseWriter, r *http
 		return
 	}
 	affected, _ := res.RowsAffected()
+	log.Printf("JefeDesmatricularGrupo: rows affected when deleting historial = %d", affected)
 	if affected == 0 {
 		http.Error(w, "No se encontró matrícula para el estudiante y grupo especificado.", http.StatusNotFound)
 		return
@@ -2265,8 +2493,9 @@ func (h *MatriculaHandler) getAsignaturasDisponiblesModificaciones(ctx *inscripc
 			continue
 		}
 
-		// Si está "en_espera" (prerrequisitos pendientes), solo mostrar si es núcleo común
-		if state == "en_espera" && asig.Categoria != "nucleo_comun" {
+		// NO mostrar materias "en_espera" (prerrequisitos pendientes) para estudiantes
+		// Estas materias no deben aparecer hasta que se cumplan los prerrequisitos
+		if state == "en_espera" {
 			continue
 		}
 
@@ -2325,6 +2554,185 @@ func (h *MatriculaHandler) getAsignaturasDisponiblesModificaciones(ctx *inscripc
 	}
 
 	return result, nil
+}
+
+// prepareModificacionesContextForEstudiante prepara el contexto de modificaciones para un estudiante dado (usado por jefatura)
+func (h *MatriculaHandler) prepareModificacionesContextForEstudiante(estudianteID int) (*inscripcionContext, string, error) {
+	var semestre int
+	var estado string
+	queryEst := `SELECT semestre, estado FROM estudiante WHERE id = $1`
+	err := h.db.QueryRow(queryEst, estudianteID).Scan(&semestre, &estado)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, "Estudiante no encontrado", nil
+		}
+		return nil, "", err
+	}
+
+	// Obtener pensum y programa (necesitamos el programa_id para consultar plazos)
+	var pensumID int
+	var pensumNombre string
+	var programaID int
+	var programaNombre string
+	queryPensum := `
+		SELECT p.id, p.nombre, pr.id, pr.nombre
+		FROM estudiante_pensum ep
+		JOIN pensum p ON ep.pensum_id = p.id
+		JOIN programa pr ON p.programa_id = pr.id
+		WHERE ep.estudiante_id = $1
+	`
+	err = h.db.QueryRow(queryPensum, estudianteID).Scan(&pensumID, &pensumNombre, &programaID, &programaNombre)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, "No tienes un pensum asignado. Contacta a coordinación para asignarte uno.", nil
+		}
+		return nil, "", err
+	}
+
+	var periodo models.PeriodoAcademico
+	queryPeriodo := `SELECT id, year, semestre, activo, archivado FROM periodo_academico WHERE activo = true AND archivado = false ORDER BY year DESC, semestre DESC LIMIT 1`
+	err = h.db.QueryRow(queryPeriodo).Scan(&periodo.ID, &periodo.Year, &periodo.Semestre, &periodo.Activo, &periodo.Archivado)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, "No hay un periodo académico activo.", nil
+		}
+		return nil, "", err
+	}
+
+	var plazos models.Plazos
+	queryPlazos := `SELECT id, periodo_id, programa_id, documentos, inscripcion, modificaciones FROM plazos WHERE periodo_id = $1 AND programa_id = $2`
+	err = h.db.QueryRow(queryPlazos, periodo.ID, programaID).Scan(
+		&plazos.ID,
+		&plazos.PeriodoID,
+		&plazos.ProgramaID,
+		&plazos.Documentos,
+		&plazos.Inscripcion,
+		&plazos.Modificaciones,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, "No hay plazos configurados para el programa del estudiante en el periodo activo.", nil
+		}
+		return nil, "", err
+	}
+
+	if !plazos.Modificaciones {
+		return nil, "El plazo de modificaciones no está activo para el programa de este estudiante en este periodo.", nil
+	}
+
+	return &inscripcionContext{
+		EstudianteID:   estudianteID,
+		Semestre:       semestre,
+		Estado:         estado,
+		PensumID:       pensumID,
+		PensumNombre:   pensumNombre,
+		ProgramaID:     programaID,
+		ProgramaNombre: programaNombre,
+		Periodo:        &periodo,
+		Plazos:         plazos,
+	}, "", nil
+}
+
+// JefeGetModificacionesData devuelve las materias matriculadas y disponibles para modificaciones para un estudiante (ruta para jefatura)
+func (h *MatriculaHandler) JefeGetModificacionesData(w http.ResponseWriter, r *http.Request) {
+	claims, err := h.getClaims(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if claims.Rol != "jefe_departamental" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	if idStr == "" {
+		http.Error(w, "Falta id de estudiante en la ruta", http.StatusBadRequest)
+		return
+	}
+	estudianteID, err := strconv.Atoi(idStr)
+	if err != nil || estudianteID <= 0 {
+		http.Error(w, "ID de estudiante inválido", http.StatusBadRequest)
+		return
+	}
+
+	ctx, razon, err := h.prepareModificacionesContextForEstudiante(estudianteID)
+	if err != nil {
+		log.Printf("Error preparando contexto de modificaciones (jefe): %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if razon != "" {
+		http.Error(w, razon, http.StatusForbidden)
+		return
+	}
+
+	if ctx.Periodo == nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": "No hay un periodo académico activo. No puedes realizar modificaciones en este momento.",
+		})
+		return
+	}
+
+	materiasMatriculadas, err := h.fetchMateriasMatriculadas(ctx.EstudianteID, ctx.Periodo.ID)
+	if err != nil {
+		log.Printf("Error obteniendo materias matriculadas (jefe): %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if len(materiasMatriculadas) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": "El estudiante no tiene materias matriculadas en el periodo activo. Debe realizar la inscripción inicial primero.",
+		})
+		return
+	}
+
+	asignaturasDisponibles, err := h.getAsignaturasDisponiblesModificaciones(ctx)
+	if err != nil {
+		log.Printf("Error obteniendo asignaturas disponibles (jefe): %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	creditosInscritos, err := h.fetchInscritosCredits(ctx.EstudianteID, ctx.Periodo.ID)
+	if err != nil {
+		log.Printf("Error calculando créditos matriculados (jefe): %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	creditosMax, err := h.fetchCreditLimit(ctx.PensumID, ctx.Semestre)
+	if err != nil {
+		log.Printf("Error calculando límite de créditos (jefe): %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	creditosDisponibles := creditosMax - creditosInscritos
+	if creditosDisponibles < 0 {
+		creditosDisponibles = 0
+	}
+
+	response := ModificacionesResponse{
+		Periodo:                ctx.Periodo,
+		MateriasMatriculadas:   materiasMatriculadas,
+		AsignaturasDisponibles: asignaturasDisponibles,
+		Creditos: ResumenCreditos{
+			Maximo:      creditosMax,
+			Inscritos:   creditosInscritos,
+			Disponibles: creditosDisponibles,
+		},
+		EstadoEstudiante: ctx.Estado,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 // fetchNucleoComunOtrasCarreras obtiene asignaturas de núcleo común de otras carreras
@@ -2834,5 +3242,587 @@ func (h *MatriculaHandler) AgregarMateriaModificaciones(w http.ResponseWriter, r
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Materia agregada correctamente.",
+	})
+}
+
+// ==================== SOLICITUDES DE MODIFICACIÓN ====================
+
+// SolicitudModificacion representa una solicitud de modificación de matrícula
+// SolicitudModificacion representa una solicitud de modificación de matrícula
+type SolicitudModificacion struct {
+	ID                 int             `json:"id"`
+	EstudianteID       int             `json:"estudiante_id"`
+	EstudianteCodigo   string          `json:"estudiante_codigo,omitempty"`
+	EstudianteNombre   sql.NullString  `json:"estudiante_nombre,omitempty"`
+	EstudianteApellido sql.NullString  `json:"estudiante_apellido,omitempty"`
+	ProgramaID         int             `json:"programa_id"`
+	PeriodoID          int             `json:"periodo_id"`
+	GruposAgregar      json.RawMessage `json:"grupos_agregar"`
+	GruposRetirar      json.RawMessage `json:"grupos_retirar"`
+	Estado             string          `json:"estado"`
+	Observacion        sql.NullString  `json:"observacion"`
+	RevisadoPor        sql.NullInt64   `json:"revisado_por"`
+	FechaSolicitud     time.Time       `json:"fecha_solicitud"`
+	FechaRevision      sql.NullTime    `json:"fecha_revision"`
+}
+
+// GetSolicitudesEstudiante obtiene las solicitudes de modificación del estudiante logueado
+func (h *MatriculaHandler) GetSolicitudesEstudiante(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Usuario no autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	// Obtener estudiante_id
+	var estudianteID int
+	err := h.db.QueryRow(`SELECT id FROM estudiante WHERE usuario_id = $1`, claims.Sub).Scan(&estudianteID)
+	if err != nil {
+		http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
+		return
+	}
+
+	// Obtener periodo activo
+	var periodoID int
+	err = h.db.QueryRow(`SELECT id FROM periodo_academico WHERE activo = TRUE LIMIT 1`).Scan(&periodoID)
+	if err != nil {
+		http.Error(w, "No hay periodo activo", http.StatusBadRequest)
+		return
+	}
+
+	rows, err := h.db.Query(`
+        SELECT sm.id, sm.estudiante_id, u.codigo, e.nombre, e.apellido,
+               sm.programa_id, sm.periodo_id,
+               COALESCE(sm.grupos_agregar, '[]'::jsonb), 
+               COALESCE(sm.grupos_retirar, '[]'::jsonb),
+               sm.estado, sm.observacion, sm.revisado_por, sm.fecha_solicitud, sm.fecha_revision
+        FROM solicitud_modificacion sm
+        JOIN estudiante e ON e.id = sm.estudiante_id
+        JOIN usuario u ON u.id = e.usuario_id
+        WHERE sm.estudiante_id = $1 AND sm.periodo_id = $2
+        ORDER BY sm.fecha_solicitud DESC
+    `, estudianteID, periodoID)
+	if err != nil {
+		http.Error(w, "Error consultando solicitudes", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var solicitudes []SolicitudModificacion
+	for rows.Next() {
+		var s SolicitudModificacion
+		err := rows.Scan(
+			&s.ID, &s.EstudianteID,
+			&s.EstudianteCodigo, &s.EstudianteNombre, &s.EstudianteApellido,
+			&s.ProgramaID, &s.PeriodoID,
+			&s.GruposAgregar, &s.GruposRetirar, &s.Estado, &s.Observacion,
+			&s.RevisadoPor, &s.FechaSolicitud, &s.FechaRevision,
+		)
+		if err != nil {
+			log.Printf("Error scanning solicitud: %v", err)
+			continue
+		}
+		solicitudes = append(solicitudes, s)
+	}
+
+	if solicitudes == nil {
+		solicitudes = []SolicitudModificacion{}
+	}
+
+	// Convertir a formato de respuesta JSON
+	type SolicitudResponse struct {
+		ID                 int             `json:"id"`
+		EstudianteID       int             `json:"estudiante_id"`
+		EstudianteCodigo   string          `json:"estudiante_codigo,omitempty"`
+		EstudianteNombre   string          `json:"estudiante_nombre,omitempty"`
+		EstudianteApellido string          `json:"estudiante_apellido,omitempty"`
+		ProgramaID         int             `json:"programa_id"`
+		PeriodoID          int             `json:"periodo_id"`
+		GruposAgregar      json.RawMessage `json:"grupos_agregar"`
+		GruposRetirar      json.RawMessage `json:"grupos_retirar"`
+		Estado             string          `json:"estado"`
+		Observacion        string          `json:"observacion,omitempty"`
+		RevisadoPor        *int64          `json:"revisado_por,omitempty"`
+		FechaSolicitud     time.Time       `json:"fecha_solicitud"`
+		FechaRevision       *time.Time      `json:"fecha_revision,omitempty"`
+	}
+
+	var resp []SolicitudResponse
+	for _, s := range solicitudes {
+		sr := SolicitudResponse{
+			ID:               s.ID,
+			EstudianteID:     s.EstudianteID,
+			EstudianteCodigo: s.EstudianteCodigo,
+			ProgramaID:       s.ProgramaID,
+			PeriodoID:        s.PeriodoID,
+			GruposAgregar:     s.GruposAgregar,
+			GruposRetirar:     s.GruposRetirar,
+			Estado:            s.Estado,
+			FechaSolicitud:    s.FechaSolicitud,
+		}
+		if s.EstudianteNombre.Valid {
+			sr.EstudianteNombre = s.EstudianteNombre.String
+		}
+		if s.EstudianteApellido.Valid {
+			sr.EstudianteApellido = s.EstudianteApellido.String
+		}
+		if s.Observacion.Valid {
+			sr.Observacion = s.Observacion.String
+		}
+		if s.RevisadoPor.Valid {
+			sr.RevisadoPor = &s.RevisadoPor.Int64
+		}
+		if s.FechaRevision.Valid {
+			sr.FechaRevision = &s.FechaRevision.Time
+		}
+		resp = append(resp, sr)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// CrearSolicitudModificacion crea una nueva solicitud de modificación
+func (h *MatriculaHandler) CrearSolicitudModificacion(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Usuario no autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	// Obtener estudiante (el programa_id viene de usuario, no de estudiante)
+	var estudianteID int
+	err := h.db.QueryRow(`SELECT id FROM estudiante WHERE usuario_id = $1`, claims.Sub).Scan(&estudianteID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error obteniendo estudiante: %v", err)
+		http.Error(w, "Error obteniendo información del estudiante", http.StatusInternalServerError)
+		return
+	}
+
+	// El programa_id viene de los claims del JWT (ya está validado en el middleware)
+	programaID := claims.ProgramaID
+
+	// Obtener periodo activo
+	var periodoID int
+	err = h.db.QueryRow(`SELECT id FROM periodo_academico WHERE activo = TRUE LIMIT 1`).Scan(&periodoID)
+	if err != nil {
+		http.Error(w, "No hay periodo activo", http.StatusBadRequest)
+		return
+	}
+
+	// Verificar que no haya solicitud pendiente
+	var count int
+	err = h.db.QueryRow(`
+		SELECT COUNT(*) FROM solicitud_modificacion 
+		WHERE estudiante_id = $1 AND periodo_id = $2 AND estado = 'pendiente'
+	`, estudianteID, periodoID).Scan(&count)
+	if err == nil && count > 0 {
+		http.Error(w, "Ya tienes una solicitud pendiente", http.StatusBadRequest)
+		return
+	}
+
+	var payload struct {
+		GruposAgregar json.RawMessage `json:"grupos_agregar"`
+		GruposRetirar json.RawMessage `json:"grupos_retirar"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "Payload inválido", http.StatusBadRequest)
+		return
+	}
+
+	// Valores por defecto
+	if payload.GruposAgregar == nil {
+		payload.GruposAgregar = json.RawMessage("[]")
+	}
+	if payload.GruposRetirar == nil {
+		payload.GruposRetirar = json.RawMessage("[]")
+	}
+
+	// Validar que los arrays no estén vacíos si ambos están vacíos
+	var gruposAgregarArray []interface{}
+	var gruposRetirarArray []interface{}
+	json.Unmarshal(payload.GruposAgregar, &gruposAgregarArray)
+	json.Unmarshal(payload.GruposRetirar, &gruposRetirarArray)
+	
+	if len(gruposAgregarArray) == 0 && len(gruposRetirarArray) == 0 {
+		http.Error(w, "Debes seleccionar al menos un grupo para agregar o una materia para retirar", http.StatusBadRequest)
+		return
+	}
+
+	// Si los grupos_agregar vienen como array de IDs simples, convertirlos a objetos con información completa
+	if len(gruposAgregarArray) > 0 {
+		// Verificar si el primer elemento es un número (ID simple) o un objeto
+		primerElemento := gruposAgregarArray[0]
+		if _, ok := primerElemento.(float64); ok {
+			// Es un array de IDs simples, necesitamos obtener la información completa
+			var gruposCompletos []map[string]interface{}
+			for _, id := range gruposAgregarArray {
+				grupoID := int(id.(float64))
+				// Obtener información del grupo desde la BD
+				var grupoCodigo, asignaturaCodigo, asignaturaNombre string
+				var asignaturaID, creditos int
+				err := h.db.QueryRow(`
+					SELECT g.codigo, a.id, a.codigo, a.nombre, a.creditos
+					FROM grupo g
+					JOIN asignatura a ON a.id = g.asignatura_id
+					WHERE g.id = $1
+				`, grupoID).Scan(&grupoCodigo, &asignaturaID, &asignaturaCodigo, &asignaturaNombre, &creditos)
+				if err == nil {
+					gruposCompletos = append(gruposCompletos, map[string]interface{}{
+						"grupo_id":         grupoID,
+						"grupo_codigo":     grupoCodigo,
+						"asignatura_id":     asignaturaID,
+						"asignatura_codigo": asignaturaCodigo,
+						"asignatura_nombre": asignaturaNombre,
+						"creditos":          creditos,
+					})
+				}
+			}
+			if len(gruposCompletos) > 0 {
+				payload.GruposAgregar, _ = json.Marshal(gruposCompletos)
+			}
+		}
+	}
+
+	// Si los grupos_retirar vienen como array de historial_ids simples, convertirlos a objetos con información completa
+	if len(gruposRetirarArray) > 0 {
+		primerElemento := gruposRetirarArray[0]
+		if _, ok := primerElemento.(float64); ok {
+			// Es un array de historial_ids simples, necesitamos obtener la información completa
+			var gruposCompletos []map[string]interface{}
+			for _, id := range gruposRetirarArray {
+				historialID := int(id.(float64))
+				// Obtener información del historial desde la BD
+				var grupoID, asignaturaID, creditos int
+				var grupoCodigo, asignaturaCodigo, asignaturaNombre string
+				err := h.db.QueryRow(`
+					SELECT h.grupo_id, h.id_asignatura, g.codigo, a.codigo, a.nombre, a.creditos
+					FROM historial_academico h
+					JOIN grupo g ON g.id = h.grupo_id
+					JOIN asignatura a ON a.id = h.id_asignatura
+					WHERE h.id = $1 AND h.id_estudiante = $2
+				`, historialID, estudianteID).Scan(&grupoID, &asignaturaID, &grupoCodigo, &asignaturaCodigo, &asignaturaNombre, &creditos)
+				if err == nil {
+					gruposCompletos = append(gruposCompletos, map[string]interface{}{
+						"historial_id":      historialID,
+						"grupo_id":          grupoID,
+						"grupo_codigo":      grupoCodigo,
+						"asignatura_id":     asignaturaID,
+						"asignatura_codigo": asignaturaCodigo,
+						"asignatura_nombre": asignaturaNombre,
+						"creditos":          creditos,
+					})
+				}
+			}
+			if len(gruposCompletos) > 0 {
+				payload.GruposRetirar, _ = json.Marshal(gruposCompletos)
+			}
+		}
+	}
+
+	var solicitudID int
+	err = h.db.QueryRow(`
+		INSERT INTO solicitud_modificacion (estudiante_id, programa_id, periodo_id, grupos_agregar, grupos_retirar, estado)
+		VALUES ($1, $2, $3, $4, $5, 'pendiente')
+		RETURNING id
+	`, estudianteID, programaID, periodoID, payload.GruposAgregar, payload.GruposRetirar).Scan(&solicitudID)
+	if err != nil {
+		log.Printf("Error creando solicitud: %v", err)
+		http.Error(w, "Error creando solicitud", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"id":      solicitudID,
+		"mensaje": "Solicitud creada exitosamente",
+	})
+}
+
+// GetSolicitudesPorPrograma obtiene solicitudes de modificación para el jefe de departamento
+func (h *MatriculaHandler) GetSolicitudesPorPrograma(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Usuario no autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	// El programa_id viene de los claims del JWT (ya está validado en el middleware)
+	programaID := claims.ProgramaID
+	
+	// Verificar que el usuario sea jefe departamental (opcional, pero buena práctica)
+	var jefeID int
+	err := h.db.QueryRow(`SELECT id FROM jefe_departamental WHERE usuario_id = $1`, claims.Sub).Scan(&jefeID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Jefe departamental no encontrado", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error verificando jefe: %v", err)
+		http.Error(w, "Error verificando información del jefe", http.StatusInternalServerError)
+		return
+	}
+
+	rows, err := h.db.Query(`
+		SELECT sm.id, sm.estudiante_id, u.codigo, e.nombre, e.apellido,
+		       sm.programa_id, sm.periodo_id,
+		       COALESCE(sm.grupos_agregar, '[]'::jsonb), 
+		       COALESCE(sm.grupos_retirar, '[]'::jsonb),
+		       sm.estado, sm.observacion, sm.revisado_por, sm.fecha_solicitud, sm.fecha_revision
+		FROM solicitud_modificacion sm
+		JOIN estudiante e ON e.id = sm.estudiante_id
+		JOIN usuario u ON u.id = e.usuario_id
+		WHERE sm.programa_id = $1
+		ORDER BY sm.fecha_solicitud DESC
+	`, programaID)
+	if err != nil {
+		log.Printf("Error consultando solicitudes: %v", err)
+		http.Error(w, "Error consultando solicitudes", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var solicitudes []SolicitudModificacion
+	for rows.Next() {
+		var s SolicitudModificacion
+		err := rows.Scan(&s.ID, &s.EstudianteID, &s.EstudianteCodigo, &s.EstudianteNombre, &s.EstudianteApellido,
+			&s.ProgramaID, &s.PeriodoID, &s.GruposAgregar, &s.GruposRetirar, &s.Estado, &s.Observacion,
+			&s.RevisadoPor, &s.FechaSolicitud, &s.FechaRevision)
+		if err != nil {
+			log.Printf("Error scanning solicitud: %v", err)
+			continue
+		}
+		solicitudes = append(solicitudes, s)
+	}
+
+	if solicitudes == nil {
+		solicitudes = []SolicitudModificacion{}
+	}
+
+	// Convertir a formato de respuesta JSON
+	type SolicitudResponse struct {
+		ID                 int             `json:"id"`
+		EstudianteID       int             `json:"estudiante_id"`
+		EstudianteCodigo   string          `json:"estudiante_codigo,omitempty"`
+		EstudianteNombre   string          `json:"estudiante_nombre,omitempty"`
+		EstudianteApellido string          `json:"estudiante_apellido,omitempty"`
+		ProgramaID         int             `json:"programa_id"`
+		PeriodoID          int             `json:"periodo_id"`
+		GruposAgregar      json.RawMessage `json:"grupos_agregar"`
+		GruposRetirar      json.RawMessage `json:"grupos_retirar"`
+		Estado             string          `json:"estado"`
+		Observacion        string          `json:"observacion,omitempty"`
+		RevisadoPor        *int64          `json:"revisado_por,omitempty"`
+		FechaSolicitud     time.Time       `json:"fecha_solicitud"`
+		FechaRevision       *time.Time      `json:"fecha_revision,omitempty"`
+	}
+
+	var resp []SolicitudResponse
+	for _, s := range solicitudes {
+		sr := SolicitudResponse{
+			ID:               s.ID,
+			EstudianteID:     s.EstudianteID,
+			EstudianteCodigo: s.EstudianteCodigo,
+			ProgramaID:       s.ProgramaID,
+			PeriodoID:        s.PeriodoID,
+			GruposAgregar:     s.GruposAgregar,
+			GruposRetirar:     s.GruposRetirar,
+			Estado:            s.Estado,
+			FechaSolicitud:    s.FechaSolicitud,
+		}
+		if s.EstudianteNombre.Valid {
+			sr.EstudianteNombre = s.EstudianteNombre.String
+		}
+		if s.EstudianteApellido.Valid {
+			sr.EstudianteApellido = s.EstudianteApellido.String
+		}
+		if s.Observacion.Valid {
+			sr.Observacion = s.Observacion.String
+		}
+		if s.RevisadoPor.Valid {
+			sr.RevisadoPor = &s.RevisadoPor.Int64
+		}
+		if s.FechaRevision.Valid {
+			sr.FechaRevision = &s.FechaRevision.Time
+		}
+		resp = append(resp, sr)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// ValidarSolicitudModificacion aprueba o rechaza una solicitud
+func (h *MatriculaHandler) ValidarSolicitudModificacion(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Usuario no autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	vars := mux.Vars(r)
+	solicitudID := vars["id"]
+
+	var payload struct {
+		Estado      string `json:"estado"`
+		Observacion string `json:"observacion"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "Payload inválido", http.StatusBadRequest)
+		return
+	}
+
+	if payload.Estado != "aprobada" && payload.Estado != "rechazada" {
+		http.Error(w, "Estado inválido", http.StatusBadRequest)
+		return
+	}
+
+	// Obtener jefe_id (cambiar userID por claims.Sub)
+	var jefeID int
+	err := h.db.QueryRow(`SELECT id FROM jefe_departamental WHERE usuario_id = $1`, claims.Sub).Scan(&jefeID)
+	if err != nil {
+		http.Error(w, "Jefe departamental no encontrado", http.StatusNotFound)
+		return
+	}
+
+	// Si se aprueba, aplicar los cambios automáticamente
+	if payload.Estado == "aprobada" {
+		// Obtener la solicitud para aplicar cambios
+		var estudianteID, periodoID int
+		var gruposAgregar, gruposRetirar json.RawMessage
+		err := h.db.QueryRow(`
+			SELECT estudiante_id, periodo_id, grupos_agregar, grupos_retirar 
+			FROM solicitud_modificacion WHERE id = $1
+		`, solicitudID).Scan(&estudianteID, &periodoID, &gruposAgregar, &gruposRetirar)
+		if err != nil {
+			log.Printf("Error obteniendo solicitud: %v", err)
+			http.Error(w, "Error obteniendo información de la solicitud", http.StatusInternalServerError)
+			return
+		}
+
+		// Iniciar transacción para aplicar cambios
+		tx, err := h.db.Begin()
+		if err != nil {
+			log.Printf("Error iniciando transacción: %v", err)
+			http.Error(w, "Error procesando solicitud", http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback()
+
+		// Aplicar retiros
+		var retirar []struct {
+			HistorialID int `json:"historial_id"`
+			GrupoID     int `json:"grupo_id"`
+		}
+		if err := json.Unmarshal(gruposRetirar, &retirar); err == nil && len(retirar) > 0 {
+			for _, r := range retirar {
+				// Liberar cupo del grupo
+				_, err = tx.Exec(`
+					UPDATE grupo
+					SET cupo_disponible = cupo_disponible + 1
+					WHERE id = $1
+				`, r.GrupoID)
+				if err != nil {
+					log.Printf("Error liberando cupo grupo %d: %v", r.GrupoID, err)
+				}
+
+				// Eliminar del historial académico
+				_, err = tx.Exec(`
+					DELETE FROM historial_academico
+					WHERE id = $1 AND id_estudiante = $2 AND id_periodo = $3
+				`, r.HistorialID, estudianteID, periodoID)
+				if err != nil {
+					log.Printf("Error eliminando historial %d: %v", r.HistorialID, err)
+				}
+			}
+		}
+
+		// Aplicar adiciones
+		var agregar []struct {
+			GrupoID        int    `json:"grupo_id"`
+			AsignaturaID   int    `json:"asignatura_id"`
+			GrupoCodigo    string `json:"grupo_codigo"`
+			AsignaturaCodigo string `json:"asignatura_codigo"`
+			AsignaturaNombre string `json:"asignatura_nombre"`
+			Creditos       int    `json:"creditos"`
+		}
+		if err := json.Unmarshal(gruposAgregar, &agregar); err == nil && len(agregar) > 0 {
+			for _, a := range agregar {
+				// Verificar cupo disponible
+				var cupoDisponible int
+				err := tx.QueryRow(`SELECT cupo_disponible FROM grupo WHERE id = $1`, a.GrupoID).Scan(&cupoDisponible)
+				if err != nil {
+					log.Printf("Error verificando cupo grupo %d: %v", a.GrupoID, err)
+					continue
+				}
+
+				if cupoDisponible <= 0 {
+					log.Printf("Grupo %d sin cupo disponible", a.GrupoID)
+					continue
+				}
+
+				// Reducir cupo
+				_, err = tx.Exec(`
+					UPDATE grupo
+					SET cupo_disponible = cupo_disponible - 1
+					WHERE id = $1
+				`, a.GrupoID)
+				if err != nil {
+					log.Printf("Error reduciendo cupo grupo %d: %v", a.GrupoID, err)
+					continue
+				}
+
+				// Insertar en historial académico
+				_, err = tx.Exec(`
+					INSERT INTO historial_academico (id_estudiante, id_asignatura, id_periodo, grupo_id, estado)
+					VALUES ($1, $2, $3, $4, 'matriculada')
+					ON CONFLICT DO NOTHING
+				`, estudianteID, a.AsignaturaID, periodoID, a.GrupoID)
+				if err != nil {
+					log.Printf("Error insertando historial para grupo %d: %v", a.GrupoID, err)
+				}
+			}
+		}
+
+		// Actualizar solicitud y confirmar transacción
+		_, err = tx.Exec(`
+			UPDATE solicitud_modificacion 
+			SET estado = $1, observacion = $2, revisado_por = $3, fecha_revision = NOW()
+			WHERE id = $4
+		`, payload.Estado, payload.Observacion, jefeID, solicitudID)
+		if err != nil {
+			log.Printf("Error actualizando solicitud: %v", err)
+			http.Error(w, "Error actualizando solicitud", http.StatusInternalServerError)
+			return
+		}
+
+		if err := tx.Commit(); err != nil {
+			log.Printf("Error confirmando transacción: %v", err)
+			http.Error(w, "Error aplicando cambios", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		// Solo actualizar estado si se rechaza
+		_, err = h.db.Exec(`
+			UPDATE solicitud_modificacion 
+			SET estado = $1, observacion = $2, revisado_por = $3, fecha_revision = NOW()
+			WHERE id = $4
+		`, payload.Estado, payload.Observacion, jefeID, solicitudID)
+		if err != nil {
+			log.Printf("Error actualizando solicitud: %v", err)
+			http.Error(w, "Error actualizando solicitud", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"mensaje": "Solicitud " + payload.Estado + " exitosamente",
 	})
 }

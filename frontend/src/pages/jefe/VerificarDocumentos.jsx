@@ -105,7 +105,7 @@ const VerificarDocumentos = () => {
             />
           </div>
           <div>
-            <h1 className="page-title">Verificar Documentos</h1>
+            <h1 className="page-title">Validar Documentos</h1>
             <p className="page-subtitle">
               Revisa y aprueba o rechaza los documentos subidos por los estudiantes
             </p>

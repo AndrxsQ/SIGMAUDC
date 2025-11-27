@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { matriculaService } from "../../services/matricula";
 import "../../styles/InscribirAsignaturas.css";
+import { FaCheckCircle, FaTimesCircle, FaSpinner, FaClock, FaExclamationTriangle } from "react-icons/fa";
 
 const ModificarMatricula = () => {
   const navigate = useNavigate();
@@ -10,14 +11,24 @@ const ModificarMatricula = () => {
   const [materiasMatriculadas, setMateriasMatriculadas] = useState([]);
   const [asignaturas, setAsignaturas] = useState([]);
   const [gruposSeleccionados, setGruposSeleccionados] = useState(new Set());
+  const [gruposARetirar, setGruposARetirar] = useState(new Set()); // Nuevo: grupos a retirar en la solicitud
   const [horario, setHorario] = useState([]);
   const [conflictos, setConflictos] = useState(new Set());
   const [resumen, setResumen] = useState(null);
   const [dialog, setDialog] = useState(null);
   const [creditosSeleccionados, setCreditosSeleccionados] = useState(0);
+  
+  // Estado para solicitudes
+  const [solicitudPendiente, setSolicitudPendiente] = useState(null);
+  const [historialSolicitudes, setHistorialSolicitudes] = useState([]);
+  const [enviandoSolicitud, setEnviandoSolicitud] = useState(false);
 
-  // Días de la semana
-  const diasSemana = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+  // Mostrar/ocultar horario y ocultar horas vacías
+  const [showHorario, setShowHorario] = useState(true);
+  const [hideEmptyHours, setHideEmptyHours] = useState(false);
+
+  // Días de la semana (incluye domingo para coherencia)
+  const diasSemana = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO'];
   
   const estadoLabels = {
     activa: "Activa",
@@ -77,7 +88,6 @@ const ModificarMatricula = () => {
           puedeModificar: false,
           razon,
         });
-        openDialog("Modificaciones bloqueadas", razon);
         setLoading(false);
         return;
       }
@@ -88,13 +98,11 @@ const ModificarMatricula = () => {
       try {
         const datos = await matriculaService.getModificacionesData();
         
-        // Verificar si hay un error en la respuesta
         if (datos.error) {
           setValidacion({
             puedeModificar: false,
             razon: datos.error,
           });
-          openDialog("Modificaciones no disponibles", datos.error);
           setLoading(false);
           return;
         }
@@ -107,21 +115,20 @@ const ModificarMatricula = () => {
           estadoEstudiante: datos.estado_estudiante,
         });
         
-        // Actualizar horario con materias matriculadas
         actualizarHorarioDesdeMatriculadas(datos.materias_matriculadas || []);
+
+        // Cargar solicitudes del estudiante
+        await cargarSolicitudes();
+
       } catch (error) {
         const razonCarga = getErrorReason(error, "No pudimos cargar los datos de modificaciones en este momento.");
-        
-        // Si el error indica que no hay periodo activo o no tiene materias, mostrar error específico
         if (error?.response?.data?.error) {
           setValidacion({
             puedeModificar: false,
             razon: error.response.data.error,
           });
-          openDialog("Modificaciones no disponibles", error.response.data.error);
         } else {
           openDialog("Error al cargar", razonCarga);
-          console.warn("Error cargando datos:", error);
           setMateriasMatriculadas([]);
           setAsignaturas([]);
           setResumen(null);
@@ -129,14 +136,35 @@ const ModificarMatricula = () => {
       }
     } catch (error) {
       console.error("Error validando modificaciones:", error);
-      const razonError = getErrorReason(error, "Error al validar los requisitos de modificaciones. Por favor, intenta más tarde.");
+      const razonError = getErrorReason(error, "Error al validar los requisitos de modificaciones.");
       setValidacion({
         puedeModificar: false,
         razon: razonError,
       });
-      openDialog("Modificaciones bloqueadas", razonError);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Cargar solicitudes del estudiante
+  const cargarSolicitudes = async () => {
+    try {
+      const response = await matriculaService.getSolicitudesModificacion();
+      const solicitudes = response.solicitudes || [];
+      
+      // Buscar solicitud pendiente
+      const pendiente = solicitudes.find(s => s.estado === 'pendiente');
+      setSolicitudPendiente(pendiente || null);
+      
+      // Historial (últimas 5 no pendientes)
+      setHistorialSolicitudes(
+        solicitudes.filter(s => s.estado !== 'pendiente').slice(0, 5)
+      );
+    } catch (error) {
+      // Silenciar el error si el endpoint no existe aún
+      console.log("Solicitudes no disponibles aún:", error.message);
+      setSolicitudPendiente(null);
+      setHistorialSolicitudes([]);
     }
   };
 
@@ -209,6 +237,7 @@ const ModificarMatricula = () => {
     return !(fin1Min <= inicio2Min || fin2Min <= inicio1Min);
   };
 
+  // Modificado: toggleGrupo ahora solo marca para la solicitud
   const toggleGrupo = (grupoId, asignatura) => {
     if (asignatura.estado === "cursada") {
       return;
@@ -234,7 +263,6 @@ const ModificarMatricula = () => {
     }
 
     if (gruposSeleccionados.has(grupoId)) {
-      // Desmarcar
       const nuevosSeleccionados = new Set(gruposSeleccionados);
       nuevosSeleccionados.delete(grupoId);
       setGruposSeleccionados(nuevosSeleccionados);
@@ -257,12 +285,94 @@ const ModificarMatricula = () => {
         return;
       }
 
-      // Marcar
       const nuevosSeleccionados = new Set([...gruposSeleccionados, grupoId]);
       setGruposSeleccionados(nuevosSeleccionados);
       actualizarHorario(nuevosSeleccionados);
       setConflictos(new Set([...conflictos].filter((id) => id !== grupoId)));
       setCreditosSeleccionados((prev) => prev + asignatura.creditos);
+    }
+  };
+
+  // Nuevo: marcar materia para retirar en la solicitud
+  const toggleRetirar = (historialId, grupoId) => {
+    const materia = materiasMatriculadas.find(m => m.historial_id === historialId);
+    if (!materia?.puede_retirar) return;
+
+    if (gruposARetirar.has(historialId)) {
+      const nuevos = new Set(gruposARetirar);
+      nuevos.delete(historialId);
+      setGruposARetirar(nuevos);
+    } else {
+      const nuevos = new Set([...gruposARetirar, historialId]);
+      setGruposARetirar(nuevos);
+    }
+  };
+
+  // Nuevo: enviar solicitud de modificación
+  const enviarSolicitud = async () => {
+    if (gruposSeleccionados.size === 0 && gruposARetirar.size === 0) {
+      openDialog("Sin cambios", "Selecciona al menos un grupo para agregar o una materia para retirar.");
+      return;
+    }
+
+    if (solicitudPendiente) {
+      openDialog("Solicitud pendiente", "Ya tienes una solicitud de modificación pendiente. Espera a que sea revisada.");
+      return;
+    }
+
+    try {
+      setEnviandoSolicitud(true);
+      
+      // Preparar grupos a agregar con información completa
+      const gruposAgregarCompletos = Array.from(gruposSeleccionados).map(gid => {
+        const grupo = encontrarGrupoPorId(gid);
+        const asignatura = asignaturas.find((a) => a.grupos?.some((g) => g.id === gid));
+        if (!grupo || !asignatura) return null;
+        return {
+          grupo_id: gid,
+          grupo_codigo: grupo.codigo,
+          asignatura_id: asignatura.id,
+          asignatura_codigo: asignatura.codigo,
+          asignatura_nombre: asignatura.nombre,
+          creditos: asignatura.creditos,
+          docente: grupo.docente || null,
+        };
+      }).filter(Boolean);
+      
+      // Preparar grupos a retirar con información completa
+      const gruposRetirarCompletos = Array.from(gruposARetirar).map(historialId => {
+        const materia = materiasMatriculadas.find(m => m.historial_id === historialId);
+        if (!materia) return null;
+        return {
+          historial_id: historialId,
+          grupo_id: materia.grupo_id,
+          grupo_codigo: materia.grupo_codigo,
+          asignatura_id: materia.asignatura_id,
+          asignatura_codigo: materia.codigo,
+          asignatura_nombre: materia.nombre,
+          creditos: materia.creditos,
+        };
+      }).filter(Boolean);
+      
+      await matriculaService.crearSolicitudModificacion({
+        grupos_agregar: gruposAgregarCompletos,
+        grupos_retirar: gruposRetirarCompletos,
+      });
+
+      setGruposSeleccionados(new Set());
+      setGruposARetirar(new Set());
+      setCreditosSeleccionados(0);
+      
+      openDialog(
+        "Solicitud enviada",
+        "Tu solicitud de modificación ha sido enviada. Recibirás una notificación cuando sea revisada por el jefe de departamento.",
+        () => validarYcargar()
+      );
+    } catch (error) {
+      const razon = getErrorReason(error, "Error al enviar la solicitud.");
+      openDialog("Error", razon);
+    } finally {
+      setEnviandoSolicitud(false);
     }
   };
 
@@ -299,22 +409,6 @@ const ModificarMatricula = () => {
     setHorario(nuevoHorarioFiltrado);
   };
 
-  const handleRetirar = async (historialId) => {
-    if (!window.confirm("¿Estás seguro de que deseas retirar esta materia?")) {
-      return;
-    }
-
-    try {
-      await matriculaService.retirarMateria(historialId);
-      openDialog("Materia retirada", "La materia ha sido retirada correctamente.", () => {
-        validarYcargar(); // Recargar datos
-      });
-    } catch (error) {
-      const razon = getErrorReason(error, "Error al retirar la materia. Por favor, intenta nuevamente.");
-      openDialog("Error al retirar", razon);
-    }
-  };
-
   const formatearHora = (hora) => {
     const [h, m] = hora.split(':');
     return `${h}:${m}`;
@@ -346,6 +440,76 @@ const ModificarMatricula = () => {
 
   const creditosDisponiblesBackend = resumen?.creditos?.disponibles ?? 0;
   const creditosDisponiblesActual = Math.max(creditosDisponiblesBackend - creditosSeleccionados, 0);
+
+  // Renderizar estado de solicitud
+  const renderEstadoSolicitud = () => {
+    if (!solicitudPendiente && historialSolicitudes.length === 0) return null;
+
+    return (
+      <div className="solicitudes-section" style={{ marginBottom: '1.5rem' }}>
+        {/* Solicitud pendiente */}
+        {solicitudPendiente && (
+          <div className="solicitud-card pendiente" style={{
+            padding: '1rem',
+            backgroundColor: '#fff3cd',
+            border: '1px solid #ffc107',
+            borderRadius: '8px',
+            marginBottom: '1rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <FaClock style={{ color: '#856404' }} />
+              <strong style={{ color: '#856404' }}>Solicitud Pendiente</strong>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.9rem', color: '#856404' }}>
+              Tienes una solicitud de modificación pendiente de revisión.
+              No puedes enviar otra hasta que sea procesada.
+            </p>
+            <div style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
+              <strong>Enviada:</strong> {new Date(solicitudPendiente.fecha_creacion).toLocaleString('es-ES')}
+            </div>
+          </div>
+        )}
+
+        {/* Última solicitud procesada */}
+        {historialSolicitudes.length > 0 && (
+          <div style={{ marginTop: '0.5rem' }}>
+            <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Última solicitud:</p>
+            {historialSolicitudes.slice(0, 1).map((sol) => (
+              <div 
+                key={sol.id} 
+                className={`solicitud-card ${sol.estado}`}
+                style={{
+                  padding: '0.75rem',
+                  backgroundColor: sol.estado === 'aprobada' ? '#d4edda' : '#f8d7da',
+                  border: `1px solid ${sol.estado === 'aprobada' ? '#28a745' : '#dc3545'}`,
+                  borderRadius: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {sol.estado === 'aprobada' ? (
+                    <FaCheckCircle style={{ color: '#28a745' }} />
+                  ) : (
+                    <FaTimesCircle style={{ color: '#dc3545' }} />
+                  )}
+                  <strong style={{ color: sol.estado === 'aprobada' ? '#155724' : '#721c24' }}>
+                    {sol.estado === 'aprobada' ? 'Aprobada' : 'Rechazada'}
+                  </strong>
+                  <span style={{ fontSize: '0.85rem', marginLeft: 'auto' }}>
+                    {new Date(sol.fecha_revision).toLocaleString('es-ES')}
+                  </span>
+                </div>
+                {sol.estado === 'rechazada' && sol.observacion && (
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#721c24' }}>
+                    <strong>Observación:</strong> {sol.observacion}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -405,67 +569,119 @@ const ModificarMatricula = () => {
         {/* Columna Izquierda: Vista del Horario */}
         <div className="horario-column">
           <div className="horario-card">
-            <h2>Tu Horario</h2>
+            <div className="horario-card-header">
+              <h2>Tu Horario</h2>
+              <div className="horario-controls">
+                <label className="horario-hide-empty">
+                  <input
+                    type="checkbox"
+                    checked={hideEmptyHours}
+                    onChange={() => setHideEmptyHours((v) => !v)}
+                  />
+                  Ocultar horas sin asignaturas
+                </label>
+                <button
+                  className={`horario-toggle-arrow ${showHorario ? 'open' : ''}`}
+                  onClick={() => setShowHorario((s) => !s)}
+                  aria-label={showHorario ? 'Ocultar horario' : 'Mostrar horario'}
+                />
+              </div>
+            </div>
+
             <div className="horario-grid">
-              <div className="horario-header">
-                <div className="horario-time-col">Hora</div>
-                {diasSemana.map((dia) => (
-                  <div key={dia} className="horario-day-col">
-                    {dia.substring(0, 3)}
-                  </div>
-                ))}
-              </div>
-              <div className="horario-body">
-                {horas.map((hora) => (
-                  <div key={hora} className="horario-row">
-                    <div className="horario-time-cell">
-                      {hora}:00
-                    </div>
-                    {diasSemana.map((dia) => (
-                      <div key={`${hora}-${dia}`} className="horario-cell">
-                        {horario
-                          .filter((h) =>
-                            h.horarios.some(
-                              (hor) =>
-                                hor.dia === dia &&
-                                parseInt(hor.hora_inicio.split(':')[0]) <= hora &&
-                                parseInt(hor.hora_fin.split(':')[0]) > hora
-                            )
-                          )
-                          .map((h, idx) => {
-                            const horarioDia = h.horarios.find((hor) => hor.dia === dia);
-                            if (!horarioDia) return null;
-                            const pos = obtenerPosicionHorario(horarioDia.hora_inicio, horarioDia.hora_fin);
-                            if (parseInt(horarioDia.hora_inicio.split(':')[0]) !== hora) return null;
-                            
-                            const bloqueAltura = Math.max(pos.duracionMinutos - 4, 28);
-                            const bloqueTop = 4 + Math.min(pos.offsetDentroHora, 52);
-                            return (
-                              <div
-                                key={idx}
-                                className="horario-block"
-                                style={{
-                                  backgroundColor: obtenerColorAsignatura(h.codigo),
-                                  height: `${bloqueAltura}px`,
-                                  top: `${bloqueTop}px`,
-                                }}
-                                title={`${h.asignatura} - ${h.grupoCodigo}\n${h.docente}\n${horarioDia.salon}\n${formatearHora(horarioDia.hora_inicio)} - ${formatearHora(horarioDia.hora_fin)}`}
-                              >
-                                <div className="horario-block-content">
-                                  <div className="horario-block-title">{h.asignatura}</div>
-                                  <div className="horario-block-subtitle">{h.grupoCodigo} - {horarioDia.salon}</div>
-                                  <div className="horario-block-time">
-                                    {formatearHora(horarioDia.hora_inicio)} - {formatearHora(horarioDia.hora_fin)}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
+              {!showHorario ? (
+                <div className="horario-collapsed">Horario oculto. Pulsa la flecha para expandir.</div>
+              ) : (
+                (() => {
+                  const horaTieneAsignatura = (hora) =>
+                    horario.some((h) =>
+                      h.horarios.some((hor) =>
+                        parseInt(hor.hora_inicio.split(':')[0]) <= hora && parseInt(hor.hora_fin.split(':')[0]) > hora
+                      )
+                    );
+
+                  // Si se pidió ocultar horas vacías y no hay nada en el horario
+                  if (hideEmptyHours && horario.length === 0) {
+                    return (
+                      <div className="horario-empty-message">No hay asignaturas en tu horario actual.</div>
+                    );
+                  }
+
+                  // Filtrar horas visibles
+                  const visibleHoras = hideEmptyHours && horario.length > 0
+                    ? horas.filter(horaTieneAsignatura)
+                    : horas;
+
+                  if (visibleHoras.length === 0) {
+                    return (
+                      <div className="horario-empty-message">No hay asignaturas en tu horario actual.</div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      <div className="horario-header">
+                        <div className="horario-time-col">Hora</div>
+                        {diasSemana.map((dia) => (
+                          <div key={dia} className="horario-day-col">
+                            {dia.substring(0, 3)}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+
+                      <div className="horario-body">
+                        {visibleHoras.map((hora) => (
+                          <div key={hora} className="horario-row">
+                            <div className="horario-time-cell">{hora}:00</div>
+                            {diasSemana.map((dia) => (
+                              <div key={`${hora}-${dia}`} className="horario-cell">
+                                {horario
+                                  .filter((h) =>
+                                    h.horarios.some(
+                                      (hor) =>
+                                        hor.dia === dia &&
+                                        parseInt(hor.hora_inicio.split(':')[0]) <= hora &&
+                                        parseInt(hor.hora_fin.split(':')[0]) > hora
+                                    )
+                                  )
+                                  .map((h, idx) => {
+                                    const horarioDia = h.horarios.find((hor) => hor.dia === dia);
+                                    if (!horarioDia) return null;
+                                    const pos = obtenerPosicionHorario(horarioDia.hora_inicio, horarioDia.hora_fin);
+                                    if (parseInt(horarioDia.hora_inicio.split(':')[0]) !== hora) return null;
+
+                                    const bloqueAltura = Math.max(pos.duracionMinutos - 4, 28);
+                                    const bloqueTop = 4 + Math.min(pos.offsetDentroHora, 52);
+                                    return (
+                                      <div
+                                        key={idx}
+                                        className="horario-block"
+                                        style={{
+                                          backgroundColor: obtenerColorAsignatura(h.codigo),
+                                          height: `${bloqueAltura}px`,
+                                          top: `${bloqueTop}px`,
+                                        }}
+                                        title={`${h.asignatura} - ${h.grupoCodigo}\n${h.docente}\n${horarioDia.salon}\n${formatearHora(horarioDia.hora_inicio)} - ${formatearHora(horarioDia.hora_fin)}`}
+                                      >
+                                        <div className="horario-block-content">
+                                          <div className="horario-block-title">{h.asignatura}</div>
+                                          <div className="horario-block-subtitle">{h.grupoCodigo} - {horarioDia.salon}</div>
+                                          <div className="horario-block-time">
+                                            {formatearHora(horarioDia.hora_inicio)} - {formatearHora(horarioDia.hora_fin)}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()
+              )}
             </div>
           </div>
         </div>
@@ -473,6 +689,9 @@ const ModificarMatricula = () => {
         {/* Columna Derecha: Materias Matriculadas y Disponibles */}
         <div className="asignaturas-column">
           <div className="asignaturas-card">
+            {/* Mostrar estado de solicitudes */}
+            {renderEstadoSolicitud()}
+
             {resumen && (
               <div className="inscribir-resumen">
                 <div className="resumen-card">
@@ -512,6 +731,146 @@ const ModificarMatricula = () => {
               </div>
             )}
 
+            {/* Carrito de Solicitud */}
+            <div className="carrito-card">
+              <h3 className="carrito-title">Solicitud de Modificación</h3>
+              <p className="carrito-sub">
+                {solicitudPendiente 
+                  ? "Ya tienes una solicitud pendiente de revisión."
+                  : "Los cambios que selecciones aparecerán aquí. La solicitud será enviada al jefe de departamento."}
+              </p>
+              
+              {/* Estado de solicitud pendiente */}
+              {solicitudPendiente && (
+                <div style={{
+                  padding: '0.75rem',
+                  backgroundColor: '#fff3cd',
+                  border: '1px solid #ffc107',
+                  borderRadius: '8px',
+                  marginBottom: '1rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <FaClock style={{ color: '#856404' }} />
+                    <strong style={{ color: '#856404' }}>Solicitud Pendiente</strong>
+                  </div>
+                  <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: '#856404' }}>
+                    Enviada: {new Date(solicitudPendiente.fecha_creacion).toLocaleString('es-ES')}
+                  </p>
+                </div>
+              )}
+
+              {/* Lista de cambios en la solicitud */}
+              <div className="carrito-list">
+                {gruposSeleccionados.size === 0 && gruposARetirar.size === 0 ? (
+                  <div className="carrito-empty">
+                    {solicitudPendiente 
+                      ? "Espera a que tu solicitud sea procesada."
+                      : "No has seleccionado ningún cambio aún."}
+                  </div>
+                ) : (
+                  <>
+                    {/* Grupos a agregar */}
+                    {Array.from(gruposSeleccionados).map((gid) => {
+                      const grupo = encontrarGrupoPorId(gid);
+                      const asignatura = asignaturas.find((a) => a.grupos?.some((g) => g.id === gid));
+                      if (!grupo || !asignatura) return null;
+                      return (
+                        <div key={`add-${gid}`} className="carrito-item" style={{ borderLeft: '4px solid #28a745' }}>
+                          <div className="carrito-item-info">
+                            <div className="carrito-item-title">
+                              <span style={{ color: '#28a745', marginRight: '0.5rem' }}>➕</span>
+                              {asignatura.nombre}
+                            </div>
+                            <div className="carrito-item-meta">{asignatura.codigo} • {asignatura.creditos} cr • Grupo {grupo.codigo}</div>
+                          </div>
+                          <div className="carrito-item-actions">
+                            <button className="carrito-remove" onClick={() => toggleGrupo(gid, asignatura)}>
+                              Quitar
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Materias a retirar */}
+                    {Array.from(gruposARetirar).map((historialId) => {
+                      const materia = materiasMatriculadas.find(m => m.historial_id === historialId);
+                      if (!materia) return null;
+                      return (
+                        <div key={`rem-${historialId}`} className="carrito-item" style={{ borderLeft: '4px solid #dc3545' }}>
+                          <div className="carrito-item-info">
+                            <div className="carrito-item-title">
+                              <span style={{ color: '#dc3545', marginRight: '0.5rem' }}>➖</span>
+                              {materia.nombre}
+                            </div>
+                            <div className="carrito-item-meta">{materia.codigo} • {materia.creditos} cr • Grupo {materia.grupo_codigo}</div>
+                          </div>
+                          <div className="carrito-item-actions">
+                            <button className="carrito-remove" onClick={() => toggleRetirar(historialId)}>
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+
+              {/* Botón de enviar solicitud */}
+              {!solicitudPendiente && (gruposSeleccionados.size > 0 || gruposARetirar.size > 0) && (
+                <div className="carrito-actions">
+                  <button
+                    className="carrito-inscribir"
+                    onClick={enviarSolicitud}
+                    disabled={enviandoSolicitud}
+                  >
+                    {enviandoSolicitud ? (
+                      <>
+                        <FaSpinner className="spinner-small" /> Enviando...
+                      </>
+                    ) : (
+                      `Enviar solicitud (${gruposSeleccionados.size + gruposARetirar.size} cambios)`
+                    )}
+                  </button>
+                  <p style={{ fontSize: '0.8rem', color: '#666', textAlign: 'center', marginTop: '0.5rem' }}>
+                    Los cambios serán aplicados cuando el jefe los apruebe
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Historial de última solicitud */}
+            {historialSolicitudes.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                {historialSolicitudes.slice(0, 1).map((sol) => (
+                  <div 
+                    key={sol.id} 
+                    style={{
+                      padding: '0.75rem',
+                      backgroundColor: sol.estado === 'aprobada' ? '#d4edda' : '#f8d7da',
+                      border: `1px solid ${sol.estado === 'aprobada' ? '#28a745' : '#dc3545'}`,
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {sol.estado === 'aprobada' ? (
+                        <FaCheckCircle style={{ color: '#28a745' }} />
+                      ) : (
+                        <FaTimesCircle style={{ color: '#dc3545' }} />
+                      )}
+                      <strong>Última solicitud: {sol.estado === 'aprobada' ? 'Aprobada' : 'Rechazada'}</strong>
+                    </div>
+                    {sol.estado === 'rechazada' && sol.observacion && (
+                      <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
+                        <strong>Motivo:</strong> {sol.observacion}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <h2>Materias Matriculadas</h2>
             <div className="asignaturas-list">
               {materiasMatriculadas.length === 0 ? (
@@ -519,49 +878,60 @@ const ModificarMatricula = () => {
                   <p>No tienes materias matriculadas en este periodo.</p>
                 </div>
               ) : (
-                materiasMatriculadas.map((materia) => (
-                  <div key={materia.historial_id} className="asignatura-item">
-                    <div className="asignatura-header">
-                      <div className="asignatura-info">
-                        <h3>{materia.nombre}</h3>
-                        <div className="asignatura-meta">
-                          <span className="asignatura-codigo">{materia.codigo}</span>
-                          <span className="asignatura-creditos">{materia.creditos} créditos</span>
+                materiasMatriculadas.map((materia) => {
+                  const marcadaParaRetirar = gruposARetirar.has(materia.historial_id);
+                  
+                  return (
+                    <div 
+                      key={materia.historial_id} 
+                      className={`asignatura-item ${marcadaParaRetirar ? 'marcada-retirar' : ''}`}
+                      style={marcadaParaRetirar ? { opacity: 0.6, backgroundColor: '#ffebee' } : {}}
+                    >
+                      <div className="asignatura-header">
+                        <div className="asignatura-info">
+                          <h3>{materia.nombre}</h3>
+                          <div className="asignatura-meta">
+                            <span className="asignatura-codigo">{materia.codigo}</span>
+                            <span className="asignatura-creditos">{materia.creditos} créditos</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="grupos-list">
-                      <div className="grupo-item seleccionado">
-                        <div className="grupo-content">
-                          <div className="grupo-header">
-                            <span className="grupo-codigo">{materia.grupo_codigo}</span>
-                            <span className="grupo-docente">{materia.docente}</span>
-                          </div>
-                          <div className="grupo-horario">
-                            {materia.horarios?.map((hor, idx) => (
-                              <span key={idx} className="horario-badge">
-                                {hor.dia.substring(0, 3)} {formatearHora(hor.hora_inicio)}-{formatearHora(hor.hora_fin)} {hor.salon}
-                              </span>
-                            ))}
-                          </div>
-                          {!materia.puede_retirar && (
-                            <div className="grupo-obligatorio-text">
-                              No se puede retirar (materia atrasada o perdida)
+                      <div className="grupos-list">
+                        <div className="grupo-item seleccionado">
+                          <div className="grupo-content">
+                            <div className="grupo-header">
+                              <span className="grupo-codigo">{materia.grupo_codigo}</span>
+                              <span className="grupo-docente">{materia.docente}</span>
                             </div>
-                          )}
-                          {materia.puede_retirar && (
-                            <button
-                              className="btn-retirar"
-                              onClick={() => handleRetirar(materia.historial_id)}
-                            >
-                              Retirar
-                            </button>
-                          )}
+                            <div className="grupo-horario">
+                              {materia.horarios?.map((hor, idx) => (
+                                <span key={idx} className="horario-badge">
+                                  {hor.dia.substring(0, 3)} {formatearHora(hor.hora_inicio)}-{formatearHora(hor.hora_fin)} {hor.salon}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </div>
+                      
+                      {materia.puede_retirar && !solicitudPendiente && (
+                        <button
+                          className={`btn-retirar ${marcadaParaRetirar ? 'cancelar' : ''}`}
+                          onClick={() => toggleRetirar(materia.historial_id, materia.grupo_id)}
+                          style={marcadaParaRetirar ? { backgroundColor: '#6c757d' } : {}}
+                        >
+                          {marcadaParaRetirar ? 'Cancelar retiro' : 'Marcar para retirar'}
+                        </button>
+                      )}
+                      
+                      {!materia.puede_retirar && (
+                        <div className="grupo-obligatorio-text">
+                          No se puede retirar (materia atrasada o perdida)
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 

@@ -238,7 +238,7 @@ const HomeJefe = () => {
                   </svg>
                 </div>
               </div>
-              <h3>Verificar Documentos</h3>
+              <h3>Validar Documentos</h3>
               <p>Revisa, valida y aprueba los documentos subidos por los estudiantes durante el proceso de matrícula</p>
               <div className="card-footer">
                 <span className="card-link">Acceder</span>
@@ -249,20 +249,20 @@ const HomeJefe = () => {
             </div>
           </div>
 
-          {/* Card: Modificaciones */}
+          {/* Card: Consultar Estudiante */}
           <div className="dashboard-card" onClick={() => navigate("/modificaciones")}>
             <div className="card-gradient-overlay"></div>
             <div className="card-content">
               <div className="card-icon-wrapper">
                 <div className="card-icon">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="M21 21l-4.35-4.35"></path>
                   </svg>
                 </div>
               </div>
-              <h3>Modificaciones</h3>
-              <p>Gestiona solicitudes de modificación de matrícula, cambios de asignaturas y otros ajustes académicos</p>
+              <h3>Consultar Estudiante</h3>
+              <p>Busca estudiantes por código, consulta su matrícula y realiza ajustes de inscripción o retiro de asignaturas</p>
               <div className="card-footer">
                 <span className="card-link">Acceder</span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

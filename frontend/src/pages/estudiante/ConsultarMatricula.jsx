@@ -32,6 +32,10 @@ const ConsultarMatricula = () => {
   const [loading, setLoading] = useState(true);
   const [horarioData, setHorarioData] = useState(null);
   const [error, setError] = useState(null);
+  
+  // Controles del horario (igual que InscribirAsignaturas)
+  const [showHorario, setShowHorario] = useState(true);
+  const [hideEmptyHours, setHideEmptyHours] = useState(false);
 
   useEffect(() => {
     loadHorario();
@@ -105,6 +109,12 @@ const ConsultarMatricula = () => {
     );
   };
 
+  // Función para verificar si una franja tiene clases
+  const franjaTieneClases = (index, matrix) => {
+    if (!matrix) return false;
+    return diasSemana.some((dia) => matrix[dia]?.[index]?.length > 0);
+  };
+
   if (loading) {
     return (
       <div className="consultar-matricula-container">
@@ -175,6 +185,11 @@ const ConsultarMatricula = () => {
   }
 
   const matrix = buildMatrix();
+  
+  // Filtrar franjas visibles
+  const franjasVisibles = hideEmptyHours && matrix
+    ? FRANJAS.filter((_, index) => franjaTieneClases(index, matrix))
+    : FRANJAS;
 
   return (
     <div className="consultar-matricula-container">
@@ -193,27 +208,61 @@ const ConsultarMatricula = () => {
       </div>
 
       <div className="horario-visual-container">
-        <h2>Horario por franjas horarias</h2>
-        <div className="horario-grid-wrapper">
-          <div className="horario-grid tabla-franjas">
-            <div className="fila-franja header">
-              <div className="celda-franja-label">Franja</div>
-              {diasCortos.map((dia, idx) => (
-                <div key={dia} className="celda-franja-header">
-                  {dia}
-                </div>
-              ))}
-            </div>
-            {FRANJAS.map((franja, index) => (
-              <div key={franja.label} className="fila-franja">
-                <div className="celda-franja-label">
-                  <strong>{franja.label}</strong>
-                </div>
-                {diasSemana.map((dia) => renderSlot(dia, franja, index, matrix))}
-              </div>
-            ))}
+        {/* Header con controles */}
+        <div className="horario-card-header">
+          <h2>Horario por franjas horarias</h2>
+          <div className="horario-controls">
+            <label className="horario-hide-empty">
+              <input
+                type="checkbox"
+                checked={hideEmptyHours}
+                onChange={() => setHideEmptyHours((v) => !v)}
+              />
+              Ocultar horas sin asignaturas
+            </label>
+            <button
+              className={`horario-toggle-arrow ${showHorario ? 'open' : ''}`}
+              onClick={() => setShowHorario((s) => !s)}
+              aria-label={showHorario ? 'Ocultar horario' : 'Mostrar horario'}
+            />
           </div>
         </div>
+
+        {/* Contenido del horario */}
+        {!showHorario ? (
+          <div className="horario-collapsed">
+            Horario oculto. Pulsa la flecha para expandir.
+          </div>
+        ) : franjasVisibles.length === 0 ? (
+          <div className="horario-empty-message">
+            No hay franjas con asignaturas para mostrar.
+          </div>
+        ) : (
+          <div className="horario-grid-wrapper">
+            <div className="horario-grid tabla-franjas">
+              <div className="fila-franja header">
+                <div className="celda-franja-label">Franja</div>
+                {diasCortos.map((dia, idx) => (
+                  <div key={dia} className="celda-franja-header">
+                    {dia}
+                  </div>
+                ))}
+              </div>
+              {franjasVisibles.map((franja) => {
+                // Obtener el índice original de la franja
+                const originalIndex = FRANJAS.findIndex((f) => f.label === franja.label);
+                return (
+                  <div key={franja.label} className="fila-franja">
+                    <div className="celda-franja-label">
+                      <strong>{franja.label}</strong>
+                    </div>
+                    {diasSemana.map((dia) => renderSlot(dia, franja, originalIndex, matrix))}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="asignaturas-resumen">

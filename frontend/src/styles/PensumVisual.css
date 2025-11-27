@@ -191,8 +191,8 @@
    ============================================ */
 .pensum-flow-container {
   position: relative;
-  min-height: 500px;
-  margin-bottom: 24px;
+  min-height: 420px;
+  margin-bottom: 20px;
   width: 100%;
   overflow: visible;
 }
@@ -200,11 +200,11 @@
 .pensum-grid {
   display: flex;
   flex-wrap: nowrap;
-  gap: 16px;
+  gap: 12px;
   justify-content: flex-start;
   overflow-x: auto;
   overflow-y: visible;
-  padding: 12px 8px;
+  padding: 10px 6px;
   position: relative;
   z-index: 2;
   scroll-behavior: smooth;
@@ -216,7 +216,7 @@
 }
 
 .pensum-grid::-webkit-scrollbar {
-  height: 8px;
+  height: 6px;
 }
 
 .pensum-grid::-webkit-scrollbar-track {
@@ -237,8 +237,8 @@
    ============================================ */
 .semestre-column {
   flex: 0 0 auto;
-  width: 160px;
-  min-width: 160px;
+  width: 140px;
+  min-width: 140px;
   background: transparent;
   border-radius: 18px;
   padding: 8px;
@@ -264,7 +264,7 @@
 .materias-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 /* ============================================
@@ -280,8 +280,8 @@
               transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   display: flex;
   flex-direction: column;
-  padding: 14px;
-  min-height: 100px;
+  padding: 8px;
+  min-height: 64px;
   cursor: pointer;
   position: relative;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04),
@@ -1487,8 +1487,8 @@
   }
 
   .semestre-column {
-    width: 130px;
-    min-width: 130px;
+    width: 110px;
+    min-width: 110px;
   }
 
   .semestre-title {
@@ -1497,8 +1497,8 @@
   }
 
   .materia-card {
-    min-height: 85px;
-    padding: 10px;
+    min-height: 48px;
+    padding: 4px;
     font-size: 11px;
   }
 
@@ -1582,13 +1582,13 @@
   }
 
   .semestre-column {
-    width: 150px;
-    min-width: 150px;
+    width: 130px;
+    min-width: 130px;
   }
 
   .materia-card {
-    min-height: 90px;
-    padding: 12px;
+    min-height: 60px;
+    padding: 6px;
   }
 }
 
@@ -1612,13 +1612,13 @@
   }
 
   .semestre-column {
-    width: 160px;
-    min-width: 160px;
+    width: 140px;
+    min-width: 140px;
   }
 
   .materia-card {
-    min-height: 100px;
-    padding: 14px;
+    min-height: 72px;
+    padding: 8px;
     font-size: 12px;
   }
 
@@ -1711,8 +1711,8 @@
   }
 
   .semestre-column {
-    width: 180px;
-    min-width: 180px;
+    width: 160px;
+    min-width: 160px;
   }
 
   .semestre-title {
@@ -1721,8 +1721,8 @@
   }
 
   .materia-card {
-    min-height: 110px;
-    padding: 16px;
+    min-height: 80px;
+    padding: 10px;
     font-size: 13px;
   }
 
@@ -1809,13 +1809,13 @@
   }
 
   .semestre-column {
-    width: 200px;
-    min-width: 200px;
+    width: 180px;
+    min-width: 180px;
   }
 
   .materia-card {
-    min-height: 120px;
-    padding: 18px;
+    min-height: 88px;
+    padding: 12px;
   }
 
   .pensum-grid {
@@ -1835,13 +1835,13 @@
   }
 
   .semestre-column {
-    width: 220px;
-    min-width: 220px;
+    width: 200px;
+    min-width: 200px;
   }
 
   .materia-card {
-    min-height: 130px;
-    padding: 20px;
+    min-height: 96px;
+    padding: 14px;
   }
 
   .pensum-grid {
@@ -1861,13 +1861,13 @@
   }
 
   .semestre-column {
-    width: 240px;
-    min-width: 240px;
+    width: 220px;
+    min-width: 220px;
   }
 
   .materia-card {
-    min-height: 140px;
-    padding: 24px;
+    min-height: 104px;
+    padding: 16px;
   }
 
   .pensum-grid {
@@ -1880,8 +1880,8 @@
 /* Optimización para pantallas táctiles */
 @media (pointer: coarse) {
   .materia-card {
-    min-height: 100px;
-    padding: 14px;
+    min-height: 72px;
+    padding: 8px;
   }
 }
 

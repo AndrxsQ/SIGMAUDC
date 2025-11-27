@@ -228,7 +228,7 @@
   transition: transform 0.18s ease, background 0.12s ease;
 }
 
-.horario-toggle-arrow::after {
+.horario-toggle-arrow::before {
   content: '';
   display: inline-block;
   width: 8px;
@@ -240,7 +240,7 @@
 }
 
 /* Cuando está abierto, girar la flecha hacia arriba */
-.horario-toggle-arrow.open::after {
+.horario-toggle-arrow.open::before {
   transform: rotate(-135deg);
 }
 
@@ -299,7 +299,11 @@
 
 .horario-header {
   display: grid;
-  grid-template-columns: 80px repeat(7, 1fr);
+  /* Reserve a fixed time column + seven flexible day columns but prevent
+     the grid from collapsing into multiple rows. Use minmax to provide a
+     reasonable minimum for each day and allow horizontal scrolling when
+     the container is too narrow. */
+  grid-template-columns: 80px repeat(7, minmax(110px, 1fr));
   gap: 8px;
   margin-bottom: 8px;
   font-weight: 600;
@@ -307,6 +311,9 @@
   color: var(--inscribir-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  /* Ensure the header keeps its columns on a single row; allow the
+     parent `.horario-grid` to scroll horizontally instead of wrapping. */
+  min-width: max-content;
 }
 
 .horario-time-col {
@@ -327,9 +334,11 @@
 
 .horario-row {
   display: grid;
-  grid-template-columns: 80px repeat(7, 1fr);
+  grid-template-columns: 80px repeat(7, minmax(110px, 1fr));
   gap: 8px;
   min-height: 60px;
+  /* Keep the row columns aligned with the header and prevent wrapping */
+  min-width: max-content;
 }
 
 .horario-time-cell {
@@ -1084,5 +1093,11 @@
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+}
+
+/* Materias ya matriculadas en el horario */
+.horario-block.matriculada {
+  opacity: 0.7;
+  border: 2px dashed rgba(255, 255, 255, 0.5);
 }
 

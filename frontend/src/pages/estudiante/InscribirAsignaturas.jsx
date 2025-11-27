@@ -10,6 +10,7 @@ const InscribirAsignaturas = () => {
   const [asignaturas, setAsignaturas] = useState([]);
   const [gruposSeleccionados, setGruposSeleccionados] = useState(new Set());
   const [horario, setHorario] = useState([]);
+  const [materiasMatriculadas, setMateriasMatriculadas] = useState([]); // Nuevo: materias ya inscritas
   const [conflictos, setConflictos] = useState(new Set());
   const [resumen, setResumen] = useState(null);
   const [mensajes, setMensajes] = useState([]);
@@ -121,6 +122,38 @@ const InscribirAsignaturas = () => {
             obligatoriasSinGrupo: payload.obligatorias_sin_grupo || [],
           });
         }
+
+        // Cargar materias ya matriculadas para mostrar en el horario
+        try {
+          const horarioActual = await matriculaService.getHorarioActual();
+          if (horarioActual?.clases && horarioActual.clases.length > 0) {
+            // Agrupar por grupo_id para evitar duplicados
+            const gruposUnicos = {};
+            horarioActual.clases.forEach((clase) => {
+              if (!gruposUnicos[clase.grupo_id]) {
+                gruposUnicos[clase.grupo_id] = {
+                  grupoId: clase.grupo_id,
+                  asignatura: clase.asignatura_nombre,
+                  codigo: clase.asignatura_codigo,
+                  grupoCodigo: clase.grupo_codigo,
+                  docente: clase.docente,
+                  horarios: [],
+                  esMatriculada: true, // Marcar como ya matriculada
+                };
+              }
+              gruposUnicos[clase.grupo_id].horarios.push({
+                dia: clase.dia,
+                hora_inicio: clase.hora_inicio,
+                hora_fin: clase.hora_fin,
+                salon: clase.salon,
+              });
+            });
+            setMateriasMatriculadas(Object.values(gruposUnicos));
+          }
+        } catch (err) {
+          console.warn("No se pudieron cargar las materias matriculadas:", err);
+        }
+
       } catch (error) {
         const razonCarga = "No pudimos cargar la oferta de asignaturas en este momento.";
         openDialog("Oferta temporalmente indisponible", razonCarga);
@@ -144,6 +177,21 @@ const InscribirAsignaturas = () => {
   };
 
   const verificarConflicto = (grupoId, horariosGrupo) => {
+    // Verificar contra materias ya matriculadas
+    for (const materia of materiasMatriculadas) {
+      for (const horarioMat of materia.horarios || []) {
+        for (const horarioNuevo of horariosGrupo) {
+          if (
+            horarioMat.dia === horarioNuevo.dia &&
+            haySolapamiento(horarioMat.hora_inicio, horarioMat.hora_fin, horarioNuevo.hora_inicio, horarioNuevo.hora_fin)
+          ) {
+            return true;
+          }
+        }
+      }
+    }
+
+    // Verificar contra grupos seleccionados
     for (const grupoSelId of gruposSeleccionados) {
       const grupoSel = encontrarGrupoPorId(grupoSelId);
       if (!grupoSel) continue;
@@ -437,23 +485,26 @@ const InscribirAsignaturas = () => {
                 <div className="horario-collapsed">Horario oculto. Pulsa "Mostrar horario" para expandir.</div>
               ) : (
                 (() => {
+                  // Combinar materias matriculadas + seleccionadas
+                  const horarioCompleto = [...materiasMatriculadas, ...horario];
+
+                  // Función para verificar si una hora tiene asignatura
                   const horaTieneAsignatura = (hora) =>
-                    horario.some((h) =>
+                    horarioCompleto.some((h) =>
                       h.horarios.some((hor) =>
                         parseInt(hor.hora_inicio.split(':')[0]) <= hora && parseInt(hor.hora_fin.split(':')[0]) > hora
                       )
                     );
 
-                  // Si se pidió ocultar horas vacías y el carrito está vacío, mostrar mensaje y no el horario
-                  if (hideEmptyHours && gruposSeleccionados.size === 0) {
+                  // Si se pidió ocultar horas vacías y no hay asignaturas
+                  if (hideEmptyHours && horarioCompleto.length === 0) {
                     return (
-                      <div className="horario-empty-message">Aún no se ha añadido ninguna asignatura al carrito.</div>
+                      <div className="horario-empty-message">Aún no hay asignaturas en tu horario.</div>
                     );
                   }
 
-                  // Si se pidió ocultar horas vacías y hay al menos 1 asignatura en el carrito,
-                  // mostrar únicamente las horas que realmente tienen clases.
-                  const visibleHoras = hideEmptyHours && gruposSeleccionados.size > 0
+                  // Filtrar horas visibles
+                  const visibleHoras = hideEmptyHours && horarioCompleto.length > 0
                     ? horas.filter(horaTieneAsignatura)
                     : horas;
 
@@ -480,7 +531,7 @@ const InscribirAsignaturas = () => {
                             <div className="horario-time-cell">{hora}:00</div>
                             {diasSemana.map((dia) => (
                               <div key={`${hora}-${dia}`} className="horario-cell">
-                                {horario
+                                {horarioCompleto
                                   .filter((h) =>
                                     h.horarios.some(
                                       (hor) =>
@@ -500,9 +551,11 @@ const InscribirAsignaturas = () => {
                                     return (
                                       <div
                                         key={idx}
-                                        className="horario-block"
+                                        className={`horario-block ${h.esMatriculada ? 'matriculada' : ''}`}
                                         style={{
-                                          backgroundColor: obtenerColorAsignatura(h.codigo),
+                                          backgroundColor: h.esMatriculada 
+                                            ? '#6c757d' // Gris para las ya matriculadas
+                                            : obtenerColorAsignatura(h.codigo),
                                           height: `${bloqueAltura}px`,
                                           top: `${bloqueTop}px`,
                                         }}
