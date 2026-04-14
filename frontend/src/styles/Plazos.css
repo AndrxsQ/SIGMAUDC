@@ -37,6 +37,20 @@
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
 }
 
+/* Ensure content is shifted right on desktop so a fixed sidebar doesn't overlap */
+@media (min-width: 1025px) {
+  .plazos-container {
+    /* Use the sidebar CSS variables so spacing matches the actual sidebar width */
+    padding-left: calc(var(--sidebar-width) + 24px);
+    transition: padding-left 240ms ease;
+  }
+
+  /* When the sidebar is collapsed, use the collapsed width to avoid excessive gap */
+  .sidebar.closed ~ .main-content .plazos-container {
+    padding-left: calc(var(--sidebar-width-collapsed) + 16px);
+  }
+}
+
 /* iPhone SE y móviles pequeños (320px - 374px) */
 @media (max-width: 374px) {
   .plazos-container {

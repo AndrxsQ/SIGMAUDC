@@ -9,6 +9,7 @@ import React, { useState, useEffect, useImperativeHandle, forwardRef } from "rea
 // Importación de íconos desde react-icons (representan cada opción del menú)
 import {
   FaBars,
+  FaCalendarAlt,
   FaBookOpen,
   FaEdit,
   FaSearch,
@@ -196,15 +197,6 @@ const Sidebar = forwardRef(({ activePage, setActivePage, onLogout }, ref) => {
           </button>
 
           {!isOpen && <span className="tooltip">Pensum</span>}
-        </div>
-        
-        {/* Opción: Guía de matrícula */}
-        <div className="icon-content">
-          <button  className={activePage === "guia" ? "active" : ""} onClick={() => setActivePage("guia")}>
-            <FaBookOpen size={23} /> 
-            <span>Guía de matrícula</span>
-          </button>
-          {!isOpen && <span className="tooltip">Guía de matrícula</span>}
         </div>
         
         {/* Opción: Datos del estudiante */}

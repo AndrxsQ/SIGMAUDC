@@ -31,6 +31,20 @@
   overflow-x: hidden;
 }
 
+/* Ensure content is shifted right on desktop so a fixed sidebar doesn't overlap */
+@media (min-width: 1025px) {
+  .verificar-documentos-container {
+    /* Use the sidebar CSS variables so spacing matches the actual sidebar width */
+    padding-left: calc(var(--sidebar-width) + 24px);
+    transition: padding-left 240ms ease;
+  }
+
+  /* When the sidebar is collapsed, use the collapsed width to avoid excessive gap */
+  .sidebar.closed ~ .main-content .verificar-documentos-container {
+    padding-left: calc(var(--sidebar-width-collapsed) + 16px);
+  }
+}
+
 /* Header */
 .verificar-header {
   display: flex;

@@ -5,11 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"sort"
+	"strconv"
+
+	"github.com/gorilla/mux"
 
 	"github.com/andrxsq/SIGMAUDC/internal/middleware"
 	"github.com/andrxsq/SIGMAUDC/internal/models"
+	"github.com/lib/pq"
 )
 
 // PensumHandler gestiona la vista del pensum para estudiantes
@@ -232,6 +237,80 @@ func (h *PensumHandler) getAsignaturas(pensumID int) ([]models.AsignaturaComplet
 	return asignaturas, nil
 }
 
+// ListPensums devuelve la lista de pensums disponibles (id, nombre)
+func (h *PensumHandler) ListPensums(w http.ResponseWriter, r *http.Request) {
+	claims, err := h.getClaims(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	// Solo jefatura puede listar pensums en este contexto
+	if claims.Rol != "jefe_departamental" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := `SELECT id, nombre FROM pensum ORDER BY nombre`
+	rows, err := h.db.Query(query)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type PensumItem struct {
+		ID     int    `json:"id"`
+		Nombre string `json:"nombre"`
+	}
+
+	var list []PensumItem
+	for rows.Next() {
+		var p PensumItem
+		if err := rows.Scan(&p.ID, &p.Nombre); err != nil {
+			continue
+		}
+		list = append(list, p)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(list)
+}
+
+// GetAsignaturasPensum devuelve las asignaturas de un pensum dado (para jefatura)
+func (h *PensumHandler) GetAsignaturasPensum(w http.ResponseWriter, r *http.Request) {
+	claims, err := h.getClaims(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if claims.Rol != "jefe_departamental" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	if idStr == "" {
+		http.Error(w, "Falta id de pensum", http.StatusBadRequest)
+		return
+	}
+	pensumID, err := strconv.Atoi(idStr)
+	if err != nil || pensumID <= 0 {
+		http.Error(w, "ID de pensum inválido", http.StatusBadRequest)
+		return
+	}
+
+	asignaturas, err := h.getAsignaturas(pensumID)
+	if err != nil {
+		log.Printf("Error obteniendo asignaturas para pensum %d: %v", pensumID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(asignaturas)
+}
+
 type historyRecord struct {
 	AsignaturaID int
 	Estado       string
@@ -412,4 +491,145 @@ func hasApprovedEntry(historial map[int][]historyRecord, asignaturaID int) bool 
 
 func periodOrdinal(year, semestre int) int {
 	return year*2 + (semestre - 1)
+}
+
+// GrupoPensum representa un grupo con información de la asignatura para la vista del jefe
+type GrupoPensum struct {
+	ID               int                 `json:"id"`
+	Codigo           string              `json:"codigo"`
+	AsignaturaID     int                 `json:"asignatura_id"`
+	AsignaturaCodigo string              `json:"asignatura_codigo"`
+	AsignaturaNombre string              `json:"asignatura_nombre"`
+	Semestre         int                 `json:"semestre"`
+	Creditos         int                 `json:"creditos"`
+	Docente          string              `json:"docente"`
+	CupoDisponible   int                 `json:"cupo_disponible"`
+	CupoMax          int                 `json:"cupo_max"`
+	Horarios         []HorarioDisponible `json:"horarios"` // Usa el tipo de matricula.go
+}
+
+// GetGruposPensum devuelve todos los grupos del periodo activo para las asignaturas de un pensum
+func (h *PensumHandler) GetGruposPensum(w http.ResponseWriter, r *http.Request) {
+	claims, err := h.getClaims(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if claims.Rol != "jefe_departamental" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	if idStr == "" {
+		http.Error(w, "Falta id de pensum", http.StatusBadRequest)
+		return
+	}
+	pensumID, err := strconv.Atoi(idStr)
+	if err != nil || pensumID <= 0 {
+		http.Error(w, "ID de pensum inválido", http.StatusBadRequest)
+		return
+	}
+
+	// Obtener periodo activo
+	periodo, err := h.getActivePeriodo()
+	if err != nil || periodo == nil {
+		http.Error(w, "No hay periodo académico activo", http.StatusNotFound)
+		return
+	}
+
+	// Obtener grupos del pensum con información de la asignatura
+	query := `
+		SELECT 
+			g.id,
+			g.codigo,
+			a.id,
+			a.codigo,
+			a.nombre,
+			COALESCE(pa.semestre, 0),
+			a.creditos,
+			COALESCE(g.docente, ''),
+			g.cupo_disponible,
+			g.cupo_max
+		FROM grupo g
+		JOIN asignatura a ON g.asignatura_id = a.id
+		JOIN pensum_asignatura pa ON pa.asignatura_id = a.id AND pa.pensum_id = $1
+		WHERE g.periodo_id = $2
+		ORDER BY pa.semestre, a.codigo, g.codigo
+	`
+	rows, err := h.db.Query(query, pensumID, periodo.ID)
+	if err != nil {
+		log.Printf("Error obteniendo grupos para pensum %d: %v", pensumID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var grupos []GrupoPensum
+	var groupIDs []int
+	for rows.Next() {
+		var g GrupoPensum
+		if err := rows.Scan(
+			&g.ID,
+			&g.Codigo,
+			&g.AsignaturaID,
+			&g.AsignaturaCodigo,
+			&g.AsignaturaNombre,
+			&g.Semestre,
+			&g.Creditos,
+			&g.Docente,
+			&g.CupoDisponible,
+			&g.CupoMax,
+		); err != nil {
+			log.Printf("Error escaneando grupo: %v", err)
+			continue
+		}
+		grupos = append(grupos, g)
+		groupIDs = append(groupIDs, g.ID)
+	}
+
+	// Obtener horarios de todos los grupos
+	if len(groupIDs) > 0 {
+		horariosMap, err := h.fetchHorariosForGroups(groupIDs)
+		if err != nil {
+			log.Printf("Error obteniendo horarios: %v", err)
+		} else {
+			for i := range grupos {
+				grupos[i].Horarios = horariosMap[grupos[i].ID]
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(grupos)
+}
+
+// fetchHorariosForGroups obtiene los horarios para una lista de grupos
+func (h *PensumHandler) fetchHorariosForGroups(groupIDs []int) (map[int][]HorarioDisponible, error) {
+	horarios := make(map[int][]HorarioDisponible)
+	if len(groupIDs) == 0 {
+		return horarios, nil
+	}
+	query := `
+		SELECT grupo_id, dia, hora_inicio::text, hora_fin::text, COALESCE(salon, '')
+		FROM horario_grupo
+		WHERE grupo_id = ANY($1)
+	`
+	rows, err := h.db.Query(query, pq.Array(groupIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var grupoID int
+		var h HorarioDisponible
+		if err := rows.Scan(&grupoID, &h.Dia, &h.HoraInicio, &h.HoraFin, &h.Salon); err != nil {
+			return nil, err
+		}
+		horarios[grupoID] = append(horarios[grupoID], h)
+	}
+
+	return horarios, nil
 }

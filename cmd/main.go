@@ -85,7 +85,10 @@ func main() {
 	protected.HandleFunc("/documentos/{id}/revisar", documentosHandler.RevisarDocumento).Methods("PUT")     // Para jefatura
 
 	// Rutas de pensum (protegidas)
-	protected.HandleFunc("/pensum", pensumHandler.GetPensumEstudiante).Methods("GET") // Para estudiantes
+	protected.HandleFunc("/pensum", pensumHandler.GetPensumEstudiante).Methods("GET")                   // Para estudiantes
+	protected.HandleFunc("/pensum/list", pensumHandler.ListPensums).Methods("GET")                      // Para jefatura: listar pensums
+	protected.HandleFunc("/pensum/{id}/asignaturas", pensumHandler.GetAsignaturasPensum).Methods("GET") // Para jefatura: asignaturas por pensum
+	protected.HandleFunc("/pensum/{id}/grupos", pensumHandler.GetGruposPensum).Methods("GET")           // Para jefatura: grupos por pensum
 	protected.HandleFunc("/estudiante/datos", estudianteHandler.GetDatosEstudiante).Methods("GET")
 	protected.HandleFunc("/estudiante/datos", estudianteHandler.UpdateDatosEstudiante).Methods("PUT")
 	protected.HandleFunc("/estudiante/foto", estudianteHandler.SubirFotoEstudiante).Methods("POST")
@@ -102,9 +105,12 @@ func main() {
 	protected.HandleFunc("/matricula/horario-actual", matriculaHandler.GetHorarioActual).Methods("GET")                   // Para estudiantes
 	protected.HandleFunc("/matricula/asignaturas/{id}/grupos", matriculaHandler.GetGruposAsignatura).Methods("GET")
 	protected.HandleFunc("/matricula/inscribir", matriculaHandler.InscribirAsignaturas).Methods("POST")
+	// Permitir a jefatura actualizar horarios de un grupo
+	protected.HandleFunc("/grupo/{id}/horario", matriculaHandler.UpdateGrupoHorario).Methods("PUT")
 
 	// Rutas de modificaciones (para jefatura)
 	protected.HandleFunc("/modificaciones/estudiante", matriculaHandler.GetStudentMatricula).Methods("GET")
+	protected.HandleFunc("/modificaciones/estudiante/{id}/disponibles", matriculaHandler.JefeGetModificacionesData).Methods("GET")
 	protected.HandleFunc("/modificaciones/estudiante/{id}/inscribir", matriculaHandler.JefeInscribirAsignaturas).Methods("POST")
 	protected.HandleFunc("/modificaciones/estudiante/{id}/desmatricular", matriculaHandler.JefeDesmatricularGrupo).Methods("POST")
 	// Rutas de modificaciones estudiantiles (protegidas)
@@ -112,6 +118,14 @@ func main() {
 	protected.HandleFunc("/matricula/modificaciones", matriculaHandler.GetModificacionesData).Methods("GET")
 	protected.HandleFunc("/matricula/retirar-materia", matriculaHandler.RetirarMateria).Methods("POST")
 	protected.HandleFunc("/matricula/agregar-materia", matriculaHandler.AgregarMateriaModificaciones).Methods("POST")
+
+	// Rutas de solicitudes de modificación (estudiante)
+	protected.HandleFunc("/matricula/solicitudes-modificacion", matriculaHandler.GetSolicitudesEstudiante).Methods("GET")
+	protected.HandleFunc("/matricula/solicitudes-modificacion", matriculaHandler.CrearSolicitudModificacion).Methods("POST")
+
+	// Rutas de solicitudes de modificación (jefe)
+	protected.HandleFunc("/jefe/solicitudes-modificacion", matriculaHandler.GetSolicitudesPorPrograma).Methods("GET")
+	protected.HandleFunc("/jefe/solicitudes-modificacion/{id}", matriculaHandler.ValidarSolicitudModificacion).Methods("PUT")
 
 	// Servir archivos estáticos (uploads) - soporta estructura de carpetas periodo/programa/
 	r.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads/"))))

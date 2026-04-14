@@ -430,6 +430,89 @@
 }
 
 /* ============================================
+   CONTROLES DEL HORARIO (igual que InscribirAsignaturas)
+   ============================================ */
+.horario-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.horario-card-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--horario-text-primary);
+}
+
+.horario-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.horario-hide-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--horario-text-secondary);
+  cursor: pointer;
+}
+
+.horario-hide-empty input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.horario-toggle-arrow {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--horario-bg-card);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--horario-shadow-sm);
+  transition: transform 0.3s ease, background 0.2s ease;
+}
+
+.horario-toggle-arrow::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--horario-text-secondary);
+  border-bottom: 2px solid var(--horario-text-secondary);
+  transform: rotate(45deg);
+  transition: transform 0.3s ease;
+}
+
+.horario-toggle-arrow.open::before {
+  transform: rotate(-135deg);
+}
+
+.horario-toggle-arrow:hover {
+  background: var(--horario-gold-light);
+}
+
+.horario-collapsed,
+.horario-empty-message {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--horario-text-secondary);
+  font-size: 0.95rem;
+  background: var(--horario-bg-card);
+  border-radius: 12px;
+  border: 1px dashed var(--horario-border);
+}
+
+/* ============================================
    RESPONSIVE
    ============================================ */
 
@@ -556,6 +639,40 @@
 
   .horario-grid-wrapper {
     padding: 24px;
+  }
+}
+
+/* ============================================
+   AJUSTES PARA SIDEBAR EN DESKTOP
+   ============================================ */
+@media (min-width: 1025px) {
+  .consultar-matricula-container {
+    padding-left: calc(280px + 32px); /* sidebar width (280px) + padding (32px) */
+  }
+
+  /* Cuando el sidebar está colapsado */
+  .sidebar.closed ~ .main-content .consultar-matricula-container {
+    padding-left: calc(70px + 32px); /* sidebar collapsed (70px) + padding (32px) */
+  }
+}
+
+@media (min-width: 1441px) {
+  .consultar-matricula-container {
+    padding-left: calc(280px + 40px);
+  }
+
+  .sidebar.closed ~ .main-content .consultar-matricula-container {
+    padding-left: calc(70px + 40px);
+  }
+}
+
+@media (min-width: 1921px) {
+  .consultar-matricula-container {
+    padding-left: calc(280px + 56px);
+  }
+
+  .sidebar.closed ~ .main-content .consultar-matricula-container {
+    padding-left: calc(70px + 56px);
   }
 }
 

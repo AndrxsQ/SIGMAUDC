@@ -182,6 +182,61 @@ func RunMigrations(db *sql.DB) error {
 			END IF;
 		END $$;
 		`,
+		// Tabla de solicitudes de modificación de matrícula
+		`
+		CREATE TABLE IF NOT EXISTS solicitud_modificacion (
+			id SERIAL PRIMARY KEY,
+			estudiante_id INT NOT NULL,
+			programa_id INT NOT NULL,
+			periodo_id INT NOT NULL,
+			grupos_agregar JSONB DEFAULT '[]',
+			grupos_retirar JSONB DEFAULT '[]',
+			estado VARCHAR(20) DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'aprobada', 'rechazada')),
+			observacion TEXT DEFAULT NULL,
+			revisado_por INT DEFAULT NULL,
+			fecha_solicitud TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			fecha_revision TIMESTAMP DEFAULT NULL
+		)
+		`,
+		`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint 
+				WHERE conname = 'fk_solicitud_estudiante' 
+				AND conrelid = 'solicitud_modificacion'::regclass
+			) THEN
+				ALTER TABLE solicitud_modificacion
+				ADD CONSTRAINT fk_solicitud_estudiante FOREIGN KEY (estudiante_id) REFERENCES estudiante(id) ON DELETE CASCADE;
+			END IF;
+		END $$;
+		`,
+		`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint 
+				WHERE conname = 'fk_solicitud_programa' 
+				AND conrelid = 'solicitud_modificacion'::regclass
+			) THEN
+				ALTER TABLE solicitud_modificacion
+				ADD CONSTRAINT fk_solicitud_programa FOREIGN KEY (programa_id) REFERENCES programa(id);
+			END IF;
+		END $$;
+		`,
+		`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint 
+				WHERE conname = 'fk_solicitud_periodo' 
+				AND conrelid = 'solicitud_modificacion'::regclass
+			) THEN
+				ALTER TABLE solicitud_modificacion
+				ADD CONSTRAINT fk_solicitud_periodo FOREIGN KEY (periodo_id) REFERENCES periodo_academico(id);
+			END IF;
+		END $$;
+		`,
 	}
 
 	for _, stmt := range statements {
