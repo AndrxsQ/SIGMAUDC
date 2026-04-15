@@ -1,3 +1,5 @@
+// Package handlers – AuthHandler
+// Gestiona la autenticación de usuarios: login y configuración inicial de contraseña.
 package handlers
 
 import (
@@ -13,23 +15,42 @@ import (
 
 	"github.com/andrxsq/SIGMAUDC/internal/middleware"
 	"github.com/andrxsq/SIGMAUDC/internal/models"
+	"github.com/andrxsq/SIGMAUDC/internal/services"
 	"github.com/andrxsq/SIGMAUDC/internal/utils"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
+// AuthHandler gestiona las peticiones de autenticación del sistema.
+//
+// Principios aplicados:
+//   - SRP: solo se ocupa de autenticación; la auditoría es delegada al AuditoriaService.
+//   - DIP: depende de AuditoriaService (abstracción), no implementa la lógica de auditoría.
 type AuthHandler struct {
 	db        *sql.DB
 	jwtSecret string
+	auditoria *services.AuditoriaService
 }
 
-func NewAuthHandler(db *sql.DB, jwtSecret string) *AuthHandler {
+// NewAuthHandler crea una nueva instancia de AuthHandler con sus dependencias inyectadas.
+func NewAuthHandler(db *sql.DB, jwtSecret string, auditoria *services.AuditoriaService) *AuthHandler {
 	return &AuthHandler{
 		db:        db,
 		jwtSecret: jwtSecret,
+		auditoria: auditoria,
 	}
 }
 
+// Login autentica a un usuario por código y contraseña.
+//
+// POST /auth/login
+// Body: models.LoginRequest
+//
+// Flujos posibles:
+//   - Usuario no existe → 401 con errorType "user_not_found".
+//   - Usuario sin contraseña → 200 con requiresPasswordSetup: true.
+//   - Contraseña incorrecta → 401 con errorType "wrong_password".
+//   - Éxito → 200 con token JWT.
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req models.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -37,14 +58,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Obtener IP y User-Agent para auditoría
 	ip := utils.GetIPAddress(r)
 	userAgent := r.UserAgent()
 
-	// Buscar usuario por código
 	var usuario models.Usuario
-	query := `SELECT id, codigo, email, password_hash, rol, programa_id 
-			  FROM usuario WHERE codigo = $1`
+	query := `SELECT id, codigo, email, password_hash, rol, programa_id
+	          FROM usuario WHERE codigo = $1`
 
 	err := h.db.QueryRow(query, req.Codigo).Scan(
 		&usuario.ID,
@@ -56,9 +75,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		// Usuario no existe - registrar auditoría
-		h.registrarAuditoria(0, "login_fallido", "Usuario no encontrado: "+req.Codigo, ip, userAgent)
-
+		h.auditoria.Registrar(0, "login_fallido", "Usuario no encontrado: "+req.Codigo, ip, userAgent)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(models.LoginResponse{
@@ -69,9 +86,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		// Error de base de datos
-		h.registrarAuditoria(0, "login_fallido", "Error de base de datos: "+err.Error(), ip, userAgent)
-
+		h.auditoria.Registrar(0, "login_fallido", "Error de base de datos: "+err.Error(), ip, userAgent)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.LoginResponse{
@@ -81,11 +96,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verificar si password_hash es NULL (primer inicio de sesión)
+	// Primer inicio de sesión: el usuario aún no tiene contraseña configurada.
 	if !usuario.PasswordHash.Valid || usuario.PasswordHash.String == "" {
-		// Primer inicio de sesión - requiere crear contraseña
-		h.registrarAuditoria(usuario.ID, "login_fallido", "Intento de login sin contraseña configurada", ip, userAgent)
-
+		h.auditoria.Registrar(usuario.ID, "login_fallido", "Intento de login sin contraseña configurada", ip, userAgent)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(models.LoginResponse{
 			RequiresPasswordSetup: true,
@@ -94,14 +107,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verificar contraseña
+	// Verificar contraseña con bcrypt.
 	if err := bcrypt.CompareHashAndPassword(
 		[]byte(usuario.PasswordHash.String),
 		[]byte(req.Password),
 	); err != nil {
-		// Contraseña incorrecta
-		h.registrarAuditoria(usuario.ID, "login_fallido", "Contraseña incorrecta", ip, userAgent)
-
+		h.auditoria.Registrar(usuario.ID, "login_fallido", "Contraseña incorrecta", ip, userAgent)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(models.LoginResponse{
@@ -111,22 +122,25 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Login exitoso - generar JWT
 	token, err := h.generateJWT(usuario)
 	if err != nil {
 		http.Error(w, "Error generating token", http.StatusInternalServerError)
 		return
 	}
 
-	// Registrar auditoría de login exitoso
-	h.registrarAuditoria(usuario.ID, "login_exitoso", "Inicio de sesión exitoso", ip, userAgent)
+	h.auditoria.Registrar(usuario.ID, "login_exitoso", "Inicio de sesión exitoso", ip, userAgent)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(models.LoginResponse{
-		Token: token,
-	})
+	json.NewEncoder(w).Encode(models.LoginResponse{Token: token})
 }
 
+// SetPassword establece la contraseña inicial de un usuario en su primer acceso.
+//
+// POST /auth/set-password
+// Body: models.SetPasswordRequest
+//
+// Valida que el userId, código y email coincidan con los datos en BD,
+// y que el usuario aún no tenga contraseña configurada.
 func (h *AuthHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	var req models.SetPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -134,7 +148,6 @@ func (h *AuthHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Obtener información del usuario para validar código, correo y que tenga password_hash NULL
 	var usuario models.Usuario
 	var passwordHash sql.NullString
 	query := `SELECT id, codigo, email, password_hash, rol, programa_id FROM usuario WHERE id = $1`
@@ -160,13 +173,12 @@ func (h *AuthHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validar que el código ingresado coincida con el código del usuario
-	if strings.TrimSpace(req.Codigo) != strings.TrimSpace(usuario.Codigo) {
-		// Registrar intento fallido de verificación de código
-		ip := utils.GetIPAddress(r)
-		userAgent := r.UserAgent()
-		h.registrarAuditoria(req.UserID, "verificacion_codigo_fallida", "Código no coincide al crear contraseña", ip, userAgent)
+	ip := utils.GetIPAddress(r)
+	userAgent := r.UserAgent()
 
+	// Validar que el código coincida.
+	if strings.TrimSpace(req.Codigo) != strings.TrimSpace(usuario.Codigo) {
+		h.auditoria.Registrar(req.UserID, "verificacion_codigo_fallida", "Código no coincide al crear contraseña", ip, userAgent)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(models.SetPasswordResponse{
@@ -176,13 +188,9 @@ func (h *AuthHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validar que el usuario tenga password_hash NULL (debe ser primer inicio de sesión)
+	// Solo usuarios sin contraseña previa pueden usar este endpoint.
 	if passwordHash.Valid && passwordHash.String != "" {
-		// El usuario ya tiene contraseña - no debería estar aquí
-		ip := utils.GetIPAddress(r)
-		userAgent := r.UserAgent()
-		h.registrarAuditoria(req.UserID, "intento_crear_contraseña_existente", "Intento de crear contraseña cuando ya existe", ip, userAgent)
-
+		h.auditoria.Registrar(req.UserID, "intento_crear_contraseña_existente", "Intento de crear contraseña cuando ya existe", ip, userAgent)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(models.SetPasswordResponse{
@@ -192,7 +200,6 @@ func (h *AuthHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validar que el correo no esté vacío
 	if strings.TrimSpace(req.Email) == "" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -203,11 +210,10 @@ func (h *AuthHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Normalizar correos: convertir a minúsculas, eliminar espacios al inicio y final
+	// Normalizar correctamente antes de comparar (minúsculas + trim).
 	emailIngresado := strings.ToLower(strings.TrimSpace(req.Email))
 	emailBD := strings.ToLower(strings.TrimSpace(usuario.Email))
 
-	// Validar que el email de la BD no esté vacío (por si acaso)
 	if emailBD == "" {
 		log.Printf("[SetPassword] ERROR CRÍTICO: Email en BD está vacío para UserID: %d", req.UserID)
 		w.Header().Set("Content-Type", "application/json")
@@ -219,20 +225,16 @@ func (h *AuthHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log para debugging
 	log.Printf("[SetPassword] Validando correo - UserID: %d, Codigo: %s", req.UserID, req.Codigo)
 	log.Printf("[SetPassword] Email ingresado (normalizado): '%s' (longitud: %d)", emailIngresado, len(emailIngresado))
 	log.Printf("[SetPassword] Email BD (normalizado): '%s' (longitud: %d)", emailBD, len(emailBD))
 
-	// Validar que el correo ingresado coincida EXACTAMENTE con el correo del usuario
-	// Comparación estricta byte por byte después de normalización
 	if emailIngresado != emailBD {
-		// Registrar intento fallido de verificación de correo con detalles completos
-		ip := utils.GetIPAddress(r)
-		userAgent := r.UserAgent()
-		descripcion := fmt.Sprintf("Correo no coincide: ingresado='%s' (len=%d), esperado='%s' (len=%d), usuario_id=%d, codigo=%s", 
-			emailIngresado, len(emailIngresado), emailBD, len(emailBD), req.UserID, req.Codigo)
-		h.registrarAuditoria(req.UserID, "verificacion_correo_fallida", descripcion, ip, userAgent)
+		descripcion := fmt.Sprintf(
+			"Correo no coincide: ingresado='%s' (len=%d), esperado='%s' (len=%d), usuario_id=%d, codigo=%s",
+			emailIngresado, len(emailIngresado), emailBD, len(emailBD), req.UserID, req.Codigo,
+		)
+		h.auditoria.Registrar(req.UserID, "verificacion_correo_fallida", descripcion, ip, userAgent)
 
 		log.Printf("[SetPassword] ERROR: Correo no coincide")
 		log.Printf("[SetPassword]   - Email ingresado: '%s' (longitud: %d)", emailIngresado, len(emailIngresado))
@@ -250,7 +252,7 @@ func (h *AuthHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[SetPassword] ✓ Correo validado correctamente para UserID: %d", req.UserID)
 
-	// Validar que la contraseña cumpla con los requisitos (alfanumérica, mínimo 8 caracteres)
+	// Validar requisitos de la contraseña (mínimo 8 caracteres, alfanumérica).
 	valid, message := utils.ValidatePassword(req.NewPassword)
 	if !valid {
 		w.Header().Set("Content-Type", "application/json")
@@ -262,32 +264,25 @@ func (h *AuthHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Hashear la contraseña
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
 		http.Error(w, "Error hashing password", http.StatusInternalServerError)
 		return
 	}
 
-	// Actualizar password_hash en la BD
 	updateQuery := `UPDATE usuario SET password_hash = $1 WHERE id = $2`
-	_, err = h.db.Exec(updateQuery, string(hashedPassword), req.UserID)
-	if err != nil {
+	if _, err = h.db.Exec(updateQuery, string(hashedPassword), req.UserID); err != nil {
 		http.Error(w, "Error updating password", http.StatusInternalServerError)
 		return
 	}
 
-	// Generar JWT
 	token, err := h.generateJWT(usuario)
 	if err != nil {
 		http.Error(w, "Error generating token", http.StatusInternalServerError)
 		return
 	}
 
-	// Registrar auditoría
-	ip := utils.GetIPAddress(r)
-	userAgent := r.UserAgent()
-	h.registrarAuditoria(usuario.ID, "cambio_contraseña", "Creación de contraseña inicial", ip, userAgent)
+	h.auditoria.Registrar(usuario.ID, "cambio_contraseña", "Creación de contraseña inicial", ip, userAgent)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(models.SetPasswordResponse{
@@ -296,31 +291,32 @@ func (h *AuthHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetCurrentUser retorna los datos del usuario autenticado extraídos del JWT + BD.
+//
+// GET /api/me
+// Requiere: cabecera Authorization con token JWT válido.
 func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
-	// El usuario viene del contexto del middleware JWT
 	claims, ok := middleware.GetClaimsFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Obtener información completa del usuario con el nombre del programa y nombre/apellido según el rol
 	var usuario models.Usuario
 	var nombre, apellido sql.NullString
-	
-	// Query dinámico según el rol para obtener nombre y apellido
+
 	query := `
-		SELECT 
-			u.id, 
-			u.codigo, 
-			u.email, 
-			u.rol, 
-			u.programa_id, 
+		SELECT
+			u.id,
+			u.codigo,
+			u.email,
+			u.rol,
+			u.programa_id,
 			p.nombre as programa_nombre,
 			COALESCE(jd.nombre, e.nombre) as nombre,
 			COALESCE(jd.apellido, e.apellido) as apellido
-		FROM usuario u 
-		INNER JOIN programa p ON u.programa_id = p.id 
+		FROM usuario u
+		INNER JOIN programa p ON u.programa_id = p.id
 		LEFT JOIN jefe_departamental jd ON u.id = jd.usuario_id
 		LEFT JOIN estudiante e ON u.id = e.usuario_id
 		WHERE u.id = $1
@@ -339,7 +335,7 @@ func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error fetching user", http.StatusInternalServerError)
 		return
 	}
-	
+
 	if nombre.Valid {
 		usuario.Nombre = nombre.String
 	}
@@ -351,8 +347,9 @@ func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(usuario)
 }
 
+// generateJWT genera un token JWT firmado para el usuario dado.
+// El token tiene una validez de 24 horas.
 func (h *AuthHandler) generateJWT(usuario models.Usuario) (string, error) {
-	// Token expira en 24 horas (más apropiado para una aplicación web)
 	expirationTime := time.Now().Add(24 * time.Hour)
 	claims := &models.JWTClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -365,22 +362,6 @@ func (h *AuthHandler) generateJWT(usuario models.Usuario) (string, error) {
 		Rol:        usuario.Rol,
 		ProgramaID: usuario.ProgramaID,
 	}
-
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(h.jwtSecret))
-}
-
-func (h *AuthHandler) registrarAuditoria(usuarioID int, accion, descripcion, ip, userAgent string) {
-	var userID sql.NullInt64
-	if usuarioID > 0 {
-		userID = sql.NullInt64{Int64: int64(usuarioID), Valid: true}
-	}
-
-	query := `INSERT INTO auditoria (usuario_id, accion, descripcion, ip, user_agent) 
-			  VALUES ($1, $2, $3, $4, $5)`
-	_, err := h.db.Exec(query, userID, accion, descripcion, ip, userAgent)
-	if err != nil {
-		// Log error pero no fallar la operación principal
-		// En producción, usar un logger apropiado
-	}
 }

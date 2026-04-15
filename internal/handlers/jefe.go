@@ -1,3 +1,5 @@
+// Package handlers – JefeHandler
+// Gestiona las peticiones relacionadas con datos y perfil del jefe departamental.
 package handlers
 
 import (
@@ -11,29 +13,27 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/andrxsq/SIGMAUDC/internal/middleware"
-	"github.com/andrxsq/SIGMAUDC/internal/models"
+	"github.com/andrxsq/SIGMAUDC/internal/constants"
 )
 
+// JefeHandler gestiona las peticiones HTTP relacionadas con el perfil
+// y datos personales del jefe departamental.
 type JefeHandler struct {
 	db *sql.DB
 }
 
+// NewJefeHandler crea una nueva instancia de JefeHandler.
 func NewJefeHandler(db *sql.DB) *JefeHandler {
 	return &JefeHandler{db: db}
 }
 
-func (h *JefeHandler) getClaims(r *http.Request) (*models.JWTClaims, error) {
-	claims, ok := middleware.GetClaimsFromContext(r.Context())
-	if !ok {
-		return nil, errors.New("unauthorized")
-	}
-	return claims, nil
-}
-
+// getJefeID obtiene el ID interno del jefe departamental a partir del ID de usuario.
+// Retorna un error descriptivo si el jefe no existe en la base de datos.
 func (h *JefeHandler) getJefeID(usuarioID int) (int, error) {
 	var jefeID int
-	err := h.db.QueryRow(`SELECT id FROM jefe_departamental WHERE usuario_id = $1`, usuarioID).Scan(&jefeID)
+	err := h.db.QueryRow(
+		`SELECT id FROM jefe_departamental WHERE usuario_id = $1`, usuarioID,
+	).Scan(&jefeID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, errors.New("jefe departamental no encontrado")
@@ -43,24 +43,29 @@ func (h *JefeHandler) getJefeID(usuarioID int) (int, error) {
 	return jefeID, nil
 }
 
+// JefeDatosResponse es el DTO de respuesta para GET /api/jefe/datos.
 type JefeDatosResponse struct {
-	JefeID      int    `json:"jefe_id"`
-	Codigo      string `json:"codigo"`
-	Nombre      string `json:"nombre"`
-	Apellido    string `json:"apellido"`
-	Email       string `json:"email"`
-	Programa    string `json:"programa"`
-	Sexo        string `json:"sexo"`
-	FotoPerfil  string `json:"foto_perfil"`
+	JefeID     int    `json:"jefe_id"`
+	Codigo     string `json:"codigo"`
+	Nombre     string `json:"nombre"`
+	Apellido   string `json:"apellido"`
+	Email      string `json:"email"`
+	Programa   string `json:"programa"`
+	Sexo       string `json:"sexo"`
+	FotoPerfil string `json:"foto_perfil"`
 }
 
+// GetDatosJefe retorna los datos personales del jefe departamental autenticado.
+//
+// Requiere: rol "jefe_departamental".
+// Responde con JefeDatosResponse en JSON.
 func (h *JefeHandler) GetDatosJefe(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Rol != "jefe_departamental" {
+	if claims.Rol != constants.RolJefe {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -104,25 +109,24 @@ func (h *JefeHandler) GetDatosJefe(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(datos)
 }
 
+// UpdateDatosJefeRequest es el body esperado en PUT /api/jefe/datos.
 type UpdateDatosJefeRequest struct {
 	Nombre   string `json:"nombre"`
 	Apellido string `json:"apellido"`
 	Sexo     string `json:"sexo"`
 }
 
-var allowedSexosJefe = map[string]struct{}{
-	"masculino": {},
-	"femenino":  {},
-	"otro":      {},
-}
-
+// UpdateDatosJefe actualiza el nombre, apellido y sexo del jefe autenticado.
+//
+// Requiere: rol "jefe_departamental".
+// Responde con 204 No Content si la actualización es exitosa.
 func (h *JefeHandler) UpdateDatosJefe(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Rol != "jefe_departamental" {
+	if claims.Rol != constants.RolJefe {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -133,11 +137,12 @@ func (h *JefeHandler) UpdateDatosJefe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Normalizar y validar sexo usando la lista centralizada del paquete constants.
 	sexo := strings.TrimSpace(strings.ToLower(payload.Sexo))
 	if sexo == "" {
 		sexo = "otro"
 	}
-	if _, ok := allowedSexosJefe[sexo]; !ok {
+	if _, ok := constants.SexosPermitidos[sexo]; !ok {
 		http.Error(w, "Valor de sexo inválido", http.StatusBadRequest)
 		return
 	}
@@ -169,18 +174,22 @@ func (h *JefeHandler) UpdateDatosJefe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// SubirFotoJefe reemplaza la foto de perfil del jefe departamental autenticado.
+//
+// Requiere: rol "jefe_departamental", form-data con campo "foto" (JPG, JPEG o PNG, máx 8 MB).
+// Responde con la URL pública de la foto en JSON.
 func (h *JefeHandler) SubirFotoJefe(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Rol != "jefe_departamental" {
+	if claims.Rol != constants.RolJefe {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
-	if err := r.ParseMultipartForm(8 << 20); err != nil {
+	if err := r.ParseMultipartForm(constants.MaxFotoBytes); err != nil {
 		http.Error(w, "No se pudo procesar el archivo", http.StatusBadRequest)
 		return
 	}
@@ -192,8 +201,16 @@ func (h *JefeHandler) SubirFotoJefe(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	// Validar extensión contra la lista centralizada de extensiones permitidas.
 	ext := strings.ToLower(filepath.Ext(header.Filename))
-	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
+	extValida := false
+	for _, e := range constants.ExtensionesFoto {
+		if ext == e {
+			extValida = true
+			break
+		}
+	}
+	if !extValida {
 		http.Error(w, "Formato de imagen no permitido", http.StatusBadRequest)
 		return
 	}
@@ -236,4 +253,3 @@ func (h *JefeHandler) SubirFotoJefe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"foto_perfil": photoURL})
 }
-

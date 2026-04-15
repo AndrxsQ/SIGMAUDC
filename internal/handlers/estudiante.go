@@ -1,3 +1,5 @@
+// Package handlers – EstudianteHandler
+// Gestiona las peticiones relacionadas con datos y perfil del estudiante.
 package handlers
 
 import (
@@ -11,29 +13,27 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/andrxsq/SIGMAUDC/internal/middleware"
-	"github.com/andrxsq/SIGMAUDC/internal/models"
+	"github.com/andrxsq/SIGMAUDC/internal/constants"
 )
 
+// EstudianteHandler gestiona las peticiones HTTP relacionadas con el perfil
+// y datos personales del estudiante.
 type EstudianteHandler struct {
 	db *sql.DB
 }
 
+// NewEstudianteHandler crea una nueva instancia de EstudianteHandler.
 func NewEstudianteHandler(db *sql.DB) *EstudianteHandler {
 	return &EstudianteHandler{db: db}
 }
 
-func (h *EstudianteHandler) getClaims(r *http.Request) (*models.JWTClaims, error) {
-	claims, ok := middleware.GetClaimsFromContext(r.Context())
-	if !ok {
-		return nil, errors.New("unauthorized")
-	}
-	return claims, nil
-}
-
+// getEstudianteID obtiene el ID interno del estudiante a partir del ID de usuario.
+// Retorna un error descriptivo si el estudiante no existe en la base de datos.
 func (h *EstudianteHandler) getEstudianteID(usuarioID int) (int, error) {
 	var estudianteID int
-	err := h.db.QueryRow(`SELECT id FROM estudiante WHERE usuario_id = $1`, usuarioID).Scan(&estudianteID)
+	err := h.db.QueryRow(
+		`SELECT id FROM estudiante WHERE usuario_id = $1`, usuarioID,
+	).Scan(&estudianteID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, errors.New("estudiante no encontrado")
@@ -43,6 +43,7 @@ func (h *EstudianteHandler) getEstudianteID(usuarioID int) (int, error) {
 	return estudianteID, nil
 }
 
+// EstudianteDatosResponse es el DTO de respuesta para GET /api/estudiante/datos.
 type EstudianteDatosResponse struct {
 	EstudianteID int      `json:"estudiante_id"`
 	Codigo       string   `json:"codigo"`
@@ -57,13 +58,17 @@ type EstudianteDatosResponse struct {
 	FotoPerfil   string   `json:"foto_perfil"`
 }
 
+// GetDatosEstudiante retorna los datos personales y académicos del estudiante autenticado.
+//
+// Requiere: rol "estudiante".
+// Responde con EstudianteDatosResponse en JSON.
 func (h *EstudianteHandler) GetDatosEstudiante(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -118,25 +123,24 @@ func (h *EstudianteHandler) GetDatosEstudiante(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(datos)
 }
 
+// UpdateDatosRequest es el body esperado en PUT /api/estudiante/datos.
 type UpdateDatosRequest struct {
 	Nombre   string `json:"nombre"`
 	Apellido string `json:"apellido"`
 	Sexo     string `json:"sexo"`
 }
 
-var allowedSexos = map[string]struct{}{
-	"masculino": {},
-	"femenino":  {},
-	"otro":      {},
-}
-
+// UpdateDatosEstudiante actualiza el nombre, apellido y sexo del estudiante autenticado.
+//
+// Requiere: rol "estudiante".
+// Responde con 204 No Content si la actualización es exitosa.
 func (h *EstudianteHandler) UpdateDatosEstudiante(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -147,11 +151,12 @@ func (h *EstudianteHandler) UpdateDatosEstudiante(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Normalizar y validar sexo usando la lista de valores permitidos del paquete constants.
 	sexo := strings.TrimSpace(strings.ToLower(payload.Sexo))
 	if sexo == "" {
 		sexo = "otro"
 	}
-	if _, ok := allowedSexos[sexo]; !ok {
+	if _, ok := constants.SexosPermitidos[sexo]; !ok {
 		http.Error(w, "Valor de sexo inválido", http.StatusBadRequest)
 		return
 	}
@@ -183,18 +188,22 @@ func (h *EstudianteHandler) UpdateDatosEstudiante(w http.ResponseWriter, r *http
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// SubirFotoEstudiante reemplaza la foto de perfil del estudiante autenticado.
+//
+// Requiere: rol "estudiante", form-data con campo "foto" (JPG, JPEG o PNG, máx. 8 MB).
+// Responde con la URL pública de la foto en JSON.
 func (h *EstudianteHandler) SubirFotoEstudiante(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
-	if err := r.ParseMultipartForm(8 << 20); err != nil {
+	if err := r.ParseMultipartForm(constants.MaxFotoBytes); err != nil {
 		http.Error(w, "No se pudo procesar el archivo", http.StatusBadRequest)
 		return
 	}
@@ -206,8 +215,16 @@ func (h *EstudianteHandler) SubirFotoEstudiante(w http.ResponseWriter, r *http.R
 	}
 	defer file.Close()
 
+	// Validar extensión contra la lista centralizada de extensiones permitidas.
 	ext := strings.ToLower(filepath.Ext(header.Filename))
-	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
+	extValida := false
+	for _, e := range constants.ExtensionesFoto {
+		if ext == e {
+			extValida = true
+			break
+		}
+	}
+	if !extValida {
 		http.Error(w, "Formato de imagen no permitido", http.StatusBadRequest)
 		return
 	}

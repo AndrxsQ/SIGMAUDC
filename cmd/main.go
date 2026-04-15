@@ -1,71 +1,80 @@
+// Package main es el punto de entrada de la aplicación SIGMAUDC.
+// Carga la configuración, conecta la base de datos, inicializa los handlers
+// con sus dependencias inyectadas y arranca el servidor HTTP.
+//
+// Principios aplicados:
+//   - DIP: los handlers reciben sus dependencias (db, AuditoriaService) por inyección.
+//   - SRP: main solo orquesta el arranque; la lógica vive en los paquetes internos.
 package main
 
 import (
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/andrxsq/SIGMAUDC/internal/config"
 	"github.com/andrxsq/SIGMAUDC/internal/database"
 	"github.com/andrxsq/SIGMAUDC/internal/handlers"
 	"github.com/andrxsq/SIGMAUDC/internal/middleware"
+	"github.com/andrxsq/SIGMAUDC/internal/services"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Cargar variables de entorno
-	// Intenta cargar desde el directorio actual (raíz del proyecto)
+	// ── 1. Variables de entorno ────────────────────────────────────────────────
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using environment variables")
-		log.Printf("Error: %v", err)
+		log.Println("No se encontró .env, usando variables de entorno del sistema")
 	} else {
-		log.Println("Loaded .env file successfully")
+		log.Println("Archivo .env cargado correctamente")
 	}
 
-	// Cargar configuración
+	// ── 2. Configuración ──────────────────────────────────────────────────────
 	cfg := config.Load()
 
-	// Conectar a la base de datos
+	// ── 3. Base de datos ──────────────────────────────────────────────────────
 	db, err := database.Connect(cfg.DatabaseURL)
 	if err != nil {
-		log.Fatal("Error connecting to database:", err)
+		log.Fatal("Error conectando a la base de datos:", err)
 	}
 	defer db.Close()
 
-	// Ejecutar migraciones mínimas para periodo/plazos
 	if err := database.RunMigrations(db); err != nil {
-		log.Fatal("Error running migrations:", err)
+		log.Fatal("Error ejecutando migraciones:", err)
 	}
 
-	// Inicializar handlers
-	authHandler := handlers.NewAuthHandler(db, cfg.JWTSecret)
+	// ── 4. Servicios compartidos ──────────────────────────────────────────────
+	// AuditoriaService se crea una vez y se inyecta en todos los handlers
+	// que necesitan registrar eventos (DIP + GRASP Information Expert).
+	auditoria := services.NewAuditoriaService(db)
+
+	// ── 5. Handlers ───────────────────────────────────────────────────────────
+	authHandler := handlers.NewAuthHandler(db, cfg.JWTSecret, auditoria)
 	auditHandler := handlers.NewAuditHandler(db)
-	plazosHandler := handlers.NewPlazosHandler(db)
-	documentosHandler := handlers.NewDocumentosHandler(db)
+	plazosHandler := handlers.NewPlazosHandler(db, auditoria)
+	documentosHandler := handlers.NewDocumentosHandler(db, auditoria)
 	pensumHandler := handlers.NewPensumHandler(db)
 	matriculaHandler := handlers.NewMatriculaHandler(db)
 	estudianteHandler := handlers.NewEstudianteHandler(db)
 	jefeHandler := handlers.NewJefeHandler(db)
 
-	// Configurar router
+	// ── 6. Router y rutas ────────────────────────────────────────────────────
 	r := mux.NewRouter()
 
-	// Rutas públicas
+	// Rutas públicas (sin autenticación)
 	r.HandleFunc("/auth/login", authHandler.Login).Methods("POST")
 	r.HandleFunc("/auth/set-password", authHandler.SetPassword).Methods("POST")
 
-	// Rutas protegidas (requieren JWT)
+	// Subrouter protegido: todas las rutas bajo /api requieren JWT válido
 	protected := r.PathPrefix("/api").Subrouter()
 	protected.Use(middleware.JWTAuthMiddleware(cfg.JWTSecret))
 
-	// Ejemplo de ruta protegida
+	// Perfil del usuario autenticado
 	protected.HandleFunc("/me", authHandler.GetCurrentUser).Methods("GET")
 
-	// Ruta de auditoría (protegida)
+	// Auditoría
 	protected.HandleFunc("/audit", auditHandler.GetAuditLogs).Methods("GET")
 
-	// Rutas de periodos académicos y plazos (protegidas)
+	// Periodos académicos y plazos
 	protected.HandleFunc("/periodos", plazosHandler.GetPeriodos).Methods("GET")
 	protected.HandleFunc("/periodos/activo", plazosHandler.GetPeriodoActivo).Methods("GET")
 	protected.HandleFunc("/periodos", plazosHandler.CreatePeriodo).Methods("POST")
@@ -73,67 +82,70 @@ func main() {
 	protected.HandleFunc("/periodos/{id}", plazosHandler.DeletePeriodo).Methods("DELETE")
 	protected.HandleFunc("/periodos-con-plazos", plazosHandler.GetPeriodosConPlazos).Methods("GET")
 	protected.HandleFunc("/plazos/activo", plazosHandler.GetActivePeriodoPlazos).Methods("GET")
-
-	// Rutas de plazos
 	protected.HandleFunc("/periodos/{periodo_id}/plazos", plazosHandler.GetPlazos).Methods("GET")
 	protected.HandleFunc("/periodos/{periodo_id}/plazos", plazosHandler.UpdatePlazos).Methods("PUT")
 
-	// Rutas de documentos (protegidas)
-	protected.HandleFunc("/documentos", documentosHandler.GetDocumentosEstudiante).Methods("GET")           // Para estudiantes
-	protected.HandleFunc("/documentos", documentosHandler.SubirDocumento).Methods("POST")                   // Para estudiantes
-	protected.HandleFunc("/documentos/programa", documentosHandler.GetDocumentosPorPrograma).Methods("GET") // Para jefatura
-	protected.HandleFunc("/documentos/{id}/revisar", documentosHandler.RevisarDocumento).Methods("PUT")     // Para jefatura
+	// Documentos académicos
+	protected.HandleFunc("/documentos", documentosHandler.GetDocumentosEstudiante).Methods("GET")
+	protected.HandleFunc("/documentos", documentosHandler.SubirDocumento).Methods("POST")
+	protected.HandleFunc("/documentos/programa", documentosHandler.GetDocumentosPorPrograma).Methods("GET")
+	protected.HandleFunc("/documentos/{id}/revisar", documentosHandler.RevisarDocumento).Methods("PUT")
 
-	// Rutas de pensum (protegidas)
-	protected.HandleFunc("/pensum", pensumHandler.GetPensumEstudiante).Methods("GET")                   // Para estudiantes
-	protected.HandleFunc("/pensum/list", pensumHandler.ListPensums).Methods("GET")                      // Para jefatura: listar pensums
-	protected.HandleFunc("/pensum/{id}/asignaturas", pensumHandler.GetAsignaturasPensum).Methods("GET") // Para jefatura: asignaturas por pensum
-	protected.HandleFunc("/pensum/{id}/grupos", pensumHandler.GetGruposPensum).Methods("GET")           // Para jefatura: grupos por pensum
+	// Pensum y asignaturas
+	protected.HandleFunc("/pensum", pensumHandler.GetPensumEstudiante).Methods("GET")
+	protected.HandleFunc("/pensum/list", pensumHandler.ListPensums).Methods("GET")
+	protected.HandleFunc("/pensum/{id}/asignaturas", pensumHandler.GetAsignaturasPensum).Methods("GET")
+	protected.HandleFunc("/pensum/{id}/grupos", pensumHandler.GetGruposPensum).Methods("GET")
+
+	// Datos personales del estudiante
 	protected.HandleFunc("/estudiante/datos", estudianteHandler.GetDatosEstudiante).Methods("GET")
 	protected.HandleFunc("/estudiante/datos", estudianteHandler.UpdateDatosEstudiante).Methods("PUT")
 	protected.HandleFunc("/estudiante/foto", estudianteHandler.SubirFotoEstudiante).Methods("POST")
 
-	// Rutas de jefe departamental (protegidas)
+	// Datos personales del jefe departamental
 	protected.HandleFunc("/jefe/datos", jefeHandler.GetDatosJefe).Methods("GET")
 	protected.HandleFunc("/jefe/datos", jefeHandler.UpdateDatosJefe).Methods("PUT")
 	protected.HandleFunc("/jefe/foto", jefeHandler.SubirFotoJefe).Methods("POST")
-	log.Println("✅ Ruta /api/pensum registrada correctamente")
 
-	// Rutas de matrícula (protegidas)
-	protected.HandleFunc("/matricula/validar-inscripcion", matriculaHandler.ValidarInscripcion).Methods("GET")            // Para estudiantes
-	protected.HandleFunc("/matricula/asignaturas-disponibles", matriculaHandler.GetAsignaturasDisponibles).Methods("GET") // Para estudiantes (temporal - retorna vacío)
-	protected.HandleFunc("/matricula/horario-actual", matriculaHandler.GetHorarioActual).Methods("GET")                   // Para estudiantes
+	// Matrícula e inscripción
+	protected.HandleFunc("/matricula/validar-inscripcion", matriculaHandler.ValidarInscripcion).Methods("GET")
+	protected.HandleFunc("/matricula/asignaturas-disponibles", matriculaHandler.GetAsignaturasDisponibles).Methods("GET")
+	protected.HandleFunc("/matricula/horario-actual", matriculaHandler.GetHorarioActual).Methods("GET")
 	protected.HandleFunc("/matricula/asignaturas/{id}/grupos", matriculaHandler.GetGruposAsignatura).Methods("GET")
 	protected.HandleFunc("/matricula/inscribir", matriculaHandler.InscribirAsignaturas).Methods("POST")
-	// Permitir a jefatura actualizar horarios de un grupo
 	protected.HandleFunc("/grupo/{id}/horario", matriculaHandler.UpdateGrupoHorario).Methods("PUT")
 
-	// Rutas de modificaciones (para jefatura)
+	// Modificaciones de matrícula (jefatura)
 	protected.HandleFunc("/modificaciones/estudiante", matriculaHandler.GetStudentMatricula).Methods("GET")
 	protected.HandleFunc("/modificaciones/estudiante/{id}/disponibles", matriculaHandler.JefeGetModificacionesData).Methods("GET")
 	protected.HandleFunc("/modificaciones/estudiante/{id}/inscribir", matriculaHandler.JefeInscribirAsignaturas).Methods("POST")
 	protected.HandleFunc("/modificaciones/estudiante/{id}/desmatricular", matriculaHandler.JefeDesmatricularGrupo).Methods("POST")
-	// Rutas de modificaciones estudiantiles (protegidas)
+
+	// Modificaciones de matrícula (estudiante)
 	protected.HandleFunc("/matricula/validar-modificaciones", matriculaHandler.ValidarModificaciones).Methods("GET")
 	protected.HandleFunc("/matricula/modificaciones", matriculaHandler.GetModificacionesData).Methods("GET")
 	protected.HandleFunc("/matricula/retirar-materia", matriculaHandler.RetirarMateria).Methods("POST")
 	protected.HandleFunc("/matricula/agregar-materia", matriculaHandler.AgregarMateriaModificaciones).Methods("POST")
 
-	// Rutas de solicitudes de modificación (estudiante)
+	// Solicitudes de modificación
 	protected.HandleFunc("/matricula/solicitudes-modificacion", matriculaHandler.GetSolicitudesEstudiante).Methods("GET")
 	protected.HandleFunc("/matricula/solicitudes-modificacion", matriculaHandler.CrearSolicitudModificacion).Methods("POST")
-
-	// Rutas de solicitudes de modificación (jefe)
 	protected.HandleFunc("/jefe/solicitudes-modificacion", matriculaHandler.GetSolicitudesPorPrograma).Methods("GET")
 	protected.HandleFunc("/jefe/solicitudes-modificacion/{id}", matriculaHandler.ValidarSolicitudModificacion).Methods("PUT")
 
-	// Servir archivos estáticos (uploads) - soporta estructura de carpetas periodo/programa/
+	// Archivos estáticos (uploads)
 	r.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads/"))))
 
-	// CORS middleware
+	// ── 7. Middlewares globales ───────────────────────────────────────────────
+
+	// corsHandler aplica las cabeceras CORS y registra cada petición en el log.
+	// El origen permitido viene de la variable de entorno CORS_ORIGIN (ver config.go).
+	// En producción debe ser el dominio exacto del frontend, no "*".
 	corsHandler := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
+			log.Printf("📥 %s %s", r.Method, r.URL.Path)
+
+			w.Header().Set("Access-Control-Allow-Origin", cfg.CORSOrigin)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
@@ -146,27 +158,7 @@ func main() {
 		})
 	}
 
-	// Aplicar CORS
-	handler := corsHandler(r)
-
-	// Agregar logging para todas las peticiones (para depuración)
-	loggedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("📥 Request: %s %s", r.Method, r.URL.Path)
-		handler.ServeHTTP(w, r)
-	})
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Printf("🚀 Server starting on port %s", port)
-	log.Println("📋 Rutas registradas:")
-	log.Println("   GET  /api/pensum")
-	log.Println("   GET  /api/me")
-	log.Println("   GET  /api/periodos")
-	log.Println("   GET  /api/documentos")
-	log.Println("   POST /auth/login")
-	log.Println("   POST /auth/set-password")
-	log.Fatal(http.ListenAndServe(":"+port, loggedHandler))
+	// ── 8. Arrancar servidor ──────────────────────────────────────────────────
+	log.Printf("🚀 Servidor iniciado en el puerto %s", cfg.Port)
+	log.Fatal(http.ListenAndServe(":"+cfg.Port, corsHandler(r)))
 }

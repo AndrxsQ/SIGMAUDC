@@ -1,3 +1,6 @@
+// Package handlers – MatriculaHandler
+// Gestiona todo el ciclo de matrícula académica del estudiante:
+// validación, inscripción, horarios, modificaciones y solicitudes.
 package handlers
 
 import (
@@ -10,7 +13,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/andrxsq/SIGMAUDC/internal/middleware"
+	"github.com/andrxsq/SIGMAUDC/internal/constants"
 	"github.com/andrxsq/SIGMAUDC/internal/models"
 	"github.com/gorilla/mux"
 	"github.com/lib/pq"
@@ -128,26 +131,21 @@ func NewMatriculaHandler(db *sql.DB) *MatriculaHandler {
 	return &MatriculaHandler{db: db}
 }
 
-func (h *MatriculaHandler) getClaims(r *http.Request) (*models.JWTClaims, error) {
-	claims, ok := middleware.GetClaimsFromContext(r.Context())
-	if !ok {
-		return nil, errors.New("unauthorized")
-	}
-	return claims, nil
-}
+// Nota: getClaims está definida en base.go como función de paquete compartida
+// por todos los handlers (Pure Fabrication, GRASP).
 
 // ValidarInscripcion valida si el estudiante puede inscribir asignaturas
 // Verifica:
 // 1. Plazo activo (plazos.inscripcion = TRUE, programa_id del estudiante, periodo_id activo)
 // 2. Documentos aprobados (todos los documentos del periodo activo deben estar aprobados)
 func (h *MatriculaHandler) ValidarInscripcion(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -233,20 +231,22 @@ func (h *MatriculaHandler) prepareInscripcionContext(claims *models.JWTClaims) (
 
 	// Verificar que los documentos requeridos del periodo activo estén aprobados
 	// Se requieren exactamente: certificado_eps y comprobante_matricula, ambos en estado 'aprobado'
+	// Verificar que los documentos requeridos del periodo activo estén aprobados.
+	// Los tipos de documento y la cantidad mínima se leen de constants para evitar código quemado.
 	var docsAprobados int
 	queryDocs := `
 		SELECT COUNT(*)
 		FROM documentos_estudiante
 		WHERE estudiante_id = $1
 		  AND periodo_id    = $2
-		  AND tipo_documento IN ('certificado_eps', 'comprobante_matricula')
-		  AND estado = 'aprobado'
+		  AND tipo_documento IN ('` + constants.TipoCertificadoEPS + `', '` + constants.TipoComprobanteMatricula + `')
+		  AND estado = '` + constants.EstadoDocAprobado + `'
 	`
 	err = h.db.QueryRow(queryDocs, estudianteID, periodo.ID).Scan(&docsAprobados)
 	if err != nil {
 		return nil, "", err
 	}
-	if docsAprobados < 2 {
+	if docsAprobados < constants.DocsRequeridosInscripcion {
 		return nil, "No puedes inscribir asignaturas porque tus documentos requeridos (certificado EPS y comprobante de matrícula) aún no han sido aprobados. Por favor, sube los documentos y espera su aprobación.", nil
 	}
 
@@ -277,13 +277,13 @@ func joinDocumentos(docs []string) string {
 
 // GetAsignaturasDisponibles obtiene las asignaturas disponibles para inscripción
 func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -512,13 +512,13 @@ func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *h
 
 // GetGruposAsignatura devuelve los grupos disponibles para una asignatura y periodo activo
 func (h *MatriculaHandler) GetGruposAsignatura(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -563,13 +563,13 @@ func (h *MatriculaHandler) GetGruposAsignatura(w http.ResponseWriter, r *http.Re
 // UpdateGrupoHorario permite a la jefatura actualizar los horarios y docente de un grupo
 // Endpoint: PUT /api/grupo/{id}/horario
 func (h *MatriculaHandler) UpdateGrupoHorario(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "jefe_departamental" {
+	if claims.Rol != constants.RolJefe {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -712,13 +712,13 @@ func (h *MatriculaHandler) UpdateGrupoHorario(w http.ResponseWriter, r *http.Req
 
 // InscribirAsignaturas procesa la matrícula provisional de un estudiante
 func (h *MatriculaHandler) InscribirAsignaturas(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -1087,13 +1087,13 @@ func (h *MatriculaHandler) InscribirAsignaturas(w http.ResponseWriter, r *http.R
 
 // GetHorarioActual obtiene el horario actual del estudiante para el periodo activo
 func (h *MatriculaHandler) GetHorarioActual(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -1221,13 +1221,13 @@ func (h *MatriculaHandler) GetHorarioActual(w http.ResponseWriter, r *http.Reque
 // Query params: codigo (código del estudiante) o id (id numérico)
 func (h *MatriculaHandler) GetStudentMatricula(w http.ResponseWriter, r *http.Request) {
 
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "jefe_departamental" {
+	if claims.Rol != constants.RolJefe {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -1422,13 +1422,13 @@ func (h *MatriculaHandler) GetStudentMatricula(w http.ResponseWriter, r *http.Re
 
 // JefeInscribirAsignaturas permite a la jefatura inscribir grupos en nombre de un estudiante
 func (h *MatriculaHandler) JefeInscribirAsignaturas(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "jefe_departamental" {
+	if claims.Rol != constants.RolJefe {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -1718,13 +1718,13 @@ func (h *MatriculaHandler) JefeInscribirAsignaturas(w http.ResponseWriter, r *ht
 
 // JefeDesmatricularGrupo permite a la jefatura quitar una matricula (desmatricular) de un estudiante
 func (h *MatriculaHandler) JefeDesmatricularGrupo(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "jefe_departamental" {
+	if claims.Rol != constants.RolJefe {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -2077,13 +2077,13 @@ type AgregarMateriaModificacionesRequest struct {
 // 1. Plazo activo (plazos.modificaciones = TRUE)
 // 2. Que tenga asignaturas previamente matriculadas en el periodo activo
 func (h *MatriculaHandler) ValidarModificaciones(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -2200,13 +2200,13 @@ func (h *MatriculaHandler) prepareModificacionesContext(claims *models.JWTClaims
 
 // GetModificacionesData obtiene todas las materias matriculadas y disponibles para modificaciones
 func (h *MatriculaHandler) GetModificacionesData(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -2654,13 +2654,13 @@ func (h *MatriculaHandler) prepareModificacionesContextForEstudiante(estudianteI
 
 // JefeGetModificacionesData devuelve las materias matriculadas y disponibles para modificaciones para un estudiante (ruta para jefatura)
 func (h *MatriculaHandler) JefeGetModificacionesData(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "jefe_departamental" {
+	if claims.Rol != constants.RolJefe {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -2860,13 +2860,13 @@ func (h *MatriculaHandler) fetchProgramaPorGrupo(grupoID, asignaturaID int) (*Pr
 
 // RetirarMateria permite retirar una materia del periodo activo
 func (h *MatriculaHandler) RetirarMateria(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -2972,13 +2972,13 @@ func (h *MatriculaHandler) RetirarMateria(w http.ResponseWriter, r *http.Request
 
 // AgregarMateriaModificaciones permite agregar una materia durante el periodo de modificaciones
 func (h *MatriculaHandler) AgregarMateriaModificaciones(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -3287,15 +3287,15 @@ type SolicitudModificacion struct {
 
 // GetSolicitudesEstudiante obtiene las solicitudes de modificación del estudiante logueado
 func (h *MatriculaHandler) GetSolicitudesEstudiante(w http.ResponseWriter, r *http.Request) {
-	claims, ok := middleware.GetClaimsFromContext(r.Context())
-	if !ok {
+	claims, err := getClaims(r)
+	if err != nil {
 		http.Error(w, "Usuario no autenticado", http.StatusUnauthorized)
 		return
 	}
 
 	// Obtener estudiante_id
 	var estudianteID int
-	err := h.db.QueryRow(`SELECT id FROM estudiante WHERE usuario_id = $1`, claims.Sub).Scan(&estudianteID)
+	err = h.db.QueryRow(`SELECT id FROM estudiante WHERE usuario_id = $1`, claims.Sub).Scan(&estudianteID)
 	if err != nil {
 		http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
 		return
@@ -3403,15 +3403,15 @@ func (h *MatriculaHandler) GetSolicitudesEstudiante(w http.ResponseWriter, r *ht
 
 // CrearSolicitudModificacion crea una nueva solicitud de modificación
 func (h *MatriculaHandler) CrearSolicitudModificacion(w http.ResponseWriter, r *http.Request) {
-	claims, ok := middleware.GetClaimsFromContext(r.Context())
-	if !ok {
+	claims, err := getClaims(r)
+	if err != nil {
 		http.Error(w, "Usuario no autenticado", http.StatusUnauthorized)
 		return
 	}
 
 	// Obtener estudiante (el programa_id viene de usuario, no de estudiante)
 	var estudianteID int
-	err := h.db.QueryRow(`SELECT id FROM estudiante WHERE usuario_id = $1`, claims.Sub).Scan(&estudianteID)
+	err = h.db.QueryRow(`SELECT id FROM estudiante WHERE usuario_id = $1`, claims.Sub).Scan(&estudianteID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
@@ -3565,8 +3565,8 @@ func (h *MatriculaHandler) CrearSolicitudModificacion(w http.ResponseWriter, r *
 
 // GetSolicitudesPorPrograma obtiene solicitudes de modificación para el jefe de departamento
 func (h *MatriculaHandler) GetSolicitudesPorPrograma(w http.ResponseWriter, r *http.Request) {
-	claims, ok := middleware.GetClaimsFromContext(r.Context())
-	if !ok {
+	claims, err := getClaims(r)
+	if err != nil {
 		http.Error(w, "Usuario no autenticado", http.StatusUnauthorized)
 		return
 	}
@@ -3576,7 +3576,7 @@ func (h *MatriculaHandler) GetSolicitudesPorPrograma(w http.ResponseWriter, r *h
 	
 	// Verificar que el usuario sea jefe departamental (opcional, pero buena práctica)
 	var jefeID int
-	err := h.db.QueryRow(`SELECT id FROM jefe_departamental WHERE usuario_id = $1`, claims.Sub).Scan(&jefeID)
+	err = h.db.QueryRow(`SELECT id FROM jefe_departamental WHERE usuario_id = $1`, claims.Sub).Scan(&jefeID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			http.Error(w, "Jefe departamental no encontrado", http.StatusNotFound)
@@ -3678,8 +3678,8 @@ func (h *MatriculaHandler) GetSolicitudesPorPrograma(w http.ResponseWriter, r *h
 
 // ValidarSolicitudModificacion aprueba o rechaza una solicitud
 func (h *MatriculaHandler) ValidarSolicitudModificacion(w http.ResponseWriter, r *http.Request) {
-	claims, ok := middleware.GetClaimsFromContext(r.Context())
-	if !ok {
+	claims, err := getClaims(r)
+	if err != nil {
 		http.Error(w, "Usuario no autenticado", http.StatusUnauthorized)
 		return
 	}
@@ -3703,7 +3703,7 @@ func (h *MatriculaHandler) ValidarSolicitudModificacion(w http.ResponseWriter, r
 
 	// Obtener jefe_id (cambiar userID por claims.Sub)
 	var jefeID int
-	err := h.db.QueryRow(`SELECT id FROM jefe_departamental WHERE usuario_id = $1`, claims.Sub).Scan(&jefeID)
+	err = h.db.QueryRow(`SELECT id FROM jefe_departamental WHERE usuario_id = $1`, claims.Sub).Scan(&jefeID)
 	if err != nil {
 		http.Error(w, "Jefe departamental no encontrado", http.StatusNotFound)
 		return

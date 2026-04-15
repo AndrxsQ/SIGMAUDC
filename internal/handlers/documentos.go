@@ -1,3 +1,6 @@
+// Package handlers – DocumentosHandler
+// Gestiona la subida, consulta y revisión de documentos académicos requeridos
+// para que el estudiante pueda inscribir asignaturas.
 package handlers
 
 import (
@@ -14,23 +17,33 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andrxsq/SIGMAUDC/internal/middleware"
+	"github.com/andrxsq/SIGMAUDC/internal/constants"
 	"github.com/andrxsq/SIGMAUDC/internal/models"
+	"github.com/andrxsq/SIGMAUDC/internal/services"
 	"github.com/andrxsq/SIGMAUDC/internal/utils"
 	"github.com/gorilla/mux"
 )
 
+// DocumentosHandler gestiona las peticiones HTTP relacionadas con los documentos
+// académicos de los estudiantes (subida, consulta y revisión por parte de jefatura).
+//
+// Principios aplicados:
+//   - SRP: solo gestiona la lógica HTTP de documentos; auditoría delegada al servicio.
+//   - DIP: depende de AuditoriaService por inyección de dependencias.
 type DocumentosHandler struct {
 	db              *sql.DB
 	uploadDirectory string
+	auditoria       *services.AuditoriaService
 }
 
-func NewDocumentosHandler(db *sql.DB) *DocumentosHandler {
+// NewDocumentosHandler crea una nueva instancia de DocumentosHandler.
+// El directorio de uploads se toma de la variable de entorno UPLOAD_DIR;
+// si no está definida, usa "./uploads" como valor por defecto.
+func NewDocumentosHandler(db *sql.DB, auditoria *services.AuditoriaService) *DocumentosHandler {
 	uploadDir := os.Getenv("UPLOAD_DIR")
 	if uploadDir == "" {
 		uploadDir = "./uploads"
 	}
-	// Crear directorio si no existe
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		log.Printf("Error creating upload directory %s: %v", uploadDir, err)
 	} else {
@@ -39,25 +52,21 @@ func NewDocumentosHandler(db *sql.DB) *DocumentosHandler {
 	return &DocumentosHandler{
 		db:              db,
 		uploadDirectory: uploadDir,
+		auditoria:       auditoria,
 	}
 }
 
-func (h *DocumentosHandler) getClaims(r *http.Request) (*models.JWTClaims, error) {
-	claims, ok := middleware.GetClaimsFromContext(r.Context())
-	if !ok {
-		return nil, errors.New("unauthorized")
-	}
-	return claims, nil
-}
-
-// verificarPlazosDocumentos verifica si el periodo está activo y el plazo de documentos está habilitado
+// verificarPlazosDocumentos comprueba que exista un periodo académico activo
+// y que el plazo de documentos esté habilitado para el programa indicado.
+//
+// Retorna los plazos y el periodo si todo está en orden,
+// o un error descriptivo si alguna condición no se cumple.
 func (h *DocumentosHandler) verificarPlazosDocumentos(programaID int) (*models.Plazos, *models.PeriodoAcademico, error) {
-	// Buscar periodo activo
 	var periodo models.PeriodoAcademico
-	queryPeriodo := `SELECT id, year, semestre, activo, archivado 
-					 FROM periodo_academico 
-					 WHERE activo = true AND archivado = false 
-					 LIMIT 1`
+	queryPeriodo := `SELECT id, year, semestre, activo, archivado
+	                 FROM periodo_academico
+	                 WHERE activo = true AND archivado = false
+	                 LIMIT 1`
 	err := h.db.QueryRow(queryPeriodo).Scan(
 		&periodo.ID,
 		&periodo.Year,
@@ -72,11 +81,10 @@ func (h *DocumentosHandler) verificarPlazosDocumentos(programaID int) (*models.P
 		return nil, nil, err
 	}
 
-	// Buscar plazos para el programa y periodo
 	var plazos models.Plazos
-	queryPlazos := `SELECT id, periodo_id, programa_id, documentos, inscripcion, modificaciones 
-					FROM plazos 
-					WHERE periodo_id = $1 AND programa_id = $2`
+	queryPlazos := `SELECT id, periodo_id, programa_id, documentos, inscripcion, modificaciones
+	                FROM plazos
+	                WHERE periodo_id = $1 AND programa_id = $2`
 	err = h.db.QueryRow(queryPlazos, periodo.ID, programaID).Scan(
 		&plazos.ID,
 		&plazos.PeriodoID,
@@ -99,34 +107,36 @@ func (h *DocumentosHandler) verificarPlazosDocumentos(programaID int) (*models.P
 	return &plazos, &periodo, nil
 }
 
-// GetDocumentosEstudiante obtiene los documentos de un estudiante
+// GetDocumentosEstudiante retorna los documentos del estudiante autenticado
+// para el periodo académico activo, junto con el estado del plazo.
+//
+// GET /api/documentos
+// Requiere: rol "estudiante".
 func (h *DocumentosHandler) GetDocumentosEstudiante(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
-	// Obtener estudiante_id
 	var estudianteID int
-	queryEstudiante := `SELECT id FROM estudiante WHERE usuario_id = $1`
-	err = h.db.QueryRow(queryEstudiante, claims.Sub).Scan(&estudianteID)
-	if err == sql.ErrNoRows {
-		http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
-		return
-	}
-	if err != nil {
+	if err := h.db.QueryRow(
+		`SELECT id FROM estudiante WHERE usuario_id = $1`, claims.Sub,
+	).Scan(&estudianteID); err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
+			return
+		}
 		log.Printf("Error getting estudiante: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	// Verificar plazos
+	// La verificación de plazos puede fallar sin bloquear la vista de documentos.
 	var plazoMensaje string
 	plazos, periodo, err := h.verificarPlazosDocumentos(claims.ProgramaID)
 	if err != nil {
@@ -135,14 +145,13 @@ func (h *DocumentosHandler) GetDocumentosEstudiante(w http.ResponseWriter, r *ht
 		plazoMensaje = err.Error()
 	}
 
-	// Obtener documentos del estudiante para el periodo activo
 	var documentos []models.DocumentoEstudiante
 	if periodo != nil {
-		query := `SELECT id, estudiante_id, programa_id, periodo_id, tipo_documento, archivo_url, 
-				  estado, observacion, revisado_por, fecha_subida, fecha_revision
-				  FROM documentos_estudiante 
-				  WHERE estudiante_id = $1 AND periodo_id = $2
-				  ORDER BY fecha_subida DESC`
+		query := `SELECT id, estudiante_id, programa_id, periodo_id, tipo_documento, archivo_url,
+		          estado, observacion, revisado_por, fecha_subida, fecha_revision
+		          FROM documentos_estudiante
+		          WHERE estudiante_id = $1 AND periodo_id = $2
+		          ORDER BY fecha_subida DESC`
 		rows, err := h.db.Query(query, estudianteID, periodo.ID)
 		if err != nil {
 			log.Printf("Error querying documentos: %v", err)
@@ -157,7 +166,7 @@ func (h *DocumentosHandler) GetDocumentosEstudiante(w http.ResponseWriter, r *ht
 			var revisadoPor sql.NullInt64
 			var fechaRevision sql.NullTime
 
-			err := rows.Scan(
+			if err := rows.Scan(
 				&doc.ID,
 				&doc.EstudianteID,
 				&doc.ProgramaID,
@@ -169,8 +178,7 @@ func (h *DocumentosHandler) GetDocumentosEstudiante(w http.ResponseWriter, r *ht
 				&revisadoPor,
 				&doc.FechaSubida,
 				&fechaRevision,
-			)
-			if err != nil {
+			); err != nil {
 				log.Printf("Error scanning documento: %v", err)
 				continue
 			}
@@ -186,28 +194,25 @@ func (h *DocumentosHandler) GetDocumentosEstudiante(w http.ResponseWriter, r *ht
 			if fechaRevision.Valid {
 				doc.FechaRevision = fechaRevision
 			}
-
 			documentos = append(documentos, doc)
 		}
 	}
 
-	// Verificar si todos los documentos están aprobados
+	// Determinar si los documentos están aprobados:
+	// Se necesitan exactamente los 2 tipos de documento, ambos en estado "aprobado".
 	documentosAprobados := true
-	if len(documentos) < 2 { // Necesita certificado_eps y comprobante_matricula
+	if len(documentos) < constants.DocsRequeridosInscripcion {
 		documentosAprobados = false
 	} else {
 		for _, doc := range documentos {
-			if doc.Estado != "aprobado" {
+			if doc.Estado != constants.EstadoDocAprobado {
 				documentosAprobados = false
 				break
 			}
 		}
 	}
 
-	puedeSubir := false
-	if plazos != nil && plazos.Documentos && periodo != nil {
-		puedeSubir = true
-	}
+	puedeSubir := plazos != nil && plazos.Documentos && periodo != nil
 
 	response := models.DocumentosEstudianteResponse{
 		Documentos:          documentos,
@@ -222,20 +227,25 @@ func (h *DocumentosHandler) GetDocumentosEstudiante(w http.ResponseWriter, r *ht
 	json.NewEncoder(w).Encode(response)
 }
 
-// SubirDocumento sube un documento para un estudiante
+// SubirDocumento sube un documento académico para el estudiante autenticado.
+//
+// POST /api/documentos
+// Requiere: rol "estudiante", multipart form con campos:
+//   - tipo_documento: "certificado_eps" o "comprobante_matricula"
+//   - archivo: PDF, PNG, JPG o JPEG, máx. 5 MB.
+//
+// Si ya existe un documento rechazado del mismo tipo, lo reemplaza.
 func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
-	// Verificar plazos
 	_, periodo, err := h.verificarPlazosDocumentos(claims.ProgramaID)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -244,28 +254,32 @@ func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Obtener estudiante_id
 	var estudianteID int
-	queryEstudiante := `SELECT id FROM estudiante WHERE usuario_id = $1`
-	err = h.db.QueryRow(queryEstudiante, claims.Sub).Scan(&estudianteID)
-	if err == sql.ErrNoRows {
-		http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
-		return
-	}
-	if err != nil {
+	if err := h.db.QueryRow(
+		`SELECT id FROM estudiante WHERE usuario_id = $1`, claims.Sub,
+	).Scan(&estudianteID); err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
+			return
+		}
 		log.Printf("Error getting estudiante: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	// Parsear multipart form (máximo 5MB)
-	r.ParseMultipartForm(5 << 20)
+	// Parsear el form limitando a MaxDocumentoBytes en memoria.
+	r.ParseMultipartForm(constants.MaxDocumentoBytes)
 
 	tipoDocumento := r.FormValue("tipo_documento")
-	if tipoDocumento != "certificado_eps" && tipoDocumento != "comprobante_matricula" {
+	if tipoDocumento != constants.TipoCertificadoEPS && tipoDocumento != constants.TipoComprobanteMatricula {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "tipo_documento inválido. Debe ser 'certificado_eps' o 'comprobante_matricula'"})
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf(
+				"tipo_documento inválido. Debe ser '%s' o '%s'",
+				constants.TipoCertificadoEPS, constants.TipoComprobanteMatricula,
+			),
+		})
 		return
 	}
 
@@ -278,100 +292,97 @@ func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Reques
 	}
 	defer file.Close()
 
-	// Validar tamaño del archivo (máximo 5MB)
-	if handler.Size > 5*1024*1024 {
+	// Validar tamaño del archivo.
+	if handler.Size > constants.MaxDocumentoBytes {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "El archivo excede el tamaño máximo de 5MB"})
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("El archivo excede el tamaño máximo de %dMB", constants.MaxDocumentoBytes/1024/1024),
+		})
 		return
 	}
 
-	// Validar extensión
+	// Validar extensión contra la lista centralizada.
 	ext := strings.ToLower(filepath.Ext(handler.Filename))
-	allowedExts := []string{".pdf", ".png", ".jpg", ".jpeg"}
-	allowed := false
-	for _, e := range allowedExts {
+	extValida := false
+	for _, e := range constants.ExtensionesDocumento {
 		if ext == e {
-			allowed = true
+			extValida = true
 			break
 		}
 	}
-	if !allowed {
+	if !extValida {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "formato de archivo no permitido. Solo PDF, PNG, JPG, JPEG"})
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "formato de archivo no permitido. Solo PDF, PNG, JPG, JPEG",
+		})
 		return
 	}
 
-	// Obtener nombre del archivo sin extensión
 	filenameWithoutExt := strings.TrimSuffix(handler.Filename, ext)
 
-	// Verificar si ya existe un documento de este tipo para este estudiante y periodo
+	// Verificar si ya existe un documento de este tipo para este estudiante y periodo.
 	var docExistente models.DocumentoEstudiante
-	queryExistente := `SELECT id, estado FROM documentos_estudiante 
-					   WHERE estudiante_id = $1 AND periodo_id = $2 AND tipo_documento = $3
-					   ORDER BY fecha_subida DESC LIMIT 1`
+	queryExistente := `SELECT id, estado FROM documentos_estudiante
+	                   WHERE estudiante_id = $1 AND periodo_id = $2 AND tipo_documento = $3
+	                   ORDER BY fecha_subida DESC LIMIT 1`
 	err = h.db.QueryRow(queryExistente, estudianteID, periodo.ID, tipoDocumento).Scan(
 		&docExistente.ID,
 		&docExistente.Estado,
 	)
 
 	if err == nil {
-		// Documento existe
-		if docExistente.Estado == "pendiente" {
+		if docExistente.Estado == constants.EstadoDocPendiente {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Documento ya subido, pendiente de revisión"})
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Documento ya subido, pendiente de revisión",
+			})
 			return
 		}
-		if docExistente.Estado == "aprobado" {
+		if docExistente.Estado == constants.EstadoDocAprobado {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]string{"error": "Documento ya aprobado"})
 			return
 		}
-		// Si es rechazado, permitir resubida (actualizar registro existente)
+		// Si está rechazado, se permite resubir (actualiza el registro existente).
 	}
 
-	// Obtener información del programa para crear la estructura de carpetas
+	// Construir estructura de carpetas: periodo/programa/estudiante/
 	var programaNombre string
-	queryPrograma := `SELECT nombre FROM programa WHERE id = $1`
-	err = h.db.QueryRow(queryPrograma, claims.ProgramaID).Scan(&programaNombre)
-	if err != nil {
+	if err := h.db.QueryRow(
+		`SELECT nombre FROM programa WHERE id = $1`, claims.ProgramaID,
+	).Scan(&programaNombre); err != nil {
 		log.Printf("Error getting programa: %v", err)
 		programaNombre = fmt.Sprintf("programa_%d", claims.ProgramaID)
 	}
 
-	// Obtener código del estudiante para la carpeta
 	var estudianteCodigo string
-	queryCodigo := `SELECT codigo FROM usuario WHERE id = $1`
-	err = h.db.QueryRow(queryCodigo, claims.Sub).Scan(&estudianteCodigo)
-	if err != nil {
+	if err := h.db.QueryRow(
+		`SELECT codigo FROM usuario WHERE id = $1`, claims.Sub,
+	).Scan(&estudianteCodigo); err != nil {
 		log.Printf("Error getting codigo: %v", err)
 		estudianteCodigo = fmt.Sprintf("estudiante_%d", estudianteID)
 	}
 
-	// Crear estructura de carpetas: periodo/programa/estudiante/
 	periodoFolder := fmt.Sprintf("%d-%d", periodo.Year, periodo.Semestre)
-	programaFolder := strings.ReplaceAll(strings.ToLower(programaNombre), " ", "_")
-	programaFolder = fmt.Sprintf("%d_%s", claims.ProgramaID, programaFolder)
+	programaFolder := fmt.Sprintf("%d_%s", claims.ProgramaID,
+		strings.ReplaceAll(strings.ToLower(programaNombre), " ", "_"))
 	estudianteFolder := fmt.Sprintf("%d_%s", estudianteID, estudianteCodigo)
 
 	uploadPath := filepath.Join(h.uploadDirectory, periodoFolder, programaFolder, estudianteFolder)
-
-	// Crear directorios si no existen
 	if err := os.MkdirAll(uploadPath, 0755); err != nil {
 		log.Printf("Error creating directories: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	// Generar nombre único para el archivo (sin duplicar extensión)
 	timestamp := time.Now().Unix()
 	filename := fmt.Sprintf("%d_%d_%s_%s%s", estudianteID, timestamp, tipoDocumento, filenameWithoutExt, ext)
 	filePath := filepath.Join(uploadPath, filename)
 
-	// Crear archivo en el servidor
 	dst, err := os.Create(filePath)
 	if err != nil {
 		log.Printf("Error creating file: %v", err)
@@ -380,60 +391,53 @@ func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Reques
 	}
 	defer dst.Close()
 
-	// Copiar contenido del archivo
-	_, err = io.Copy(dst, file)
-	if err != nil {
+	if _, err = io.Copy(dst, file); err != nil {
 		log.Printf("Error copying file: %v", err)
-		os.Remove(filePath) // Limpiar si falla
+		os.Remove(filePath)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	// URL relativa del archivo (mantener estructura de carpetas)
 	archivoURL := fmt.Sprintf("/uploads/%s/%s/%s/%s", periodoFolder, programaFolder, estudianteFolder, filename)
+	ip := utils.GetIPAddress(r)
+	userAgent := r.UserAgent()
 
-	// Insertar o actualizar en la base de datos
+	// Insertar o actualizar en BD según si ya existía un documento rechazado.
 	if err == sql.ErrNoRows || docExistente.ID == 0 {
-		// Insertar nuevo
-		insert := `INSERT INTO documentos_estudiante 
-				   (estudiante_id, programa_id, periodo_id, tipo_documento, archivo_url, estado)
-				   VALUES ($1, $2, $3, $4, $5, 'pendiente')
-				   RETURNING id, fecha_subida`
+		insert := `INSERT INTO documentos_estudiante
+		           (estudiante_id, programa_id, periodo_id, tipo_documento, archivo_url, estado)
+		           VALUES ($1, $2, $3, $4, $5, 'pendiente')
+		           RETURNING id, fecha_subida`
 		var docID int
 		var fechaSubida time.Time
-		err = h.db.QueryRow(insert, estudianteID, claims.ProgramaID, periodo.ID, tipoDocumento, archivoURL).Scan(
-			&docID, &fechaSubida,
-		)
-		if err != nil {
+		if err = h.db.QueryRow(insert, estudianteID, claims.ProgramaID, periodo.ID, tipoDocumento, archivoURL).
+			Scan(&docID, &fechaSubida); err != nil {
 			log.Printf("Error inserting documento: %v", err)
-			os.Remove(filePath) // Limpiar si falla
+			os.Remove(filePath)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		// Registrar auditoría: estudiante sube documento
-		ip := utils.GetIPAddress(r)
-		userAgent := r.UserAgent()
-		descripcion := fmt.Sprintf("Documento subido: %s, Periodo: %d-%d", tipoDocumento, periodo.Year, periodo.Semestre)
-		h.registrarAuditoria(claims.Sub, "subida_documento", descripcion, ip, userAgent)
+		h.auditoria.Registrar(
+			claims.Sub, "subida_documento",
+			fmt.Sprintf("Documento subido: %s, Periodo: %d-%d", tipoDocumento, periodo.Year, periodo.Semestre),
+			ip, userAgent,
+		)
 
-		response := map[string]interface{}{
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":             docID,
 			"tipo_documento": tipoDocumento,
-			"estado":         "pendiente",
+			"estado":         constants.EstadoDocPendiente,
 			"fecha_subida":   fechaSubida,
 			"message":        "Documento subido exitosamente",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		})
 	} else {
-		// Actualizar existente (rechazado)
-		// Eliminar archivo anterior si existe
+		// Actualizar documento rechazado: eliminar archivo anterior y actualizar registro.
 		var archivoAnterior string
-		queryAnterior := `SELECT archivo_url FROM documentos_estudiante WHERE id = $1`
-		h.db.QueryRow(queryAnterior, docExistente.ID).Scan(&archivoAnterior)
+		h.db.QueryRow(`SELECT archivo_url FROM documentos_estudiante WHERE id = $1`, docExistente.ID).
+			Scan(&archivoAnterior)
 		if archivoAnterior != "" && strings.HasPrefix(archivoAnterior, "/uploads/") {
-			// Remover el prefijo /uploads/ y construir la ruta completa
 			relativePath := strings.TrimPrefix(archivoAnterior, "/uploads/")
 			oldPath := filepath.Join(h.uploadDirectory, relativePath)
 			if err := os.Remove(oldPath); err != nil {
@@ -441,63 +445,59 @@ func (h *DocumentosHandler) SubirDocumento(w http.ResponseWriter, r *http.Reques
 			}
 		}
 
-		update := `UPDATE documentos_estudiante 
-				   SET archivo_url = $1, estado = 'pendiente', observacion = NULL, 
-				       revisado_por = NULL, fecha_revision = NULL, fecha_subida = CURRENT_TIMESTAMP
-				   WHERE id = $2
-				   RETURNING fecha_subida`
+		update := `UPDATE documentos_estudiante
+		           SET archivo_url = $1, estado = 'pendiente', observacion = NULL,
+		               revisado_por = NULL, fecha_revision = NULL, fecha_subida = CURRENT_TIMESTAMP
+		           WHERE id = $2
+		           RETURNING fecha_subida`
 		var fechaSubida time.Time
-		err = h.db.QueryRow(update, archivoURL, docExistente.ID).Scan(&fechaSubida)
-		if err != nil {
+		if err = h.db.QueryRow(update, archivoURL, docExistente.ID).Scan(&fechaSubida); err != nil {
 			log.Printf("Error updating documento: %v", err)
-			os.Remove(filePath) // Limpiar si falla
+			os.Remove(filePath)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		// Registrar auditoría: estudiante resube documento rechazado
-		ip := utils.GetIPAddress(r)
-		userAgent := r.UserAgent()
-		descripcion := fmt.Sprintf("Documento resubido: %s, Periodo: %d-%d (anteriormente rechazado)", tipoDocumento, periodo.Year, periodo.Semestre)
-		h.registrarAuditoria(claims.Sub, "resubida_documento", descripcion, ip, userAgent)
+		h.auditoria.Registrar(
+			claims.Sub, "resubida_documento",
+			fmt.Sprintf("Documento resubido: %s, Periodo: %d-%d (anteriormente rechazado)", tipoDocumento, periodo.Year, periodo.Semestre),
+			ip, userAgent,
+		)
 
-		response := map[string]interface{}{
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":             docExistente.ID,
 			"tipo_documento": tipoDocumento,
-			"estado":         "pendiente",
+			"estado":         constants.EstadoDocPendiente,
 			"fecha_subida":   fechaSubida,
 			"message":        "Documento resubido exitosamente",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		})
 	}
 }
 
-// GetDocumentosPorPrograma obtiene todos los documentos pendientes/rechazados de un programa (para jefatura)
+// GetDocumentosPorPrograma retorna todos los documentos del programa del jefe autenticado
+// para el periodo activo (incluidos pendientes, aprobados y rechazados).
+//
+// GET /api/documentos/programa
+// Requiere: rol "jefe_departamental".
 func (h *DocumentosHandler) GetDocumentosPorPrograma(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	if claims.Rol != "jefe_departamental" {
+	if claims.Rol != constants.RolJefe {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
-	// Obtener periodo activo
 	var periodo models.PeriodoAcademico
-	queryPeriodo := `SELECT id, year, semestre, activo, archivado 
-					 FROM periodo_academico 
-					 WHERE activo = true AND archivado = false 
-					 LIMIT 1`
+	queryPeriodo := `SELECT id, year, semestre, activo, archivado
+	                 FROM periodo_academico
+	                 WHERE activo = true AND archivado = false
+	                 LIMIT 1`
 	err = h.db.QueryRow(queryPeriodo).Scan(
-		&periodo.ID,
-		&periodo.Year,
-		&periodo.Semestre,
-		&periodo.Activo,
-		&periodo.Archivado,
+		&periodo.ID, &periodo.Year, &periodo.Semestre, &periodo.Activo, &periodo.Archivado,
 	)
 	if err == sql.ErrNoRows {
 		w.Header().Set("Content-Type", "application/json")
@@ -510,15 +510,14 @@ func (h *DocumentosHandler) GetDocumentosPorPrograma(w http.ResponseWriter, r *h
 		return
 	}
 
-	// Obtener documentos del programa para el periodo activo
-	query := `SELECT d.id, d.estudiante_id, d.programa_id, d.periodo_id, d.tipo_documento, 
-			  d.archivo_url, d.estado, d.observacion, d.revisado_por, d.fecha_subida, d.fecha_revision,
-			  e.nombre, e.apellido, u.codigo
-			  FROM documentos_estudiante d
-			  JOIN estudiante e ON d.estudiante_id = e.id
-			  JOIN usuario u ON e.usuario_id = u.id
-			  WHERE d.programa_id = $1 AND d.periodo_id = $2
-			  ORDER BY d.fecha_subida DESC`
+	query := `SELECT d.id, d.estudiante_id, d.programa_id, d.periodo_id, d.tipo_documento,
+	          d.archivo_url, d.estado, d.observacion, d.revisado_por, d.fecha_subida, d.fecha_revision,
+	          e.nombre, e.apellido, u.codigo
+	          FROM documentos_estudiante d
+	          JOIN estudiante e ON d.estudiante_id = e.id
+	          JOIN usuario u ON e.usuario_id = u.id
+	          WHERE d.programa_id = $1 AND d.periodo_id = $2
+	          ORDER BY d.fecha_subida DESC`
 	rows, err := h.db.Query(query, claims.ProgramaID, periodo.ID)
 	if err != nil {
 		log.Printf("Error querying documentos: %v", err)
@@ -534,7 +533,7 @@ func (h *DocumentosHandler) GetDocumentosPorPrograma(w http.ResponseWriter, r *h
 		var revisadoPor sql.NullInt64
 		var fechaRevision sql.NullTime
 
-		err := rows.Scan(
+		if err := rows.Scan(
 			&doc.ID,
 			&doc.EstudianteID,
 			&doc.ProgramaID,
@@ -549,8 +548,7 @@ func (h *DocumentosHandler) GetDocumentosPorPrograma(w http.ResponseWriter, r *h
 			&doc.EstudianteNombre,
 			&doc.EstudianteApellido,
 			&doc.EstudianteCodigo,
-		)
-		if err != nil {
+		); err != nil {
 			log.Printf("Error scanning documento: %v", err)
 			continue
 		}
@@ -566,7 +564,6 @@ func (h *DocumentosHandler) GetDocumentosPorPrograma(w http.ResponseWriter, r *h
 		if fechaRevision.Valid {
 			doc.FechaRevision = fechaRevision
 		}
-
 		documentos = append(documentos, doc)
 	}
 
@@ -574,28 +571,33 @@ func (h *DocumentosHandler) GetDocumentosPorPrograma(w http.ResponseWriter, r *h
 	json.NewEncoder(w).Encode(documentos)
 }
 
-// RevisarDocumento permite a la jefatura aprobar o rechazar un documento
+// RevisarDocumento permite al jefe departamental aprobar o rechazar un documento.
+//
+// PUT /api/documentos/{id}/revisar
+// Requiere: rol "jefe_departamental".
+// Body: models.RevisarDocumentoRequest (estado + observacion).
+//
+// Si se rechaza, la observación es obligatoria.
+// Solo puede revisar documentos de su propio programa.
 func (h *DocumentosHandler) RevisarDocumento(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	if claims.Rol != "jefe_departamental" {
+	if claims.Rol != constants.RolJefe {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
-	// Obtener jefe_departamental_id
 	var jefeID int
-	queryJefe := `SELECT id FROM jefe_departamental WHERE usuario_id = $1`
-	err = h.db.QueryRow(queryJefe, claims.Sub).Scan(&jefeID)
-	if err == sql.ErrNoRows {
-		http.Error(w, "Jefe departamental no encontrado", http.StatusNotFound)
-		return
-	}
-	if err != nil {
+	if err := h.db.QueryRow(
+		`SELECT id FROM jefe_departamental WHERE usuario_id = $1`, claims.Sub,
+	).Scan(&jefeID); err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Jefe departamental no encontrado", http.StatusNotFound)
+			return
+		}
 		log.Printf("Error getting jefe: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -614,111 +616,100 @@ func (h *DocumentosHandler) RevisarDocumento(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if req.Estado != "aprobado" && req.Estado != "rechazado" {
+	// Validar que el estado sea uno de los valores permitidos.
+	if req.Estado != constants.EstadoDocAprobado && req.Estado != constants.EstadoDocRechazado {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "estado inválido. Debe ser 'aprobado' o 'rechazado'"})
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf(
+				"estado inválido. Debe ser '%s' o '%s'",
+				constants.EstadoDocAprobado, constants.EstadoDocRechazado,
+			),
+		})
 		return
 	}
 
-	if req.Estado == "rechazado" && strings.TrimSpace(req.Observacion) == "" {
+	if req.Estado == constants.EstadoDocRechazado && strings.TrimSpace(req.Observacion) == "" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "observación es obligatoria cuando se rechaza un documento"})
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "observación es obligatoria cuando se rechaza un documento",
+		})
 		return
 	}
 
-	// Verificar que el documento pertenece al programa del jefe
+	// Verificar que el documento pertenece al programa del jefe autenticado.
 	var programaID int
-	queryDoc := `SELECT programa_id FROM documentos_estudiante WHERE id = $1`
-	err = h.db.QueryRow(queryDoc, docID).Scan(&programaID)
-	if err == sql.ErrNoRows {
-		http.Error(w, "Documento no encontrado", http.StatusNotFound)
-		return
-	}
-	if err != nil {
+	if err := h.db.QueryRow(
+		`SELECT programa_id FROM documentos_estudiante WHERE id = $1`, docID,
+	).Scan(&programaID); err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Documento no encontrado", http.StatusNotFound)
+			return
+		}
 		log.Printf("Error getting documento: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
 	if programaID != claims.ProgramaID {
 		http.Error(w, "Forbidden: documento no pertenece a tu programa", http.StatusForbidden)
 		return
 	}
 
-	// Actualizar documento
 	var observacionVal sql.NullString
-	if req.Estado == "rechazado" && strings.TrimSpace(req.Observacion) != "" {
+	if req.Estado == constants.EstadoDocRechazado && strings.TrimSpace(req.Observacion) != "" {
 		observacionVal = sql.NullString{String: req.Observacion, Valid: true}
 	} else {
 		observacionVal = sql.NullString{Valid: false}
 	}
 
-	update := `UPDATE documentos_estudiante 
-			   SET estado = $1, observacion = $2, revisado_por = $3, fecha_revision = CURRENT_TIMESTAMP
-			   WHERE id = $4
-			   RETURNING fecha_revision`
+	update := `UPDATE documentos_estudiante
+	           SET estado = $1, observacion = $2, revisado_por = $3, fecha_revision = CURRENT_TIMESTAMP
+	           WHERE id = $4
+	           RETURNING fecha_revision`
 	var fechaRevision sql.NullTime
-	err = h.db.QueryRow(update, req.Estado, observacionVal, jefeID, docID).Scan(&fechaRevision)
-	if err != nil {
+	if err := h.db.QueryRow(update, req.Estado, observacionVal, jefeID, docID).Scan(&fechaRevision); err != nil {
 		log.Printf("Error updating documento: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	// Registrar auditoría: jefatura revisa documento
+	// Registrar evento de auditoría con detalle del documento revisado.
 	ip := utils.GetIPAddress(r)
 	userAgent := r.UserAgent()
-
-	// Obtener información del documento y estudiante para la descripción
 	var estudianteCodigo, tipoDocumento string
 	var periodoYear, periodoSemestre int
 	queryInfo := `SELECT u.codigo, d.tipo_documento, p.year, p.semestre
-				  FROM documentos_estudiante d
-				  JOIN estudiante e ON d.estudiante_id = e.id
-				  JOIN usuario u ON e.usuario_id = u.id
-				  JOIN periodo_academico p ON d.periodo_id = p.id
-				  WHERE d.id = $1`
-	err = h.db.QueryRow(queryInfo, docID).Scan(&estudianteCodigo, &tipoDocumento, &periodoYear, &periodoSemestre)
-	if err != nil {
+	              FROM documentos_estudiante d
+	              JOIN estudiante e ON d.estudiante_id = e.id
+	              JOIN usuario u ON e.usuario_id = u.id
+	              JOIN periodo_academico p ON d.periodo_id = p.id
+	              WHERE d.id = $1`
+	if err := h.db.QueryRow(queryInfo, docID).Scan(
+		&estudianteCodigo, &tipoDocumento, &periodoYear, &periodoSemestre,
+	); err != nil {
 		log.Printf("Error getting documento info for audit: %v", err)
 	} else {
 		accion := "revision_documento_aprobado"
-		if req.Estado == "rechazado" {
+		if req.Estado == constants.EstadoDocRechazado {
 			accion = "revision_documento_rechazado"
 		}
-		descripcion := fmt.Sprintf("Documento %s: %s - Estudiante: %s, Periodo: %d-%d",
-			req.Estado, tipoDocumento, estudianteCodigo, periodoYear, periodoSemestre)
-		if req.Estado == "rechazado" && strings.TrimSpace(req.Observacion) != "" {
+		descripcion := fmt.Sprintf(
+			"Documento %s: %s - Estudiante: %s, Periodo: %d-%d",
+			req.Estado, tipoDocumento, estudianteCodigo, periodoYear, periodoSemestre,
+		)
+		if req.Estado == constants.EstadoDocRechazado && strings.TrimSpace(req.Observacion) != "" {
 			descripcion += fmt.Sprintf(", Observación: %s", req.Observacion)
 		}
-		h.registrarAuditoria(claims.Sub, accion, descripcion, ip, userAgent)
+		h.auditoria.Registrar(claims.Sub, accion, descripcion, ip, userAgent)
 	}
 
-	response := map[string]interface{}{
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"id":             docID,
 		"estado":         req.Estado,
 		"observacion":    req.Observacion,
 		"fecha_revision": fechaRevision,
 		"message":        "Documento revisado exitosamente",
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-}
-
-// registrarAuditoria registra un evento en la tabla de auditoría
-func (h *DocumentosHandler) registrarAuditoria(usuarioID int, accion, descripcion, ip, userAgent string) {
-	var userID sql.NullInt64
-	if usuarioID > 0 {
-		userID = sql.NullInt64{Int64: int64(usuarioID), Valid: true}
-	}
-
-	query := `INSERT INTO auditoria (usuario_id, accion, descripcion, ip, user_agent) 
-			  VALUES ($1, $2, $3, $4, $5)`
-	_, err := h.db.Exec(query, userID, accion, descripcion, ip, userAgent)
-	if err != nil {
-		// Log error pero no fallar la operación principal
-		log.Printf("Error registering audit: %v", err)
-	}
+	})
 }
