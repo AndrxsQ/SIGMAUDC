@@ -231,6 +231,25 @@ func (h *MatriculaHandler) prepareInscripcionContext(claims *models.JWTClaims) (
 		return nil, "El plazo de inscripción no está activo para tu programa en este periodo.", nil
 	}
 
+	// Verificar que los documentos requeridos del periodo activo estén aprobados
+	// Se requieren exactamente: certificado_eps y comprobante_matricula, ambos en estado 'aprobado'
+	var docsAprobados int
+	queryDocs := `
+		SELECT COUNT(*)
+		FROM documentos_estudiante
+		WHERE estudiante_id = $1
+		  AND periodo_id    = $2
+		  AND tipo_documento IN ('certificado_eps', 'comprobante_matricula')
+		  AND estado = 'aprobado'
+	`
+	err = h.db.QueryRow(queryDocs, estudianteID, periodo.ID).Scan(&docsAprobados)
+	if err != nil {
+		return nil, "", err
+	}
+	if docsAprobados < 2 {
+		return nil, "No puedes inscribir asignaturas porque tus documentos requeridos (certificado EPS y comprobante de matrícula) aún no han sido aprobados. Por favor, sube los documentos y espera su aprobación.", nil
+	}
+
 	return &inscripcionContext{
 		EstudianteID:   estudianteID,
 		Semestre:       semestre,
