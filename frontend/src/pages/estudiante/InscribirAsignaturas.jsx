@@ -54,12 +54,17 @@ const InscribirAsignaturas = () => {
   };
 
   const getErrorReason = (error, fallback) => {
+    if (typeof error?.userMessage === "string" && error.userMessage.trim()) {
+      return error.userMessage;
+    }
     let reason = fallback;
     if (error?.response?.data) {
       if (error.response.data.razon) {
         reason = error.response.data.razon;
       } else if (error.response.data.error) {
         reason = error.response.data.error;
+      } else if (typeof error.response.data === "string") {
+        reason = error.response.data;
       }
     } else if (error?.message) {
       reason = error.message;

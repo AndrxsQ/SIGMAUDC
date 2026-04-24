@@ -85,3 +85,29 @@ type PensumEstudianteResponse struct {
 	PensumNombre   string           `json:"pensum_nombre"`
 	Semestres      []SemestrePensum `json:"semestres"`
 }
+
+type PensumItem struct {
+	ID     int    `json:"id"`
+	Nombre string `json:"nombre"`
+}
+
+type HorarioDisponible struct {
+	Dia        string `json:"dia"`
+	HoraInicio string `json:"hora_inicio"`
+	HoraFin    string `json:"hora_fin"`
+	Salon      string `json:"salon"`
+}
+
+type GrupoPensum struct {
+	ID               int                 `json:"id"`
+	Codigo           string              `json:"codigo"`
+	AsignaturaID     int                 `json:"asignatura_id"`
+	AsignaturaCodigo string              `json:"asignatura_codigo"`
+	AsignaturaNombre string              `json:"asignatura_nombre"`
+	Semestre         int                 `json:"semestre"`
+	Creditos         int                 `json:"creditos"`
+	Docente          string              `json:"docente"`
+	CupoDisponible   int                 `json:"cupo_disponible"`
+	CupoMax          int                 `json:"cupo_max"`
+	Horarios         []HorarioDisponible `json:"horarios"`
+}

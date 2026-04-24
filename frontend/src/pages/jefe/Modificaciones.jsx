@@ -5,6 +5,14 @@ import '../../styles/Modificaciones.css';
 import '../../styles/InscribirAsignaturas.css';
 import HorarioGrid from '../../components/common/HorarioGrid';
 
+const getErrorMessage = (err, fallback) => {
+  if (typeof err?.userMessage === 'string' && err.userMessage.trim()) return err.userMessage;
+  if (typeof err?.response?.data === 'string' && err.response.data.trim()) return err.response.data;
+  if (typeof err?.response?.data?.message === 'string' && err.response.data.message.trim()) return err.response.data.message;
+  if (typeof err?.response?.data?.error === 'string' && err.response.data.error.trim()) return err.response.data.error;
+  return fallback;
+};
+
 const Modificaciones = () => {
   const [codigo, setCodigo] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,7 +36,7 @@ const Modificaciones = () => {
       setClases(data.clases || []);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data || err.message || 'Error buscando estudiante');
+      setError(getErrorMessage(err, 'Error buscando estudiante'));
     } finally {
       setLoading(false);
     }
@@ -68,7 +76,7 @@ const Modificaciones = () => {
     } catch (err) {
       console.error(err);
       console.error('Desmatricular error response:', err.response?.data || err.message);
-      setError(err.response?.data || err.message || 'Error desmatriculando');
+      setError(getErrorMessage(err, 'Error desmatriculando'));
     } finally {
       setLoading(false);
     }
@@ -101,7 +109,7 @@ const Modificaciones = () => {
       setClases(data.clases || []);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data || err.message || 'Error inscribiendo');
+      setError(getErrorMessage(err, 'Error inscribiendo'));
     } finally {
       setLoading(false);
     }

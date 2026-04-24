@@ -53,6 +53,9 @@ const ModificarMatricula = () => {
   };
 
   const getErrorReason = (error, fallback) => {
+    if (typeof error?.userMessage === "string" && error.userMessage.trim()) {
+      return error.userMessage;
+    }
     let reason = fallback;
     if (error?.response?.data) {
       if (error.response.data.razon) {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import documentosService from "../../services/documentos";
 import "../../styles/VerificarDocumentos.css";
+import { getApiErrorMessage } from "../../utils/apiError";
 import {
   FaCheckCircle,
   FaTimesCircle,
@@ -30,7 +31,7 @@ const VerificarDocumentos = () => {
       setError(null);
     } catch (err) {
       console.error("Error loading documentos:", err);
-      setError(err.response?.data?.error || "Error al cargar documentos");
+      setError(getApiErrorMessage(err, "Error al cargar documentos"));
     } finally {
       setLoading(false);
     }
@@ -54,7 +55,7 @@ const VerificarDocumentos = () => {
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       console.error("Error revisando documento:", err);
-      setError(err.response?.data?.error || "Error al revisar documento");
+      setError(getApiErrorMessage(err, "Error al revisar documento"));
     } finally {
       setRevisando({ ...revisando, [documentoId]: false });
     }

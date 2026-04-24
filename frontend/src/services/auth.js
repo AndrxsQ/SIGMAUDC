@@ -19,6 +19,18 @@ const api = axios.create({
   },
 });
 
+const extractApiErrorMessage = (error) => {
+	if (error?.response?.data) {
+		const data = error.response.data;
+		if (typeof data === 'string') return data;
+		if (typeof data?.message === 'string' && data.message.trim()) return data.message;
+		if (typeof data?.error === 'string' && data.error.trim()) return data.error;
+		if (typeof data?.razon === 'string' && data.razon.trim()) return data.razon;
+	}
+	if (typeof error?.message === 'string' && error.message.trim()) return error.message;
+	return 'Ocurrió un error inesperado';
+};
+
 // Interceptor para agregar el token a las peticiones
 api.interceptors.request.use(
 	(config) => {
@@ -58,6 +70,7 @@ api.interceptors.response.use(
 			localStorage.removeItem('user');
 			window.location.href = '/login';
 		}
+		error.userMessage = extractApiErrorMessage(error);
 		return Promise.reject(error);
 	}
 );

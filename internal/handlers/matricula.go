@@ -15,12 +15,14 @@ import (
 
 	"github.com/andrxsq/SIGMAUDC/internal/constants"
 	"github.com/andrxsq/SIGMAUDC/internal/models"
+	"github.com/andrxsq/SIGMAUDC/internal/services"
 	"github.com/gorilla/mux"
 	"github.com/lib/pq"
 )
 
 type MatriculaHandler struct {
-	db *sql.DB
+	db      *sql.DB
+	service *services.MatriculaService
 }
 
 type inscripcionContext struct {
@@ -127,8 +129,8 @@ type horarioBloque struct {
 	FinMin    int
 }
 
-func NewMatriculaHandler(db *sql.DB) *MatriculaHandler {
-	return &MatriculaHandler{db: db}
+func NewMatriculaHandler(db *sql.DB, service *services.MatriculaService) *MatriculaHandler {
+	return &MatriculaHandler{db: db, service: service}
 }
 
 // Nota: getClaims está definida en base.go como función de paquete compartida
@@ -177,89 +179,20 @@ func (h *MatriculaHandler) ValidarInscripcion(w http.ResponseWriter, r *http.Req
 }
 
 func (h *MatriculaHandler) prepareInscripcionContext(claims *models.JWTClaims) (*inscripcionContext, string, error) {
-	var estudianteID int
-	var semestre int
-	var estado string
-	queryEstudiante := `SELECT id, semestre, estado FROM estudiante WHERE usuario_id = $1`
-	err := h.db.QueryRow(queryEstudiante, claims.Sub).Scan(&estudianteID, &semestre, &estado)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, "Estudiante no encontrado", nil
-		}
-		return nil, "", err
+	sctx, razon, err := h.service.PrepareInscripcionContext(claims)
+	if err != nil || razon != "" {
+		return nil, razon, err
 	}
-
-	pensumHandler := &PensumHandler{db: h.db}
-	pensumID, pensumNombre, programaNombre, err := pensumHandler.getPensumInfo(estudianteID)
-	if err != nil {
-		if errors.Is(err, errPensumNoAsignado) {
-			return nil, "No tienes un pensum asignado. Contacta a coordinación para asignarte uno.", nil
-		}
-		return nil, "", err
-	}
-
-	var periodo models.PeriodoAcademico
-	queryPeriodo := `SELECT id, year, semestre, activo, archivado FROM periodo_academico WHERE activo = true AND archivado = false ORDER BY year DESC, semestre DESC LIMIT 1`
-	err = h.db.QueryRow(queryPeriodo).Scan(&periodo.ID, &periodo.Year, &periodo.Semestre, &periodo.Activo, &periodo.Archivado)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, "No hay un periodo académico activo.", nil
-		}
-		return nil, "", err
-	}
-
-	var plazos models.Plazos
-	queryPlazos := `SELECT id, periodo_id, programa_id, documentos, inscripcion, modificaciones FROM plazos WHERE periodo_id = $1 AND programa_id = $2`
-	err = h.db.QueryRow(queryPlazos, periodo.ID, claims.ProgramaID).Scan(
-		&plazos.ID,
-		&plazos.PeriodoID,
-		&plazos.ProgramaID,
-		&plazos.Documentos,
-		&plazos.Inscripcion,
-		&plazos.Modificaciones,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, "No hay plazos configurados para tu programa en el periodo activo.", nil
-		}
-		return nil, "", err
-	}
-
-	if !plazos.Inscripcion {
-		return nil, "El plazo de inscripción no está activo para tu programa en este periodo.", nil
-	}
-
-	// Verificar que los documentos requeridos del periodo activo estén aprobados
-	// Se requieren exactamente: certificado_eps y comprobante_matricula, ambos en estado 'aprobado'
-	// Verificar que los documentos requeridos del periodo activo estén aprobados.
-	// Los tipos de documento y la cantidad mínima se leen de constants para evitar código quemado.
-	var docsAprobados int
-	queryDocs := `
-		SELECT COUNT(*)
-		FROM documentos_estudiante
-		WHERE estudiante_id = $1
-		  AND periodo_id    = $2
-		  AND tipo_documento IN ('` + constants.TipoCertificadoEPS + `', '` + constants.TipoComprobanteMatricula + `')
-		  AND estado = '` + constants.EstadoDocAprobado + `'
-	`
-	err = h.db.QueryRow(queryDocs, estudianteID, periodo.ID).Scan(&docsAprobados)
-	if err != nil {
-		return nil, "", err
-	}
-	if docsAprobados < constants.DocsRequeridosInscripcion {
-		return nil, "No puedes inscribir asignaturas porque tus documentos requeridos (certificado EPS y comprobante de matrícula) aún no han sido aprobados. Por favor, sube los documentos y espera su aprobación.", nil
-	}
-
 	return &inscripcionContext{
-		EstudianteID:   estudianteID,
-		Semestre:       semestre,
-		Estado:         estado,
-		PensumID:       pensumID,
-		PensumNombre:   pensumNombre,
-		ProgramaID:     claims.ProgramaID,
-		ProgramaNombre: programaNombre,
-		Periodo:        &periodo,
-		Plazos:         plazos,
+		EstudianteID:   sctx.EstudianteID,
+		Semestre:       sctx.Semestre,
+		Estado:         sctx.Estado,
+		PensumID:       sctx.PensumID,
+		PensumNombre:   sctx.PensumNombre,
+		ProgramaID:     sctx.ProgramaID,
+		ProgramaNombre: sctx.ProgramaNombre,
+		Periodo:        sctx.Periodo,
+		Plazos:         sctx.Plazos,
 	}, "", nil
 }
 
@@ -1097,123 +1030,18 @@ func (h *MatriculaHandler) GetHorarioActual(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
-
-	var estudianteID int
-	queryEstudiante := `SELECT id FROM estudiante WHERE usuario_id = $1`
-	err = h.db.QueryRow(queryEstudiante, claims.Sub).Scan(&estudianteID)
-	if err == sql.ErrNoRows {
+	response, status, err := h.service.GetHorarioActual(claims.Sub)
+	if status == http.StatusNotFound {
 		http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
 		return
 	}
 	if err != nil {
-		log.Printf("Error getting estudiante: %v", err)
+		log.Printf("Error obteniendo horario actual: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	var periodo models.PeriodoAcademico
-	queryPeriodo := `SELECT id, year, semestre, activo, archivado FROM periodo_academico WHERE activo = true AND archivado = false ORDER BY year DESC, semestre DESC LIMIT 1`
-	err = h.db.QueryRow(queryPeriodo).Scan(&periodo.ID, &periodo.Year, &periodo.Semestre, &periodo.Activo, &periodo.Archivado)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"periodo": nil,
-				"clases":  []interface{}{},
-			})
-			return
-		}
-		log.Printf("Error getting periodo activo: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	query := `
-		SELECT 
-			ha.id_asignatura,
-			a.codigo,
-			a.nombre,
-			g.id as grupo_id,
-			g.codigo as grupo_codigo,
-			COALESCE(g.docente, '') as docente,
-			COALESCE(hg.dia, '') as dia,
-			COALESCE(hg.hora_inicio::text, '') as hora_inicio,
-			COALESCE(hg.hora_fin::text, '') as hora_fin,
-			COALESCE(hg.salon, '') as salon
-		FROM historial_academico ha
-		JOIN grupo g ON ha.grupo_id = g.id
-		JOIN asignatura a ON ha.id_asignatura = a.id
-		LEFT JOIN horario_grupo hg ON hg.grupo_id = g.id
-		JOIN periodo_academico p ON ha.id_periodo = p.id
-		WHERE ha.id_estudiante = $1
-			AND ha.estado = 'matriculada'
-			AND p.activo = true
-			AND p.archivado = false
-			AND p.id = $2
-		ORDER BY 
-			CASE hg.dia
-				WHEN 'LUNES' THEN 1
-				WHEN 'MARTES' THEN 2
-				WHEN 'MIERCOLES' THEN 3
-				WHEN 'JUEVES' THEN 4
-				WHEN 'VIERNES' THEN 5
-				WHEN 'SABADO' THEN 6
-				ELSE 7
-			END,
-			hg.hora_inicio
-	`
-	rows, err := h.db.Query(query, estudianteID, periodo.ID)
-	if err != nil {
-		log.Printf("Error querying horario academico: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	type claseHorario struct {
-		AsignaturaID     int    `json:"asignatura_id"`
-		AsignaturaCodigo string `json:"asignatura_codigo"`
-		AsignaturaNombre string `json:"asignatura_nombre"`
-		GrupoID          int    `json:"grupo_id"`
-		GrupoCodigo      string `json:"grupo_codigo"`
-		Docente          string `json:"docente"`
-		Dia              string `json:"dia"`
-		HoraInicio       string `json:"hora_inicio"`
-		HoraFin          string `json:"hora_fin"`
-		Salon            string `json:"salon"`
-	}
-
-	clases := []claseHorario{}
-	for rows.Next() {
-		var clase claseHorario
-		if err := rows.Scan(
-			&clase.AsignaturaID,
-			&clase.AsignaturaCodigo,
-			&clase.AsignaturaNombre,
-			&clase.GrupoID,
-			&clase.GrupoCodigo,
-			&clase.Docente,
-			&clase.Dia,
-			&clase.HoraInicio,
-			&clase.HoraFin,
-			&clase.Salon,
-		); err != nil {
-			log.Printf("Error scanning horario row: %v", err)
-			continue
-		}
-		clases = append(clases, clase)
-	}
-
-	response := map[string]interface{}{
-		"periodo": map[string]interface{}{
-			"id":       periodo.ID,
-			"year":     periodo.Year,
-			"semestre": periodo.Semestre,
-		},
-		"clases": clases,
-	}
-
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -1234,186 +1062,23 @@ func (h *MatriculaHandler) GetStudentMatricula(w http.ResponseWriter, r *http.Re
 
 	codigo := r.URL.Query().Get("codigo")
 	idStr := r.URL.Query().Get("id")
-	var estudianteID int
-	if idStr != "" {
-		estudianteID, err = strconv.Atoi(idStr)
-		if err != nil || estudianteID <= 0 {
-			http.Error(w, "ID de estudiante inválido", http.StatusBadRequest)
-			return
-		}
-	} else if codigo != "" {
-		// El código estudiantil está en la tabla `usuario`. La tabla `estudiante`
-		// referencia a `usuario` mediante `usuario_id`. Buscamos el estudiante
-		// haciendo JOIN entre `estudiante` y `usuario` por `usuario.codigo`.
-		query := `
-			SELECT e.id
-			FROM estudiante e
-			JOIN usuario u ON e.usuario_id = u.id
-			WHERE u.codigo = $1
-		`
-		if err := h.db.QueryRow(query, codigo).Scan(&estudianteID); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
-				return
-			}
-			log.Printf("Error buscando estudiante por codigo (usuario): %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-	} else {
+	response, err := h.service.GetStudentMatricula(codigo, idStr)
+	if errors.Is(err, services.ErrMatriculaInvalidStudentID) {
+		http.Error(w, "ID de estudiante inválido", http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, services.ErrMatriculaStudentNotFound) {
+		http.Error(w, "Estudiante no encontrado", http.StatusNotFound)
+		return
+	}
+	if errors.Is(err, services.ErrMatriculaMissingStudentParam) {
 		http.Error(w, "Falta parámetro 'codigo' o 'id'", http.StatusBadRequest)
 		return
 	}
-
-	// Log the incoming query for debugging (who requested and what student code/id)
-	log.Printf("GetStudentMatricula called by user=%d role=%s searching codigo=%q id=%d", claims.Sub, claims.Rol, codigo, estudianteID)
-
-	// Reuse logic similar to GetHorarioActual but for arbitrary estudianteID
-	var periodo models.PeriodoAcademico
-	queryPeriodo := `SELECT id, year, semestre, activo, archivado FROM periodo_academico WHERE activo = true AND archivado = false ORDER BY year DESC, semestre DESC LIMIT 1`
-	err = h.db.QueryRow(queryPeriodo).Scan(&periodo.ID, &periodo.Year, &periodo.Semestre, &periodo.Activo, &periodo.Archivado)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"periodo": nil, "clases": []interface{}{}})
-			return
-		}
-		log.Printf("Error getting periodo activo: %v", err)
+		log.Printf("Error en GetStudentMatricula: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
-	}
-
-	// Obtener horario/matricula del estudiante
-	query := `
-		SELECT 
-			ha.id_asignatura,
-			a.codigo,
-			a.nombre,
-			g.id as grupo_id,
-			g.codigo as grupo_codigo,
-			COALESCE(g.docente, '') as docente,
-			COALESCE(hg.dia, '') as dia,
-			COALESCE(hg.hora_inicio::text, '') as hora_inicio,
-			COALESCE(hg.hora_fin::text, '') as hora_fin,
-			COALESCE(hg.salon, '') as salon
-		FROM historial_academico ha
-		JOIN grupo g ON ha.grupo_id = g.id
-		JOIN asignatura a ON ha.id_asignatura = a.id
-		LEFT JOIN horario_grupo hg ON hg.grupo_id = g.id
-		JOIN periodo_academico p ON ha.id_periodo = p.id
-		WHERE ha.id_estudiante = $1
-			AND ha.estado = 'matriculada'
-			AND p.activo = true
-			AND p.archivado = false
-			AND p.id = $2
-		ORDER BY 
-			CASE hg.dia
-				WHEN 'LUNES' THEN 1
-				WHEN 'MARTES' THEN 2
-				WHEN 'MIERCOLES' THEN 3
-				WHEN 'JUEVES' THEN 4
-				WHEN 'VIERNES' THEN 5
-				WHEN 'SABADO' THEN 6
-				ELSE 7
-			END,
-			hg.hora_inicio
-	`
-	rows, err := h.db.Query(query, estudianteID, periodo.ID)
-	if err != nil {
-		log.Printf("Error querying horario academico (jefe): %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	type claseHorario struct {
-		AsignaturaID     int    `json:"asignatura_id"`
-		AsignaturaCodigo string `json:"asignatura_codigo"`
-		AsignaturaNombre string `json:"asignatura_nombre"`
-		GrupoID          int    `json:"grupo_id"`
-		GrupoCodigo      string `json:"grupo_codigo"`
-		Docente          string `json:"docente"`
-		Dia              string `json:"dia"`
-		HoraInicio       string `json:"hora_inicio"`
-		HoraFin          string `json:"hora_fin"`
-		Salon            string `json:"salon"`
-	}
-
-	clases := []claseHorario{}
-	for rows.Next() {
-		var clase claseHorario
-		if err := rows.Scan(
-			&clase.AsignaturaID,
-			&clase.AsignaturaCodigo,
-			&clase.AsignaturaNombre,
-			&clase.GrupoID,
-			&clase.GrupoCodigo,
-			&clase.Docente,
-			&clase.Dia,
-			&clase.HoraInicio,
-			&clase.HoraFin,
-			&clase.Salon,
-		); err != nil {
-			log.Printf("Error scanning horario row (jefe): %v", err)
-			continue
-		}
-		clases = append(clases, clase)
-	}
-
-	// Obtener información básica del estudiante. Parte de los datos (codigo,
-	// email, rol, programa_id) residen en la tabla `usuario` mientras que los
-	// datos personales (nombre, apellido, etc.) están en `estudiante`.
-	var usuarioID int
-	var usuarioCodigo sql.NullString
-	var usuarioEmail sql.NullString
-	var usuarioRol sql.NullString
-	var usuarioProgramaID sql.NullInt64
-	var estudianteNombre sql.NullString
-
-	qStu := `
-		SELECT u.id, u.codigo, u.email, u.rol, u.programa_id, e.nombre
-		FROM estudiante e
-		JOIN usuario u ON e.usuario_id = u.id
-		WHERE e.id = $1
-	`
-	_ = h.db.QueryRow(qStu, estudianteID).Scan(&usuarioID, &usuarioCodigo, &usuarioEmail, &usuarioRol, &usuarioProgramaID, &estudianteNombre)
-
-	estudianteMap := map[string]interface{}{
-		"id":     estudianteID,
-		"nombre": nil,
-		"usuario": map[string]interface{}{
-			"id":          usuarioID,
-			"codigo":      nil,
-			"email":       nil,
-			"rol":         nil,
-			"programa_id": nil,
-		},
-	}
-	if estudianteNombre.Valid {
-		estudianteMap["nombre"] = estudianteNombre.String
-	}
-	usuarioSub := estudianteMap["usuario"].(map[string]interface{})
-	if usuarioCodigo.Valid {
-		usuarioSub["codigo"] = usuarioCodigo.String
-	}
-	if usuarioEmail.Valid {
-		usuarioSub["email"] = usuarioEmail.String
-	}
-	if usuarioRol.Valid {
-		usuarioSub["rol"] = usuarioRol.String
-	}
-	if usuarioProgramaID.Valid {
-		usuarioSub["programa_id"] = int(usuarioProgramaID.Int64)
-	}
-
-	response := map[string]interface{}{
-		"estudiante": estudianteMap,
-		"periodo": map[string]interface{}{
-			"id":       periodo.ID,
-			"year":     periodo.Year,
-			"semestre": periodo.Semestre,
-		},
-		"clases": clases,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1877,55 +1542,15 @@ func (h *MatriculaHandler) fetchHorariosForGroups(groupIDs []int) (map[int][]Hor
 }
 
 func (h *MatriculaHandler) fetchInscritosCredits(estudianteID, periodoID int) (int, error) {
-	var creditos sql.NullInt64
-	query := `
-		SELECT COALESCE(SUM(a.creditos), 0)
-		FROM historial_academico ha
-		JOIN asignatura a ON a.id = ha.id_asignatura
-		WHERE ha.id_estudiante = $1
-		  AND ha.id_periodo = $2
-		  AND ha.estado = 'matriculada'
-	`
-	err := h.db.QueryRow(query, estudianteID, periodoID).Scan(&creditos)
-	if err != nil {
-		return 0, err
-	}
-	return int(creditos.Int64), nil
+	return h.service.GetInscritosCredits(estudianteID, periodoID)
 }
 
 func (h *MatriculaHandler) fetchCreditLimit(pensumID, semestre int) (int, error) {
-	var limite sql.NullInt64
-	query := `
-		SELECT creditos_semestre
-		FROM creditos_acumulados_pensum
-		WHERE pensum_id = $1 AND semestre = $2
-	`
-	err := h.db.QueryRow(query, pensumID, semestre).Scan(&limite)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return h.fallbackCreditLimit(pensumID, semestre)
-		}
-		return 0, err
-	}
-	if limite.Valid {
-		return int(limite.Int64), nil
-	}
-	return h.fallbackCreditLimit(pensumID, semestre)
+	return h.service.GetCreditLimit(pensumID, semestre)
 }
 
 func (h *MatriculaHandler) fallbackCreditLimit(pensumID, semestre int) (int, error) {
-	var total sql.NullInt64
-	query := `
-		SELECT COALESCE(SUM(a.creditos), 0)
-		FROM pensum_asignatura pa
-		JOIN asignatura a ON a.id = pa.asignatura_id
-		WHERE pa.pensum_id = $1 AND pa.semestre = $2
-	`
-	err := h.db.QueryRow(query, pensumID, semestre).Scan(&total)
-	if err != nil {
-		return 0, err
-	}
-	return int(total.Int64), nil
+	return h.service.GetCreditLimit(pensumID, semestre)
 }
 
 func (h *MatriculaHandler) fetchHorariosInscritos(estudianteID, periodoID int) ([]horarioBloque, error) {
@@ -2041,27 +1666,12 @@ func assignmentDisplay(id int, asigMap map[int]models.AsignaturaCompleta) string
 // MÓDULO DE MODIFICACIONES ESTUDIANTILES
 // =============================================================================
 
-type MateriaMatriculada struct {
-	HistorialID  int                 `json:"historial_id"`
-	AsignaturaID int                 `json:"asignatura_id"`
-	Codigo       string              `json:"codigo"`
-	Nombre       string              `json:"nombre"`
-	Creditos     int                 `json:"creditos"`
-	GrupoID      int                 `json:"grupo_id"`
-	GrupoCodigo  string              `json:"grupo_codigo"`
-	Docente      string              `json:"docente"`
-	Horarios     []HorarioDisponible `json:"horarios"`
-	EsAtrasada   bool                `json:"es_atrasada"`
-	EsPerdida    bool                `json:"es_perdida"`
-	PuedeRetirar bool                `json:"puede_retirar"`
-}
-
 type ModificacionesResponse struct {
-	Periodo                *models.PeriodoAcademico `json:"periodo"`
-	MateriasMatriculadas   []MateriaMatriculada     `json:"materias_matriculadas"`
-	AsignaturasDisponibles []AsignaturaDisponible   `json:"asignaturas_disponibles"`
-	Creditos               ResumenCreditos          `json:"creditos"`
-	EstadoEstudiante       string                   `json:"estado_estudiante"`
+	Periodo                *models.PeriodoAcademico    `json:"periodo"`
+	MateriasMatriculadas   []models.MateriaMatriculada `json:"materias_matriculadas"`
+	AsignaturasDisponibles []AsignaturaDisponible      `json:"asignaturas_disponibles"`
+	Creditos               ResumenCreditos             `json:"creditos"`
+	EstadoEstudiante       string                      `json:"estado_estudiante"`
 }
 
 type RetirarMateriaRequest struct {
@@ -2087,114 +1697,32 @@ func (h *MatriculaHandler) ValidarModificaciones(w http.ResponseWriter, r *http.
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
-
-	ctx, razon, err := h.prepareModificacionesContext(claims)
+	resp, err := h.service.ValidarModificaciones(claims)
 	if err != nil {
-		log.Printf("Error preparando contexto de modificaciones: %v", err)
+		log.Printf("Error validando modificaciones: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	if razon != "" {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"puede_modificar": false,
-			"razon":           razon,
-		})
-		return
-	}
-
-	// Verificar que tenga materias matriculadas en el periodo activo
-	count := 0
-	queryCount := `SELECT COUNT(*) FROM historial_academico WHERE id_estudiante = $1 AND id_periodo = $2 AND estado = 'matriculada'`
-	err = h.db.QueryRow(queryCount, ctx.EstudianteID, ctx.Periodo.ID).Scan(&count)
-	if err != nil {
-		log.Printf("Error contando materias matriculadas: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	if count == 0 {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"puede_modificar": false,
-			"razon":           "No tienes asignaturas matriculadas en el periodo activo. Debes realizar la inscripción inicial primero.",
-		})
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"puede_modificar": true,
-		"razon":           "",
-		"periodo":         ctx.Periodo,
-	})
+	json.NewEncoder(w).Encode(resp)
 }
 
 // prepareModificacionesContext prepara el contexto para modificaciones (similar a inscripción pero con plazo de modificaciones)
 func (h *MatriculaHandler) prepareModificacionesContext(claims *models.JWTClaims) (*inscripcionContext, string, error) {
-	var estudianteID int
-	var semestre int
-	var estado string
-	queryEstudiante := `SELECT id, semestre, estado FROM estudiante WHERE usuario_id = $1`
-	err := h.db.QueryRow(queryEstudiante, claims.Sub).Scan(&estudianteID, &semestre, &estado)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, "Estudiante no encontrado", nil
-		}
-		return nil, "", err
+	sctx, razon, err := h.service.PrepareModificacionesContext(claims)
+	if err != nil || razon != "" {
+		return nil, razon, err
 	}
-
-	pensumHandler := &PensumHandler{db: h.db}
-	pensumID, pensumNombre, programaNombre, err := pensumHandler.getPensumInfo(estudianteID)
-	if err != nil {
-		if errors.Is(err, errPensumNoAsignado) {
-			return nil, "No tienes un pensum asignado. Contacta a coordinación para asignarte uno.", nil
-		}
-		return nil, "", err
-	}
-
-	var periodo models.PeriodoAcademico
-	queryPeriodo := `SELECT id, year, semestre, activo, archivado FROM periodo_academico WHERE activo = true AND archivado = false ORDER BY year DESC, semestre DESC LIMIT 1`
-	err = h.db.QueryRow(queryPeriodo).Scan(&periodo.ID, &periodo.Year, &periodo.Semestre, &periodo.Activo, &periodo.Archivado)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, "No hay un periodo académico activo.", nil
-		}
-		return nil, "", err
-	}
-
-	var plazos models.Plazos
-	queryPlazos := `SELECT id, periodo_id, programa_id, documentos, inscripcion, modificaciones FROM plazos WHERE periodo_id = $1 AND programa_id = $2`
-	err = h.db.QueryRow(queryPlazos, periodo.ID, claims.ProgramaID).Scan(
-		&plazos.ID,
-		&plazos.PeriodoID,
-		&plazos.ProgramaID,
-		&plazos.Documentos,
-		&plazos.Inscripcion,
-		&plazos.Modificaciones,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, "No hay plazos configurados para tu programa en el periodo activo.", nil
-		}
-		return nil, "", err
-	}
-
-	if !plazos.Modificaciones {
-		return nil, "El plazo de modificaciones no está activo para tu programa en este periodo.", nil
-	}
-
 	return &inscripcionContext{
-		EstudianteID:   estudianteID,
-		Semestre:       semestre,
-		Estado:         estado,
-		PensumID:       pensumID,
-		PensumNombre:   pensumNombre,
-		ProgramaID:     claims.ProgramaID,
-		ProgramaNombre: programaNombre,
-		Periodo:        &periodo,
-		Plazos:         plazos,
+		EstudianteID:   sctx.EstudianteID,
+		Semestre:       sctx.Semestre,
+		Estado:         sctx.Estado,
+		PensumID:       sctx.PensumID,
+		PensumNombre:   sctx.PensumNombre,
+		ProgramaID:     sctx.ProgramaID,
+		ProgramaNombre: sctx.ProgramaNombre,
+		Periodo:        sctx.Periodo,
+		Plazos:         sctx.Plazos,
 	}, "", nil
 }
 
@@ -2231,20 +1759,18 @@ func (h *MatriculaHandler) GetModificacionesData(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Obtener materias matriculadas del periodo activo
-	materiasMatriculadas, err := h.fetchMateriasMatriculadas(ctx.EstudianteID, ctx.Periodo.ID)
+	core, reason, err := h.service.BuildModificacionesCoreData(
+		toServiceMatriculaContext(ctx),
+		"No tienes materias matriculadas en el periodo activo. Debes realizar la inscripción inicial antes de poder hacer modificaciones.",
+	)
 	if err != nil {
-		log.Printf("Error obteniendo materias matriculadas: %v", err)
+		log.Printf("Error construyendo datos de modificaciones: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	// Validar que tenga materias matriculadas
-	if len(materiasMatriculadas) == 0 {
+	if reason != "" {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"error": "No tienes materias matriculadas en el periodo activo. Debes realizar la inscripción inicial antes de poder hacer modificaciones.",
-		})
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"error": reason})
 		return
 	}
 
@@ -2256,35 +1782,16 @@ func (h *MatriculaHandler) GetModificacionesData(w http.ResponseWriter, r *http.
 		return
 	}
 
-	creditosInscritos, err := h.fetchInscritosCredits(ctx.EstudianteID, ctx.Periodo.ID)
-	if err != nil {
-		log.Printf("Error calculando créditos matriculados: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	creditosMax, err := h.fetchCreditLimit(ctx.PensumID, ctx.Semestre)
-	if err != nil {
-		log.Printf("Error calculando límite de créditos: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	creditosDisponibles := creditosMax - creditosInscritos
-	if creditosDisponibles < 0 {
-		creditosDisponibles = 0
-	}
-
 	response := ModificacionesResponse{
-		Periodo:                ctx.Periodo,
-		MateriasMatriculadas:   materiasMatriculadas,
+		Periodo:                core.Periodo,
+		MateriasMatriculadas:   core.MateriasMatriculadas,
 		AsignaturasDisponibles: asignaturasDisponibles,
 		Creditos: ResumenCreditos{
-			Maximo:      creditosMax,
-			Inscritos:   creditosInscritos,
-			Disponibles: creditosDisponibles,
+			Maximo:      core.CreditosMax,
+			Inscritos:   core.CreditosInscritos,
+			Disponibles: core.CreditosDisponibles,
 		},
-		EstadoEstudiante: ctx.Estado,
+		EstadoEstudiante: core.EstadoEstudiante,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -2292,63 +1799,8 @@ func (h *MatriculaHandler) GetModificacionesData(w http.ResponseWriter, r *http.
 }
 
 // fetchMateriasMatriculadas obtiene las materias actualmente matriculadas en el periodo activo
-func (h *MatriculaHandler) fetchMateriasMatriculadas(estudianteID, periodoID int) ([]MateriaMatriculada, error) {
-	query := `
-		SELECT 
-			ha.id,
-			ha.id_asignatura,
-			a.codigo,
-			a.nombre,
-			a.creditos,
-			ha.grupo_id,
-			g.codigo,
-			COALESCE(g.docente, '')
-		FROM historial_academico ha
-		JOIN asignatura a ON a.id = ha.id_asignatura
-		JOIN grupo g ON g.id = ha.grupo_id
-		WHERE ha.id_estudiante = $1
-			AND ha.id_periodo = $2
-			AND ha.estado = 'matriculada'
-		ORDER BY a.codigo
-	`
-	rows, err := h.db.Query(query, estudianteID, periodoID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var materias []MateriaMatriculada
-	for rows.Next() {
-		var mat MateriaMatriculada
-		if err := rows.Scan(
-			&mat.HistorialID,
-			&mat.AsignaturaID,
-			&mat.Codigo,
-			&mat.Nombre,
-			&mat.Creditos,
-			&mat.GrupoID,
-			&mat.GrupoCodigo,
-			&mat.Docente,
-		); err != nil {
-			return nil, err
-		}
-
-		// Obtener horarios del grupo
-		horarios, err := h.fetchHorariosForGroups([]int{mat.GrupoID})
-		if err == nil {
-			mat.Horarios = horarios[mat.GrupoID]
-		}
-
-		// Determinar si es atrasada o perdida (basado en historial previo)
-		mat.EsAtrasada, mat.EsPerdida = h.determinarEstadoMateria(estudianteID, mat.AsignaturaID, periodoID)
-
-		// Puede retirar si NO es atrasada ni perdida
-		mat.PuedeRetirar = !mat.EsAtrasada && !mat.EsPerdida
-
-		materias = append(materias, mat)
-	}
-
-	return materias, nil
+func (h *MatriculaHandler) fetchMateriasMatriculadas(estudianteID, periodoID int) ([]models.MateriaMatriculada, error) {
+	return h.service.GetMateriasMatriculadas(estudianteID, periodoID)
 }
 
 // determinarEstadoMateria verifica si una materia es atrasada o perdida
@@ -2364,7 +1816,7 @@ func (h *MatriculaHandler) determinarEstadoMateria(estudianteID, asignaturaID, p
 
 	// Obtener historial previo de la asignatura
 	query := `
-		SELECT 
+		SELECT
 			ha.estado,
 			p.year,
 			p.semestre
@@ -2403,16 +1855,8 @@ func (h *MatriculaHandler) determinarEstadoMateria(estudianteID, asignaturaID, p
 		}
 	}
 
-	// Es perdida si tiene reprobada
 	esPerdida := tieneReprobada
-
-	// Es atrasada si el último periodo en que la cursó es anterior al periodo actual por más de 2 períodos
-	// y no está aprobada
-	esAtrasada := false
-	if ultimoOrdinal > 0 && periodoOrdinal > ultimoOrdinal+2 {
-		esAtrasada = true
-	}
-
+	esAtrasada := ultimoOrdinal > 0 && periodoOrdinal > ultimoOrdinal+2
 	return esAtrasada, esPerdida
 }
 
@@ -2577,79 +2021,35 @@ func (h *MatriculaHandler) getAsignaturasDisponiblesModificaciones(ctx *inscripc
 
 // prepareModificacionesContextForEstudiante prepara el contexto de modificaciones para un estudiante dado (usado por jefatura)
 func (h *MatriculaHandler) prepareModificacionesContextForEstudiante(estudianteID int) (*inscripcionContext, string, error) {
-	var semestre int
-	var estado string
-	queryEst := `SELECT semestre, estado FROM estudiante WHERE id = $1`
-	err := h.db.QueryRow(queryEst, estudianteID).Scan(&semestre, &estado)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, "Estudiante no encontrado", nil
-		}
-		return nil, "", err
+	sctx, razon, err := h.service.PrepareModificacionesContextForEstudiante(estudianteID)
+	if err != nil || razon != "" {
+		return nil, razon, err
 	}
-
-	// Obtener pensum y programa (necesitamos el programa_id para consultar plazos)
-	var pensumID int
-	var pensumNombre string
-	var programaID int
-	var programaNombre string
-	queryPensum := `
-		SELECT p.id, p.nombre, pr.id, pr.nombre
-		FROM estudiante_pensum ep
-		JOIN pensum p ON ep.pensum_id = p.id
-		JOIN programa pr ON p.programa_id = pr.id
-		WHERE ep.estudiante_id = $1
-	`
-	err = h.db.QueryRow(queryPensum, estudianteID).Scan(&pensumID, &pensumNombre, &programaID, &programaNombre)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, "No tienes un pensum asignado. Contacta a coordinación para asignarte uno.", nil
-		}
-		return nil, "", err
-	}
-
-	var periodo models.PeriodoAcademico
-	queryPeriodo := `SELECT id, year, semestre, activo, archivado FROM periodo_academico WHERE activo = true AND archivado = false ORDER BY year DESC, semestre DESC LIMIT 1`
-	err = h.db.QueryRow(queryPeriodo).Scan(&periodo.ID, &periodo.Year, &periodo.Semestre, &periodo.Activo, &periodo.Archivado)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, "No hay un periodo académico activo.", nil
-		}
-		return nil, "", err
-	}
-
-	var plazos models.Plazos
-	queryPlazos := `SELECT id, periodo_id, programa_id, documentos, inscripcion, modificaciones FROM plazos WHERE periodo_id = $1 AND programa_id = $2`
-	err = h.db.QueryRow(queryPlazos, periodo.ID, programaID).Scan(
-		&plazos.ID,
-		&plazos.PeriodoID,
-		&plazos.ProgramaID,
-		&plazos.Documentos,
-		&plazos.Inscripcion,
-		&plazos.Modificaciones,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, "No hay plazos configurados para el programa del estudiante en el periodo activo.", nil
-		}
-		return nil, "", err
-	}
-
-	if !plazos.Modificaciones {
-		return nil, "El plazo de modificaciones no está activo para el programa de este estudiante en este periodo.", nil
-	}
-
 	return &inscripcionContext{
-		EstudianteID:   estudianteID,
-		Semestre:       semestre,
-		Estado:         estado,
-		PensumID:       pensumID,
-		PensumNombre:   pensumNombre,
-		ProgramaID:     programaID,
-		ProgramaNombre: programaNombre,
-		Periodo:        &periodo,
-		Plazos:         plazos,
+		EstudianteID:   sctx.EstudianteID,
+		Semestre:       sctx.Semestre,
+		Estado:         sctx.Estado,
+		PensumID:       sctx.PensumID,
+		PensumNombre:   sctx.PensumNombre,
+		ProgramaID:     sctx.ProgramaID,
+		ProgramaNombre: sctx.ProgramaNombre,
+		Periodo:        sctx.Periodo,
+		Plazos:         sctx.Plazos,
 	}, "", nil
+}
+
+func toServiceMatriculaContext(ctx *inscripcionContext) *services.MatriculaContext {
+	return &services.MatriculaContext{
+		EstudianteID:   ctx.EstudianteID,
+		Semestre:       ctx.Semestre,
+		Estado:         ctx.Estado,
+		PensumID:       ctx.PensumID,
+		PensumNombre:   ctx.PensumNombre,
+		ProgramaID:     ctx.ProgramaID,
+		ProgramaNombre: ctx.ProgramaNombre,
+		Periodo:        ctx.Periodo,
+		Plazos:         ctx.Plazos,
+	}
 }
 
 // JefeGetModificacionesData devuelve las materias matriculadas y disponibles para modificaciones para un estudiante (ruta para jefatura)
@@ -2697,18 +2097,18 @@ func (h *MatriculaHandler) JefeGetModificacionesData(w http.ResponseWriter, r *h
 		return
 	}
 
-	materiasMatriculadas, err := h.fetchMateriasMatriculadas(ctx.EstudianteID, ctx.Periodo.ID)
+	core, reason, err := h.service.BuildModificacionesCoreData(
+		toServiceMatriculaContext(ctx),
+		"El estudiante no tiene materias matriculadas en el periodo activo. Debe realizar la inscripción inicial primero.",
+	)
 	if err != nil {
-		log.Printf("Error obteniendo materias matriculadas (jefe): %v", err)
+		log.Printf("Error construyendo datos de modificaciones (jefe): %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	if len(materiasMatriculadas) == 0 {
+	if reason != "" {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"error": "El estudiante no tiene materias matriculadas en el periodo activo. Debe realizar la inscripción inicial primero.",
-		})
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"error": reason})
 		return
 	}
 
@@ -2719,35 +2119,16 @@ func (h *MatriculaHandler) JefeGetModificacionesData(w http.ResponseWriter, r *h
 		return
 	}
 
-	creditosInscritos, err := h.fetchInscritosCredits(ctx.EstudianteID, ctx.Periodo.ID)
-	if err != nil {
-		log.Printf("Error calculando créditos matriculados (jefe): %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	creditosMax, err := h.fetchCreditLimit(ctx.PensumID, ctx.Semestre)
-	if err != nil {
-		log.Printf("Error calculando límite de créditos (jefe): %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	creditosDisponibles := creditosMax - creditosInscritos
-	if creditosDisponibles < 0 {
-		creditosDisponibles = 0
-	}
-
 	response := ModificacionesResponse{
-		Periodo:                ctx.Periodo,
-		MateriasMatriculadas:   materiasMatriculadas,
+		Periodo:                core.Periodo,
+		MateriasMatriculadas:   core.MateriasMatriculadas,
 		AsignaturasDisponibles: asignaturasDisponibles,
 		Creditos: ResumenCreditos{
-			Maximo:      creditosMax,
-			Inscritos:   creditosInscritos,
-			Disponibles: creditosDisponibles,
+			Maximo:      core.CreditosMax,
+			Inscritos:   core.CreditosInscritos,
+			Disponibles: core.CreditosDisponibles,
 		},
-		EstadoEstudiante: ctx.Estado,
+		EstadoEstudiante: core.EstadoEstudiante,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -2756,106 +2137,34 @@ func (h *MatriculaHandler) JefeGetModificacionesData(w http.ResponseWriter, r *h
 
 // fetchNucleoComunOtrasCarreras obtiene asignaturas de núcleo común de otras carreras
 func (h *MatriculaHandler) fetchNucleoComunOtrasCarreras(programaID int) ([]models.AsignaturaCompleta, error) {
-	query := `
-		SELECT DISTINCT
-			pa.semestre,
-			a.id,
-			a.codigo,
-			a.nombre,
-			a.creditos,
-			COALESCE(at.nombre, '') as tipo_nombre,
-			a.tiene_laboratorio,
-			pa.categoria
-		FROM pensum_asignatura pa
-		JOIN asignatura a ON pa.asignatura_id = a.id
-		LEFT JOIN asignatura_tipo at ON a.tipo_id = at.id
-		JOIN pensum p ON pa.pensum_id = p.id
-		WHERE pa.categoria = 'nucleo_comun'
-			AND p.programa_id != $1
-			AND p.activo = true
-		ORDER BY a.codigo
-	`
-	rows, err := h.db.Query(query, programaID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var asignaturas []models.AsignaturaCompleta
-	for rows.Next() {
-		var asig models.AsignaturaCompleta
-		if err := rows.Scan(
-			&asig.Semestre,
-			&asig.ID,
-			&asig.Codigo,
-			&asig.Nombre,
-			&asig.Creditos,
-			&asig.TipoNombre,
-			&asig.TieneLaboratorio,
-			&asig.Categoria,
-		); err != nil {
-			return nil, err
-		}
-		asignaturas = append(asignaturas, asig)
-	}
-
-	return asignaturas, nil
+	return h.service.GetNucleoComunOtrasCarreras(programaID)
 }
 
 // fetchProgramasNucleoComun obtiene los programas que tienen una asignatura como núcleo común
 func (h *MatriculaHandler) fetchProgramasNucleoComun(asignaturaID int) ([]ProgramaInfo, error) {
-	query := `
-		SELECT DISTINCT p.programa_id, pr.nombre
-		FROM pensum_asignatura pa
-		JOIN pensum p ON pa.pensum_id = p.id
-		JOIN programa pr ON p.programa_id = pr.id
-		WHERE pa.asignatura_id = $1
-			AND pa.categoria = 'nucleo_comun'
-			AND p.activo = true
-		ORDER BY pr.nombre
-	`
-	rows, err := h.db.Query(query, asignaturaID)
+	programasRepo, err := h.service.GetProgramasNucleoComun(asignaturaID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var programas []ProgramaInfo
-	for rows.Next() {
-		var prog ProgramaInfo
-		if err := rows.Scan(&prog.ID, &prog.Nombre); err != nil {
-			return nil, err
-		}
-		programas = append(programas, prog)
+	programas := make([]ProgramaInfo, 0, len(programasRepo))
+	for _, p := range programasRepo {
+		programas = append(programas, ProgramaInfo{ID: p.ID, Nombre: p.Nombre})
 	}
-
 	return programas, nil
 }
 
 // fetchProgramaPorGrupo obtiene el programa asociado a un grupo (para núcleo común)
 // Un grupo puede tener múltiples programas si la asignatura está en varios pensums
 // Retornamos el primer programa encontrado o nil si no hay ninguno
-func (h *MatriculaHandler) fetchProgramaPorGrupo(grupoID, asignaturaID int) (*ProgramaInfo, error) {
-	query := `
-		SELECT DISTINCT p.programa_id, pr.nombre
-		FROM pensum_asignatura pa
-		JOIN pensum p ON pa.pensum_id = p.id
-		JOIN programa pr ON p.programa_id = pr.id
-		WHERE pa.asignatura_id = $1
-			AND pa.categoria = 'nucleo_comun'
-			AND p.activo = true
-		LIMIT 1
-	`
-	var prog ProgramaInfo
-	err := h.db.QueryRow(query, asignaturaID).Scan(&prog.ID, &prog.Nombre)
+func (h *MatriculaHandler) fetchProgramaPorGrupo(_ int, asignaturaID int) (*ProgramaInfo, error) {
+	prog, err := h.service.GetProgramaPorGrupo(asignaturaID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
 		return nil, err
 	}
-
-	return &prog, nil
+	if prog == nil {
+		return nil, nil
+	}
+	return &ProgramaInfo{ID: prog.ID, Nombre: prog.Nombre}, nil
 }
 
 // RetirarMateria permite retirar una materia del periodo activo
@@ -3363,7 +2672,7 @@ func (h *MatriculaHandler) GetSolicitudesEstudiante(w http.ResponseWriter, r *ht
 		Observacion        string          `json:"observacion,omitempty"`
 		RevisadoPor        *int64          `json:"revisado_por,omitempty"`
 		FechaSolicitud     time.Time       `json:"fecha_solicitud"`
-		FechaRevision       *time.Time      `json:"fecha_revision,omitempty"`
+		FechaRevision      *time.Time      `json:"fecha_revision,omitempty"`
 	}
 
 	var resp []SolicitudResponse
@@ -3374,10 +2683,10 @@ func (h *MatriculaHandler) GetSolicitudesEstudiante(w http.ResponseWriter, r *ht
 			EstudianteCodigo: s.EstudianteCodigo,
 			ProgramaID:       s.ProgramaID,
 			PeriodoID:        s.PeriodoID,
-			GruposAgregar:     s.GruposAgregar,
-			GruposRetirar:     s.GruposRetirar,
-			Estado:            s.Estado,
-			FechaSolicitud:    s.FechaSolicitud,
+			GruposAgregar:    s.GruposAgregar,
+			GruposRetirar:    s.GruposRetirar,
+			Estado:           s.Estado,
+			FechaSolicitud:   s.FechaSolicitud,
 		}
 		if s.EstudianteNombre.Valid {
 			sr.EstudianteNombre = s.EstudianteNombre.String
@@ -3466,7 +2775,7 @@ func (h *MatriculaHandler) CrearSolicitudModificacion(w http.ResponseWriter, r *
 	var gruposRetirarArray []interface{}
 	json.Unmarshal(payload.GruposAgregar, &gruposAgregarArray)
 	json.Unmarshal(payload.GruposRetirar, &gruposRetirarArray)
-	
+
 	if len(gruposAgregarArray) == 0 && len(gruposRetirarArray) == 0 {
 		http.Error(w, "Debes seleccionar al menos un grupo para agregar o una materia para retirar", http.StatusBadRequest)
 		return
@@ -3492,8 +2801,8 @@ func (h *MatriculaHandler) CrearSolicitudModificacion(w http.ResponseWriter, r *
 				`, grupoID).Scan(&grupoCodigo, &asignaturaID, &asignaturaCodigo, &asignaturaNombre, &creditos)
 				if err == nil {
 					gruposCompletos = append(gruposCompletos, map[string]interface{}{
-						"grupo_id":         grupoID,
-						"grupo_codigo":     grupoCodigo,
+						"grupo_id":          grupoID,
+						"grupo_codigo":      grupoCodigo,
 						"asignatura_id":     asignaturaID,
 						"asignatura_codigo": asignaturaCodigo,
 						"asignatura_nombre": asignaturaNombre,
@@ -3573,7 +2882,7 @@ func (h *MatriculaHandler) GetSolicitudesPorPrograma(w http.ResponseWriter, r *h
 
 	// El programa_id viene de los claims del JWT (ya está validado en el middleware)
 	programaID := claims.ProgramaID
-	
+
 	// Verificar que el usuario sea jefe departamental (opcional, pero buena práctica)
 	var jefeID int
 	err = h.db.QueryRow(`SELECT id FROM jefe_departamental WHERE usuario_id = $1`, claims.Sub).Scan(&jefeID)
@@ -3638,7 +2947,7 @@ func (h *MatriculaHandler) GetSolicitudesPorPrograma(w http.ResponseWriter, r *h
 		Observacion        string          `json:"observacion,omitempty"`
 		RevisadoPor        *int64          `json:"revisado_por,omitempty"`
 		FechaSolicitud     time.Time       `json:"fecha_solicitud"`
-		FechaRevision       *time.Time      `json:"fecha_revision,omitempty"`
+		FechaRevision      *time.Time      `json:"fecha_revision,omitempty"`
 	}
 
 	var resp []SolicitudResponse
@@ -3649,10 +2958,10 @@ func (h *MatriculaHandler) GetSolicitudesPorPrograma(w http.ResponseWriter, r *h
 			EstudianteCodigo: s.EstudianteCodigo,
 			ProgramaID:       s.ProgramaID,
 			PeriodoID:        s.PeriodoID,
-			GruposAgregar:     s.GruposAgregar,
-			GruposRetirar:     s.GruposRetirar,
-			Estado:            s.Estado,
-			FechaSolicitud:    s.FechaSolicitud,
+			GruposAgregar:    s.GruposAgregar,
+			GruposRetirar:    s.GruposRetirar,
+			Estado:           s.Estado,
+			FechaSolicitud:   s.FechaSolicitud,
 		}
 		if s.EstudianteNombre.Valid {
 			sr.EstudianteNombre = s.EstudianteNombre.String
@@ -3763,12 +3072,12 @@ func (h *MatriculaHandler) ValidarSolicitudModificacion(w http.ResponseWriter, r
 
 		// Aplicar adiciones
 		var agregar []struct {
-			GrupoID        int    `json:"grupo_id"`
-			AsignaturaID   int    `json:"asignatura_id"`
-			GrupoCodigo    string `json:"grupo_codigo"`
+			GrupoID          int    `json:"grupo_id"`
+			AsignaturaID     int    `json:"asignatura_id"`
+			GrupoCodigo      string `json:"grupo_codigo"`
 			AsignaturaCodigo string `json:"asignatura_codigo"`
 			AsignaturaNombre string `json:"asignatura_nombre"`
-			Creditos       int    `json:"creditos"`
+			Creditos         int    `json:"creditos"`
 		}
 		if err := json.Unmarshal(gruposAgregar, &agregar); err == nil && len(agregar) > 0 {
 			for _, a := range agregar {

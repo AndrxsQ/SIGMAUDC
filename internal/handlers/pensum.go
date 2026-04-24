@@ -5,401 +5,163 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
-	"sort"
 	"strconv"
 
-	"github.com/gorilla/mux"
-
-	"github.com/andrxsq/SIGMAUDC/internal/middleware"
+	"github.com/andrxsq/SIGMAUDC/internal/constants"
 	"github.com/andrxsq/SIGMAUDC/internal/models"
-	"github.com/lib/pq"
+	"github.com/andrxsq/SIGMAUDC/internal/repositories"
+	"github.com/andrxsq/SIGMAUDC/internal/services"
+	"github.com/gorilla/mux"
 )
 
-// PensumHandler gestiona la vista del pensum para estudiantes
 type PensumHandler struct {
-	db *sql.DB
+	service *services.PensumService
+	db      *sql.DB
 }
 
-// NewPensumHandler crea un handler nuevo
-func NewPensumHandler(db *sql.DB) *PensumHandler {
-	return &PensumHandler{db: db}
+func NewPensumHandler(service *services.PensumService) *PensumHandler {
+	return &PensumHandler{service: service}
 }
 
-func (h *PensumHandler) getClaims(r *http.Request) (*models.JWTClaims, error) {
-	claims, ok := middleware.GetClaimsFromContext(r.Context())
-	if !ok {
-		return nil, errors.New("unauthorized")
-	}
-	return claims, nil
-}
-
-// GetPensumEstudiante devuelve la vista completa del pensum del estudiante
 func (h *PensumHandler) GetPensumEstudiante(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Rol != "estudiante" {
+	if claims.Rol != constants.RolEstudiante {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
-
-	estudianteID, err := h.getEstudianteID(claims.Sub)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	resp, err := h.service.GetPensumEstudiante(claims.Sub)
+	if errors.Is(err, services.ErrPensumNoAsignado) {
+		http.Error(w, "Pensum no asignado al estudiante", http.StatusNotFound)
 		return
 	}
-
-	pensumID, pensumNombre, programaNombre, err := h.getPensumInfo(estudianteID)
 	if err != nil {
-		if errors.Is(err, errPensumNoAsignado) {
-			http.Error(w, "Pensum no asignado al estudiante", http.StatusNotFound)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Error obteniendo pensum", http.StatusInternalServerError)
 		return
 	}
-
-	activePeriodo, err := h.getActivePeriodo()
-	if err != nil {
-		// no abortamos, seguimos sin período activo
-		activePeriodo = nil
-	}
-
-	asignaturas, err := h.getAsignaturas(pensumID)
-	if err != nil {
-		http.Error(w, "Error obteniendo asignaturas del pensum", http.StatusInternalServerError)
-		return
-	}
-
-	prereqMap, err := h.buildPrereqMap(pensumID)
-	if err != nil {
-		http.Error(w, "Error obteniendo prerrequisitos", http.StatusInternalServerError)
-		return
-	}
-
-	historialMap, err := h.buildHistorialMap(estudianteID)
-	if err != nil {
-		http.Error(w, "Error obteniendo historial académico", http.StatusInternalServerError)
-		return
-	}
-
-	activeOrdinal := (*int)(nil)
-	if activePeriodo != nil {
-		ord := periodOrdinal(activePeriodo.Year, activePeriodo.Semestre)
-		activeOrdinal = &ord
-	}
-
-	semestresMap := make(map[int][]models.AsignaturaCompleta)
-	for _, asig := range asignaturas {
-		hist := historialMap[asig.ID]
-		prereqs := make([]models.Prerequisito, 0, len(prereqMap[asig.ID]))
-		for _, prereq := range prereqMap[asig.ID] {
-			prereq.Completado = hasApprovedEntry(historialMap, prereq.PrerequisitoID)
-			prereqs = append(prereqs, prereq)
-		}
-
-		var faltantes []models.Prerequisito
-		for _, p := range prereqs {
-			if !p.Completado {
-				faltantes = append(faltantes, p)
-			}
-		}
-
-		state, nota, grupoID, periodoCursada, repeticiones := determineEstado(hist, activePeriodo, activeOrdinal, len(faltantes) > 0)
-
-		asig.Estado = &state
-		asig.Nota = nota
-		asig.Repeticiones = repeticiones
-		asig.Prerequisitos = prereqs
-		asig.PrerequisitosFaltantes = faltantes
-		asig.GrupoID = grupoID
-		asig.PeriodoCursada = periodoCursada
-
-		semestresMap[asig.Semestre] = append(semestresMap[asig.Semestre], asig)
-	}
-
-	var semestres []models.SemestrePensum
-	for semestre := range semestresMap {
-		semestres = append(semestres, models.SemestrePensum{
-			Numero:      semestre,
-			Asignaturas: semestresMap[semestre],
-		})
-	}
-	sort.Slice(semestres, func(i, j int) bool {
-		return semestres[i].Numero < semestres[j].Numero
-	})
-
-	response := models.PensumEstudianteResponse{
-		ProgramaNombre: programaNombre,
-		PensumNombre:   pensumNombre,
-		Semestres:      semestres,
-	}
-
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "Error encoding response", http.StatusInternalServerError)
-		return
-	}
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
-func (h *PensumHandler) getEstudianteID(usuarioID int) (int, error) {
-	var estudianteID int
-	query := `SELECT id FROM estudiante WHERE usuario_id = $1`
-	err := h.db.QueryRow(query, usuarioID).Scan(&estudianteID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, fmt.Errorf("estudiante no encontrado")
-		}
-		return 0, err
-	}
-	return estudianteID, nil
-}
-
-var errPensumNoAsignado = errors.New("pensum no asignado")
-
-func (h *PensumHandler) getPensumInfo(estudianteID int) (int, string, string, error) {
-	var pensumID int
-	var pensumNombre, programaNombre string
-	query := `
-		SELECT p.id, p.nombre, pr.nombre
-		FROM estudiante_pensum ep
-		JOIN pensum p ON ep.pensum_id = p.id
-		JOIN programa pr ON p.programa_id = pr.id
-		WHERE ep.estudiante_id = $1
-	`
-	err := h.db.QueryRow(query, estudianteID).Scan(&pensumID, &pensumNombre, &programaNombre)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, "", "", errPensumNoAsignado
-		}
-		return 0, "", "", err
-	}
-	return pensumID, pensumNombre, programaNombre, nil
-}
-
-func (h *PensumHandler) getActivePeriodo() (*models.PeriodoAcademico, error) {
-	var periodo models.PeriodoAcademico
-	query := `SELECT id, year, semestre FROM periodo_academico WHERE activo = true AND archivado = false ORDER BY year DESC, semestre DESC LIMIT 1`
-	err := h.db.QueryRow(query).Scan(&periodo.ID, &periodo.Year, &periodo.Semestre)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &periodo, nil
-}
-
-func (h *PensumHandler) getAsignaturas(pensumID int) ([]models.AsignaturaCompleta, error) {
-	query := `
-		SELECT 
-			pa.semestre,
-			a.id,
-			a.codigo,
-			a.nombre,
-			a.creditos,
-			COALESCE(at.nombre, '') as tipo_nombre,
-			a.tiene_laboratorio,
-			pa.categoria
-		FROM pensum_asignatura pa
-		JOIN asignatura a ON pa.asignatura_id = a.id
-		LEFT JOIN asignatura_tipo at ON a.tipo_id = at.id
-		WHERE pa.pensum_id = $1
-		ORDER BY pa.semestre, a.codigo
-	`
-	rows, err := h.db.Query(query, pensumID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var asignaturas []models.AsignaturaCompleta
-	for rows.Next() {
-		var asig models.AsignaturaCompleta
-		if err := rows.Scan(
-			&asig.Semestre,
-			&asig.ID,
-			&asig.Codigo,
-			&asig.Nombre,
-			&asig.Creditos,
-			&asig.TipoNombre,
-			&asig.TieneLaboratorio,
-			&asig.Categoria,
-		); err != nil {
-			return nil, err
-		}
-		asignaturas = append(asignaturas, asig)
-	}
-	return asignaturas, nil
-}
-
-// ListPensums devuelve la lista de pensums disponibles (id, nombre)
 func (h *PensumHandler) ListPensums(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	// Solo jefatura puede listar pensums en este contexto
-	if claims.Rol != "jefe_departamental" {
+	if claims.Rol != constants.RolJefe {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
-
-	query := `SELECT id, nombre FROM pensum ORDER BY nombre`
-	rows, err := h.db.Query(query)
+	list, err := h.service.ListPensums()
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
-
-	type PensumItem struct {
-		ID     int    `json:"id"`
-		Nombre string `json:"nombre"`
-	}
-
-	var list []PensumItem
-	for rows.Next() {
-		var p PensumItem
-		if err := rows.Scan(&p.ID, &p.Nombre); err != nil {
-			continue
-		}
-		list = append(list, p)
-	}
-
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(list)
+	_ = json.NewEncoder(w).Encode(list)
 }
 
-// GetAsignaturasPensum devuelve las asignaturas de un pensum dado (para jefatura)
 func (h *PensumHandler) GetAsignaturasPensum(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
+	claims, err := getClaims(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Rol != "jefe_departamental" {
+	if claims.Rol != constants.RolJefe {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
-
-	vars := mux.Vars(r)
-	idStr := vars["id"]
-	if idStr == "" {
-		http.Error(w, "Falta id de pensum", http.StatusBadRequest)
-		return
-	}
-	pensumID, err := strconv.Atoi(idStr)
+	pensumID, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil || pensumID <= 0 {
 		http.Error(w, "ID de pensum inválido", http.StatusBadRequest)
 		return
 	}
-
-	asignaturas, err := h.getAsignaturas(pensumID)
+	asignaturas, err := h.service.GetAsignaturasPensum(pensumID)
 	if err != nil {
-		log.Printf("Error obteniendo asignaturas para pensum %d: %v", pensumID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(asignaturas)
+	_ = json.NewEncoder(w).Encode(asignaturas)
 }
 
-type historyRecord struct {
-	AsignaturaID int
-	Estado       string
-	Nota         sql.NullFloat64
-	GrupoID      sql.NullInt64
-	PeriodoID    int
-	Year         int
-	Semestre     int
-	Ordinal      int
-}
-
-func (h *PensumHandler) buildHistorialMap(estudianteID int) (map[int][]historyRecord, error) {
-	query := `
-		SELECT 
-			ha.id_asignatura,
-			ha.estado,
-			ha.nota,
-			ha.grupo_id,
-			ha.id_periodo,
-			p.year,
-			p.semestre
-		FROM historial_academico ha
-		JOIN periodo_academico p ON ha.id_periodo = p.id
-		WHERE ha.id_estudiante = $1
-		ORDER BY p.year, p.semestre, ha.id
-	`
-	rows, err := h.db.Query(query, estudianteID)
+func (h *PensumHandler) GetGruposPensum(w http.ResponseWriter, r *http.Request) {
+	claims, err := getClaims(r)
 	if err != nil {
-		return nil, err
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
 	}
-	defer rows.Close()
+	if claims.Rol != constants.RolJefe {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	pensumID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil || pensumID <= 0 {
+		http.Error(w, "ID de pensum inválido", http.StatusBadRequest)
+		return
+	}
+	grupos, err := h.service.GetGruposPensum(pensumID)
+	if err != nil {
+		http.Error(w, "No hay periodo académico activo", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(grupos)
+}
 
-	hist := make(map[int][]historyRecord)
-	for rows.Next() {
-		var rec historyRecord
-		if err := rows.Scan(
-			&rec.AsignaturaID,
-			&rec.Estado,
-			&rec.Nota,
-			&rec.GrupoID,
-			&rec.PeriodoID,
-			&rec.Year,
-			&rec.Semestre,
-		); err != nil {
-			return nil, err
-		}
-		rec.Ordinal = periodOrdinal(rec.Year, rec.Semestre)
-		hist[rec.AsignaturaID] = append(hist[rec.AsignaturaID], rec)
+// Compatibilidad temporal para MatriculaHandler hasta completar fase 3.
+var errPensumNoAsignado = errors.New("pensum no asignado")
+
+type historyRecord = repositories.HistorialRecord
+
+func (h *PensumHandler) getPensumInfo(estudianteID int) (int, string, string, error) {
+	repo := repositories.NewPensumRepository(h.db)
+	pensumID, pensumNombre, programaNombre, err := repo.GetPensumInfo(estudianteID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, "", "", errPensumNoAsignado
 	}
-	return hist, nil
+	return pensumID, pensumNombre, programaNombre, err
+}
+
+func (h *PensumHandler) getAsignaturas(pensumID int) ([]models.AsignaturaCompleta, error) {
+	return repositories.NewPensumRepository(h.db).GetAsignaturas(pensumID)
 }
 
 func (h *PensumHandler) buildPrereqMap(pensumID int) (map[int][]models.Prerequisito, error) {
-	query := `
-		SELECT 
-			pr.asignatura_id,
-			pr.prerequisito_id,
-			a.codigo,
-			a.nombre,
-			COALESCE(pa.semestre, 0) as semestre,
-			pr.tipo
-		FROM pensum_prerequisito pr
-		JOIN asignatura a ON pr.prerequisito_id = a.id
-		LEFT JOIN pensum_asignatura pa ON pa.asignatura_id = a.id AND pa.pensum_id = $1
-		WHERE pr.pensum_id = $1
-		ORDER BY a.codigo
-	`
-	rows, err := h.db.Query(query, pensumID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+	return repositories.NewPensumRepository(h.db).BuildPrereqMap(pensumID)
+}
 
-	prereqMap := make(map[int][]models.Prerequisito)
-	for rows.Next() {
-		var prereq models.Prerequisito
-		if err := rows.Scan(
-			&prereq.AsignaturaID,
-			&prereq.PrerequisitoID,
-			&prereq.Codigo,
-			&prereq.Nombre,
-			&prereq.Semestre,
-			&prereq.Tipo,
-		); err != nil {
-			return nil, err
+func (h *PensumHandler) buildHistorialMap(estudianteID int) (map[int][]historyRecord, error) {
+	return repositories.NewPensumRepository(h.db).BuildHistorialMap(estudianteID)
+}
+
+func periodOrdinal(year, semestre int) int { return year*2 + (semestre - 1) }
+
+func hasApprovedEntry(historial map[int][]historyRecord, asignaturaID int) bool {
+	for _, entry := range historial[asignaturaID] {
+		if (entry.Estado == "aprobada" && entry.Nota.Valid && entry.Nota.Float64 >= 3.0) || entry.Estado == "convalidada" {
+			return true
 		}
-		prereqMap[prereq.AsignaturaID] = append(prereqMap[prereq.AsignaturaID], prereq)
 	}
-	return prereqMap, nil
+	return false
+}
+
+func shouldObligatoria(history []historyRecord, lastReprob historyRecord, activeOrdinal *int) bool {
+	if activeOrdinal == nil || *activeOrdinal < lastReprob.Ordinal+2 {
+		return false
+	}
+	next := lastReprob.Ordinal + 1
+	for _, entry := range history {
+		if entry.Ordinal == next {
+			return false
+		}
+	}
+	return true
 }
 
 func determineEstado(history []historyRecord, activePeriodo *models.PeriodoAcademico, activeOrdinal *int, tienePrereqPendientes bool) (string, *float64, *int, *string, int) {
@@ -424,7 +186,6 @@ func determineEstado(history []historyRecord, activePeriodo *models.PeriodoAcade
 			return "matriculada", nota, grupo, nil, repeticiones
 		}
 	}
-
 	for i := len(history) - 1; i >= 0; i-- {
 		entry := history[i]
 		if entry.Estado == "aprobada" && entry.Nota.Valid && entry.Nota.Float64 >= 3.0 {
@@ -437,199 +198,19 @@ func determineEstado(history []historyRecord, activePeriodo *models.PeriodoAcade
 			return "cursada", nil, nil, &periodo, repeticiones
 		}
 	}
-
 	var notaPendiente *float64
 	if lastReprob != nil && lastReprob.Nota.Valid {
 		n := lastReprob.Nota.Float64
 		notaPendiente = &n
 	}
-
-	if repeticiones >= 2 {
-		return "obligatoria_repeticion", notaPendiente, nil, nil, repeticiones
-	}
-	if lastReprob != nil && shouldObligatoria(history, *lastReprob, activeOrdinal) {
+	if repeticiones >= 2 || (lastReprob != nil && shouldObligatoria(history, *lastReprob, activeOrdinal)) {
 		return "obligatoria_repeticion", notaPendiente, nil, nil, repeticiones
 	}
 	if repeticiones == 1 {
 		return "pendiente_repeticion", notaPendiente, nil, nil, repeticiones
 	}
-
 	if tienePrereqPendientes {
 		return "en_espera", nil, nil, nil, repeticiones
 	}
-
 	return "activa", nil, nil, nil, repeticiones
-}
-
-func shouldObligatoria(history []historyRecord, lastReprob historyRecord, activeOrdinal *int) bool {
-	if activeOrdinal == nil {
-		return false
-	}
-	if *activeOrdinal < lastReprob.Ordinal+2 {
-		return false
-	}
-	next := lastReprob.Ordinal + 1
-	for _, entry := range history {
-		if entry.Ordinal == next {
-			return false
-		}
-	}
-	return true
-}
-
-func hasApprovedEntry(historial map[int][]historyRecord, asignaturaID int) bool {
-	for _, entry := range historial[asignaturaID] {
-		if entry.Estado == "aprobada" && entry.Nota.Valid && entry.Nota.Float64 >= 3.0 {
-			return true
-		}
-		if entry.Estado == "convalidada" {
-			return true
-		}
-	}
-	return false
-}
-
-func periodOrdinal(year, semestre int) int {
-	return year*2 + (semestre - 1)
-}
-
-// GrupoPensum representa un grupo con información de la asignatura para la vista del jefe
-type GrupoPensum struct {
-	ID               int                 `json:"id"`
-	Codigo           string              `json:"codigo"`
-	AsignaturaID     int                 `json:"asignatura_id"`
-	AsignaturaCodigo string              `json:"asignatura_codigo"`
-	AsignaturaNombre string              `json:"asignatura_nombre"`
-	Semestre         int                 `json:"semestre"`
-	Creditos         int                 `json:"creditos"`
-	Docente          string              `json:"docente"`
-	CupoDisponible   int                 `json:"cupo_disponible"`
-	CupoMax          int                 `json:"cupo_max"`
-	Horarios         []HorarioDisponible `json:"horarios"` // Usa el tipo de matricula.go
-}
-
-// GetGruposPensum devuelve todos los grupos del periodo activo para las asignaturas de un pensum
-func (h *PensumHandler) GetGruposPensum(w http.ResponseWriter, r *http.Request) {
-	claims, err := h.getClaims(r)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-	if claims.Rol != "jefe_departamental" {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
-
-	vars := mux.Vars(r)
-	idStr := vars["id"]
-	if idStr == "" {
-		http.Error(w, "Falta id de pensum", http.StatusBadRequest)
-		return
-	}
-	pensumID, err := strconv.Atoi(idStr)
-	if err != nil || pensumID <= 0 {
-		http.Error(w, "ID de pensum inválido", http.StatusBadRequest)
-		return
-	}
-
-	// Obtener periodo activo
-	periodo, err := h.getActivePeriodo()
-	if err != nil || periodo == nil {
-		http.Error(w, "No hay periodo académico activo", http.StatusNotFound)
-		return
-	}
-
-	// Obtener grupos del pensum con información de la asignatura
-	query := `
-		SELECT 
-			g.id,
-			g.codigo,
-			a.id,
-			a.codigo,
-			a.nombre,
-			COALESCE(pa.semestre, 0),
-			a.creditos,
-			COALESCE(g.docente, ''),
-			g.cupo_disponible,
-			g.cupo_max
-		FROM grupo g
-		JOIN asignatura a ON g.asignatura_id = a.id
-		JOIN pensum_asignatura pa ON pa.asignatura_id = a.id AND pa.pensum_id = $1
-		WHERE g.periodo_id = $2
-		ORDER BY pa.semestre, a.codigo, g.codigo
-	`
-	rows, err := h.db.Query(query, pensumID, periodo.ID)
-	if err != nil {
-		log.Printf("Error obteniendo grupos para pensum %d: %v", pensumID, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	var grupos []GrupoPensum
-	var groupIDs []int
-	for rows.Next() {
-		var g GrupoPensum
-		if err := rows.Scan(
-			&g.ID,
-			&g.Codigo,
-			&g.AsignaturaID,
-			&g.AsignaturaCodigo,
-			&g.AsignaturaNombre,
-			&g.Semestre,
-			&g.Creditos,
-			&g.Docente,
-			&g.CupoDisponible,
-			&g.CupoMax,
-		); err != nil {
-			log.Printf("Error escaneando grupo: %v", err)
-			continue
-		}
-		grupos = append(grupos, g)
-		groupIDs = append(groupIDs, g.ID)
-	}
-
-	// Obtener horarios de todos los grupos
-	if len(groupIDs) > 0 {
-		horariosMap, err := h.fetchHorariosForGroups(groupIDs)
-		if err != nil {
-			log.Printf("Error obteniendo horarios: %v", err)
-		} else {
-			for i := range grupos {
-				grupos[i].Horarios = horariosMap[grupos[i].ID]
-			}
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(grupos)
-}
-
-// fetchHorariosForGroups obtiene los horarios para una lista de grupos
-func (h *PensumHandler) fetchHorariosForGroups(groupIDs []int) (map[int][]HorarioDisponible, error) {
-	horarios := make(map[int][]HorarioDisponible)
-	if len(groupIDs) == 0 {
-		return horarios, nil
-	}
-	query := `
-		SELECT grupo_id, dia, hora_inicio::text, hora_fin::text, COALESCE(salon, '')
-		FROM horario_grupo
-		WHERE grupo_id = ANY($1)
-	`
-	rows, err := h.db.Query(query, pq.Array(groupIDs))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var grupoID int
-		var h HorarioDisponible
-		if err := rows.Scan(&grupoID, &h.Dia, &h.HoraInicio, &h.HoraFin, &h.Salon); err != nil {
-			return nil, err
-		}
-		horarios[grupoID] = append(horarios[grupoID], h)
-	}
-
-	return horarios, nil
 }

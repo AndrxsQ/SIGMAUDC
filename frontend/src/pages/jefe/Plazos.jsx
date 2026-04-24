@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { plazosService } from "../../services/plazos";
 import "../../styles/Plazos.css";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 const PLAZO_ITEMS = [
   {
@@ -66,7 +67,7 @@ const Plazos = () => {
       setPlazos(data?.plazos || null);
     } catch (err) {
       console.error("Error loading active plazos:", err);
-      setError("No se pudieron cargar los plazos del periodo activo.");
+      setError(getApiErrorMessage(err, "No se pudieron cargar los plazos del periodo activo."));
     } finally {
       setLoading(false);
     }
@@ -89,8 +90,7 @@ const Plazos = () => {
       setTimeout(() => setSuccess(""), 2500);
     } catch (err) {
       console.error("Error updating plazos:", err);
-      const message = err.response?.data || "Error al actualizar los plazos";
-      setError(typeof message === "string" ? message : "Error al actualizar los plazos");
+      setError(getApiErrorMessage(err, "Error al actualizar los plazos"));
     } finally {
       setUpdatingKey(null);
     }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { authService } from "../../services/auth";
 import "../../styles/Login.css";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 const Login = () => {
   const [codigo, setCodigo] = useState("");
@@ -108,6 +109,11 @@ const Login = () => {
         setLoading(false);
       }
     } catch (err) {
+      if (typeof err?.userMessage === "string" && err.userMessage.trim()) {
+        setError(err.userMessage);
+        setLoading(false);
+        return;
+      }
       // Manejar diferentes tipos de errores
       if (err.response) {
         // Error de respuesta del servidor
@@ -135,7 +141,7 @@ const Login = () => {
         setError("Error de conexión. Verifica que el servidor esté funcionando");
       } else {
         // Otro error
-        setError("Ocurrió un error inesperado. Por favor intenta nuevamente");
+        setError(getApiErrorMessage(err, "Ocurrió un error inesperado. Por favor intenta nuevamente"));
       }
       setLoading(false);
     }

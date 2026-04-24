@@ -10,11 +10,13 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/andrxsq/SIGMAUDC/internal/config"
 	"github.com/andrxsq/SIGMAUDC/internal/database"
 	"github.com/andrxsq/SIGMAUDC/internal/handlers"
 	"github.com/andrxsq/SIGMAUDC/internal/middleware"
+	"github.com/andrxsq/SIGMAUDC/internal/repositories"
 	"github.com/andrxsq/SIGMAUDC/internal/services"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -48,14 +50,29 @@ func main() {
 	auditoria := services.NewAuditoriaService(db)
 
 	// ── 5. Handlers ───────────────────────────────────────────────────────────
-	authHandler := handlers.NewAuthHandler(db, cfg.JWTSecret, auditoria)
-	auditHandler := handlers.NewAuditHandler(db)
-	plazosHandler := handlers.NewPlazosHandler(db, auditoria)
-	documentosHandler := handlers.NewDocumentosHandler(db, auditoria)
-	pensumHandler := handlers.NewPensumHandler(db)
-	matriculaHandler := handlers.NewMatriculaHandler(db)
-	estudianteHandler := handlers.NewEstudianteHandler(db)
-	jefeHandler := handlers.NewJefeHandler(db)
+	plazosRepository := repositories.NewPlazosRepository(db)
+	plazosService := services.NewPlazosService(plazosRepository, auditoria)
+	authRepository := repositories.NewAuthRepository(db)
+	authService := services.NewAuthService(authRepository, auditoria, cfg.JWTSecret)
+	auditRepository := repositories.NewAuditRepository(db)
+	auditService := services.NewAuditService(auditRepository)
+	profileRepository := repositories.NewProfileRepository(db)
+	profileService := services.NewProfileService(profileRepository)
+	documentosRepository := repositories.NewDocumentosRepository(db)
+	documentosService := services.NewDocumentosService(documentosRepository, auditoria, os.Getenv("UPLOAD_DIR"))
+	pensumRepository := repositories.NewPensumRepository(db)
+	pensumService := services.NewPensumService(pensumRepository)
+	matriculaRepository := repositories.NewMatriculaRepository(db)
+	matriculaService := services.NewMatriculaService(matriculaRepository, pensumRepository)
+
+	authHandler := handlers.NewAuthHandler(authService)
+	auditHandler := handlers.NewAuditHandler(auditService)
+	plazosHandler := handlers.NewPlazosHandler(plazosService)
+	documentosHandler := handlers.NewDocumentosHandler(documentosService)
+	pensumHandler := handlers.NewPensumHandler(pensumService)
+	matriculaHandler := handlers.NewMatriculaHandler(db, matriculaService)
+	estudianteHandler := handlers.NewEstudianteHandler(profileService)
+	jefeHandler := handlers.NewJefeHandler(profileService)
 
 	// ── 6. Router y rutas ────────────────────────────────────────────────────
 	r := mux.NewRouter()

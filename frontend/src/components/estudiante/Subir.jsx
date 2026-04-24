@@ -4,6 +4,7 @@ import documentosService from "../../services/documentos";
 import "../../styles/Subir.css";
 import { FaUpload, FaFileAlt, FaCheckCircle, FaTimesCircle, FaSpinner, FaExclamationTriangle } from "react-icons/fa";
 import { FaFileUpload } from "react-icons/fa";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 const SubirDocumentos = () => {
   const navigate = useNavigate();
@@ -38,7 +39,7 @@ const SubirDocumentos = () => {
       setError(null);
     } catch (err) {
       console.error("Error loading documentos:", err);
-      setError(err.response?.data?.error || "Error al cargar documentos");
+      setError(getApiErrorMessage(err, "Error al cargar documentos"));
     } finally {
       setLoading(false);
     }
@@ -110,7 +111,7 @@ const SubirDocumentos = () => {
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       console.error("Error uploading documento:", err);
-      setError(err.response?.data?.error || `Error al subir ${tipoDocumento}`);
+      setError(getApiErrorMessage(err, `Error al subir ${tipoDocumento}`));
     } finally {
       setUploading({ ...uploading, [tipoDocumento]: false });
     }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { authService } from "../../services/auth";
 import "../../styles/Login.css";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 const SetPassword = () => {
   const [email, setEmail] = useState("");
@@ -156,6 +157,10 @@ const SetPassword = () => {
         setError(response.message || "Error al establecer la contraseña");
       }
     } catch (err) {
+      if (typeof err?.userMessage === "string" && err.userMessage.trim()) {
+        setError(err.userMessage);
+        return;
+      }
       // Manejar diferentes tipos de errores
       if (err.response) {
         const errorData = err.response.data || {};
@@ -175,7 +180,7 @@ const SetPassword = () => {
       } else if (err.request) {
         setError("Error de conexión. Verifica que el servidor esté funcionando");
       } else {
-        setError("Ocurrió un error inesperado. Por favor intenta nuevamente");
+        setError(getApiErrorMessage(err, "Ocurrió un error inesperado. Por favor intenta nuevamente"));
       }
     } finally {
       setLoading(false);

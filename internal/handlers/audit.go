@@ -3,22 +3,20 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 
-	"github.com/andrxsq/SIGMAUDC/internal/constants"
-	"github.com/andrxsq/SIGMAUDC/internal/models"
+	"github.com/andrxsq/SIGMAUDC/internal/services"
 )
 
 // AuditHandler gestiona las peticiones relacionadas con el log de auditoría.
 type AuditHandler struct {
-	db *sql.DB
+	service *services.AuditService
 }
 
 // NewAuditHandler crea una nueva instancia de AuditHandler.
-func NewAuditHandler(db *sql.DB) *AuditHandler {
-	return &AuditHandler{db: db}
+func NewAuditHandler(service *services.AuditService) *AuditHandler {
+	return &AuditHandler{service: service}
 }
 
 // GetAuditLogs retorna los registros de auditoría más recientes.
@@ -28,46 +26,10 @@ func NewAuditHandler(db *sql.DB) *AuditHandler {
 //
 // Responde con un array JSON de models.AuditLog.
 func (h *AuditHandler) GetAuditLogs(w http.ResponseWriter, r *http.Request) {
-	limit := r.URL.Query().Get("limit")
-	if limit == "" {
-		limit = constants.DefaultAuditLimit
-	}
-
-	query := `SELECT id, usuario_id, accion, descripcion, fecha, ip, user_agent
-	          FROM auditoria
-	          ORDER BY fecha DESC
-	          LIMIT $1`
-
-	rows, err := h.db.Query(query, limit)
+	logs, err := h.service.GetAuditLogs(r.URL.Query().Get("limit"))
 	if err != nil {
 		http.Error(w, "Error fetching audit logs", http.StatusInternalServerError)
 		return
-	}
-	defer rows.Close()
-
-	var logs []models.AuditLog
-	for rows.Next() {
-		var entry models.AuditLog
-		var userID sql.NullInt64
-
-		if err := rows.Scan(
-			&entry.ID,
-			&userID,
-			&entry.Accion,
-			&entry.Descripcion,
-			&entry.Fecha,
-			&entry.IP,
-			&entry.UserAgent,
-		); err != nil {
-			continue
-		}
-
-		if userID.Valid {
-			uid := int(userID.Int64)
-			entry.UsuarioID = &uid
-		}
-
-		logs = append(logs, entry)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
