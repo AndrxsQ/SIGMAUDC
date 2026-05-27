@@ -23,6 +23,19 @@ const ValidarSolicitudes = () => {
     loadSolicitudes();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = matriculaService.subscribeModificacionesEvents({
+      onMessage: (event) => {
+        if (event?.event_type === "solicitud_actualizada" || event?.event_type === "cupos_actualizados") {
+          // Sin polling: solo refrescamos cuando llega evento del servidor.
+          loadSolicitudes();
+        }
+      },
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const loadSolicitudes = async () => {
     try {
       setLoading(true);
@@ -39,17 +52,30 @@ const ValidarSolicitudes = () => {
 
   const handleValidar = async (solicitudId, estado, observacion) => {
     try {
-      setProcesando({ ...procesando, [solicitudId]: true });
+      setProcesando((prev) => ({ ...prev, [solicitudId]: true }));
       setError(null);
       setSuccess(null);
 
       await matriculaService.validarSolicitud(solicitudId, estado, observacion);
+      const nowISO = new Date().toISOString();
+
+      // Actualización local inmediata para evitar recargar la página.
+      setSolicitudes((prev) =>
+        prev.map((sol) =>
+          sol.id === solicitudId
+            ? {
+                ...sol,
+                estado,
+                observacion: estado === "rechazada" ? observacion : "",
+                fecha_revision: nowISO,
+              }
+            : sol
+        )
+      );
+
       setSuccess(
         `Solicitud ${estado === "aprobada" ? "aprobada" : "rechazada"} exitosamente`
       );
-
-      // Recargar solicitudes (Igual a loadDocumentos() en VerificarDocumentos.jsx)
-      await loadSolicitudes();
 
       // Limpiar mensaje de éxito después de 3 segundos
       setTimeout(() => setSuccess(null), 3000);
@@ -57,7 +83,7 @@ const ValidarSolicitudes = () => {
       console.error("Error validando solicitud:", err);
       setError(err.response?.data?.error || "Error al validar solicitud");
     } finally {
-      setProcesando({ ...procesando, [solicitudId]: false });
+      setProcesando((prev) => ({ ...prev, [solicitudId]: false }));
     }
   };
 

@@ -735,6 +735,16 @@
   margin-bottom: 16px;
 }
 
+.inscribir-info {
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  font-size: 13px;
+  color: #1e3a8a;
+  margin-bottom: 16px;
+}
+
 .asignatura-state {
   font-size: 12px;
   font-weight: 600;
@@ -911,6 +921,39 @@
 .grupo-cupo {
   font-size: 12px;
   color: var(--inscribir-text-secondary);
+  font-weight: 500;
+}
+
+.grupo-cupo-pill {
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 5px 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  letter-spacing: 0.01em;
+}
+
+.grupo-cupo-pill.ok {
+  color: #0f172a;
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.grupo-cupo-pill.pocos {
+  color: #7c2d12;
+  background: rgba(249, 115, 22, 0.1);
+  border-color: rgba(249, 115, 22, 0.2);
+}
+
+.grupo-cupo-pill.agotado {
+  color: #7f1d1d;
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.grupo-cupo-meta {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 4px 0 8px 0;
   font-weight: 500;
 }
 

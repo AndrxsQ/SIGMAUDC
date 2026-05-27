@@ -319,9 +319,9 @@ func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *h
 			continue
 		}
 
-		isCurrentSemester := asig.Semestre == ctx.Semestre
+		isAllowedSemester := asig.Semestre <= ctx.Semestre
 		isAtrasada := state == "pendiente_repeticion" || state == "obligatoria_repeticion"
-		if !isCurrentSemester && !isAtrasada {
+		if !isAllowedSemester && !isAtrasada {
 			continue
 		}
 
@@ -372,7 +372,7 @@ func (h *MatriculaHandler) GetAsignaturasDisponibles(w http.ResponseWriter, r *h
 	mensajes := []string{}
 
 	if len(result) == 0 {
-		mensajes = append(mensajes, "Tu semestre actual no tiene asignaturas nuevas disponibles para inscribir. Espera a la apertura de nuevos grupos o consulta con tu asesor.")
+		mensajes = append(mensajes, "No hay asignaturas de tu semestre o anteriores disponibles para inscripción en este momento. Las de semestres superiores se gestionan por modificaciones.")
 	}
 
 	if len(obligatoriasSinGrupo) > 0 {
@@ -879,6 +879,21 @@ func (h *MatriculaHandler) InscribirAsignaturas(w http.ResponseWriter, r *http.R
 			http.Error(w, fmt.Sprintf("No puedes inscribir %s hasta que apruebes los prerrequisitos.", asignaturaMap[reg.AsignaturaID].Codigo), http.StatusConflict)
 			return
 		}
+		// Regla de negocio: inscripción inicial solo permite semestre actual y anteriores.
+		// Materias de semestres superiores deben gestionarse por módulo de modificaciones.
+		asigInfo, ok := asignaturaMap[reg.AsignaturaID]
+		if !ok {
+			http.Error(w, "Asignatura fuera del pensum", http.StatusBadRequest)
+			return
+		}
+		if asigInfo.Semestre > ctx.Semestre {
+			http.Error(
+				w,
+				fmt.Sprintf("No puedes inscribir %s porque pertenece a un semestre superior. Debes solicitarla por modificaciones.", asigInfo.Codigo),
+				http.StatusConflict,
+			)
+			return
+		}
 
 		if _, ok := selectedAsignaturas[reg.AsignaturaID]; ok {
 			http.Error(w, "Solo puedes seleccionar un grupo por asignatura.", http.StatusBadRequest)
@@ -1378,6 +1393,10 @@ func (h *MatriculaHandler) JefeInscribirAsignaturas(w http.ResponseWriter, r *ht
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	h.emitModificacionesEvent(claims.ProgramaID, "cupos_actualizados", map[string]interface{}{
+		"source":        "jefe_inscribir",
+		"estudiante_id": estudianteID,
+	})
 	json.NewEncoder(w).Encode(map[string]string{"message": "Inscripción realizada correctamente (jefe)."})
 }
 
@@ -1442,7 +1461,7 @@ func (h *MatriculaHandler) JefeDesmatricularGrupo(w http.ResponseWriter, r *http
 	}
 
 	// Incrementar cupo
-	_, err = tx.Exec(`UPDATE grupo SET cupo_disponible = cupo_disponible + 1 WHERE id = $1`, payload.GrupoID)
+	_, err = tx.Exec(`UPDATE grupo SET cupo_disponible = LEAST(cupo_disponible + 1, cupo_max) WHERE id = $1`, payload.GrupoID)
 	if err != nil {
 		log.Printf("Error incrementando cupo (jefe): %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -1456,6 +1475,10 @@ func (h *MatriculaHandler) JefeDesmatricularGrupo(w http.ResponseWriter, r *http
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	h.emitModificacionesEvent(claims.ProgramaID, "cupos_actualizados", map[string]interface{}{
+		"source":        "jefe_desmatricular",
+		"estudiante_id": estudianteID,
+	})
 	json.NewEncoder(w).Encode(map[string]string{"message": "Desmatriculación realizada correctamente."})
 }
 
@@ -1488,6 +1511,16 @@ func (h *MatriculaHandler) fetchGroupsForAsignaturas(periodoID int, asignaturas 
 		var asignaturaID int
 		if err := rows.Scan(&g.ID, &asignaturaID, &g.Codigo, &g.Docente, &g.CupoDisponible, &g.CupoMax); err != nil {
 			return nil, err
+		}
+		// Blindaje por consistencia: evitar exponer valores imposibles (ej. 31/30).
+		if g.CupoMax < 0 {
+			g.CupoMax = 0
+		}
+		if g.CupoDisponible < 0 {
+			g.CupoDisponible = 0
+		}
+		if g.CupoDisponible > g.CupoMax {
+			g.CupoDisponible = g.CupoMax
 		}
 		temp[asignaturaID] = append(temp[asignaturaID], g)
 		groupIDs = append(groupIDs, g.ID)
@@ -2247,7 +2280,7 @@ func (h *MatriculaHandler) RetirarMateria(w http.ResponseWriter, r *http.Request
 	// Liberar cupo del grupo primero
 	_, err = tx.Exec(`
 		UPDATE grupo
-		SET cupo_disponible = cupo_disponible + 1
+		SET cupo_disponible = LEAST(cupo_disponible + 1, cupo_max)
 		WHERE id = $1
 	`, grupoID)
 	if err != nil {
@@ -2274,6 +2307,10 @@ func (h *MatriculaHandler) RetirarMateria(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	h.emitModificacionesEvent(ctx.ProgramaID, "cupos_actualizados", map[string]interface{}{
+		"source":        "estudiante_retiro",
+		"estudiante_id": ctx.EstudianteID,
+	})
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Materia retirada correctamente. Puedes inscribirla de nuevo si hay cupos disponibles.",
 	})
@@ -2568,6 +2605,10 @@ func (h *MatriculaHandler) AgregarMateriaModificaciones(w http.ResponseWriter, r
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	h.emitModificacionesEvent(ctx.ProgramaID, "cupos_actualizados", map[string]interface{}{
+		"source":        "estudiante_agregar",
+		"estudiante_id": ctx.EstudianteID,
+	})
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Materia agregada correctamente.",
 	})
@@ -2865,6 +2906,12 @@ func (h *MatriculaHandler) CrearSolicitudModificacion(w http.ResponseWriter, r *
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	h.emitModificacionesEvent(programaID, "solicitud_actualizada", map[string]interface{}{
+		"action":        "creada",
+		"solicitud_id":  solicitudID,
+		"estudiante_id": estudianteID,
+		"estado":        "pendiente",
+	})
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"id":      solicitudID,
@@ -3018,22 +3065,39 @@ func (h *MatriculaHandler) ValidarSolicitudModificacion(w http.ResponseWriter, r
 		return
 	}
 
-	// Si se aprueba, aplicar los cambios automáticamente
-	if payload.Estado == "aprobada" {
-		// Obtener la solicitud para aplicar cambios
-		var estudianteID, periodoID int
-		var gruposAgregar, gruposRetirar json.RawMessage
-		err := h.db.QueryRow(`
-			SELECT estudiante_id, periodo_id, grupos_agregar, grupos_retirar 
-			FROM solicitud_modificacion WHERE id = $1
-		`, solicitudID).Scan(&estudianteID, &periodoID, &gruposAgregar, &gruposRetirar)
-		if err != nil {
-			log.Printf("Error obteniendo solicitud: %v", err)
-			http.Error(w, "Error obteniendo información de la solicitud", http.StatusInternalServerError)
+	// Obtener la solicitud a validar y verificar permisos/estado.
+	var estudianteID, periodoID, programaID int
+	var estadoActual string
+	var gruposAgregar, gruposRetirar json.RawMessage
+	err = h.db.QueryRow(`
+		SELECT estudiante_id, periodo_id, programa_id, estado, grupos_agregar, grupos_retirar 
+		FROM solicitud_modificacion
+		WHERE id = $1
+	`, solicitudID).Scan(&estudianteID, &periodoID, &programaID, &estadoActual, &gruposAgregar, &gruposRetirar)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Solicitud no encontrada", http.StatusNotFound)
 			return
 		}
+		log.Printf("Error obteniendo solicitud: %v", err)
+		http.Error(w, "Error obteniendo información de la solicitud", http.StatusInternalServerError)
+		return
+	}
+	if programaID != claims.ProgramaID {
+		http.Error(w, "No tienes permisos para validar esta solicitud", http.StatusForbidden)
+		return
+	}
+	if estadoActual != "pendiente" {
+		http.Error(w, "La solicitud ya fue procesada", http.StatusConflict)
+		return
+	}
+	if payload.Estado == "rechazada" && payload.Observacion == "" {
+		http.Error(w, "La observación es obligatoria al rechazar", http.StatusBadRequest)
+		return
+	}
 
-		// Iniciar transacción para aplicar cambios
+	// Si se aprueba, aplicar cambios de forma transaccional y estricta.
+	if payload.Estado == "aprobada" {
 		tx, err := h.db.Begin()
 		if err != nil {
 			log.Printf("Error iniciando transacción: %v", err)
@@ -3042,90 +3106,113 @@ func (h *MatriculaHandler) ValidarSolicitudModificacion(w http.ResponseWriter, r
 		}
 		defer tx.Rollback()
 
-		// Aplicar retiros
 		var retirar []struct {
 			HistorialID int `json:"historial_id"`
 			GrupoID     int `json:"grupo_id"`
 		}
-		if err := json.Unmarshal(gruposRetirar, &retirar); err == nil && len(retirar) > 0 {
-			for _, r := range retirar {
-				// Liberar cupo del grupo
-				_, err = tx.Exec(`
-					UPDATE grupo
-					SET cupo_disponible = cupo_disponible + 1
-					WHERE id = $1
-				`, r.GrupoID)
-				if err != nil {
-					log.Printf("Error liberando cupo grupo %d: %v", r.GrupoID, err)
-				}
+		if err := json.Unmarshal(gruposRetirar, &retirar); err != nil {
+			http.Error(w, "Formato inválido en grupos a retirar", http.StatusBadRequest)
+			return
+		}
+		for _, r := range retirar {
+			resCupo, err := tx.Exec(`
+				UPDATE grupo
+				SET cupo_disponible = LEAST(cupo_disponible + 1, cupo_max)
+				WHERE id = $1
+			`, r.GrupoID)
+			if err != nil {
+				log.Printf("Error liberando cupo grupo %d: %v", r.GrupoID, err)
+				http.Error(w, "Error aplicando retiros de la solicitud", http.StatusInternalServerError)
+				return
+			}
+			affectedCupo, _ := resCupo.RowsAffected()
+			if affectedCupo == 0 {
+				http.Error(w, fmt.Sprintf("No existe el grupo %d para liberar cupo.", r.GrupoID), http.StatusBadRequest)
+				return
+			}
 
-				// Eliminar del historial académico
-				_, err = tx.Exec(`
-					DELETE FROM historial_academico
-					WHERE id = $1 AND id_estudiante = $2 AND id_periodo = $3
-				`, r.HistorialID, estudianteID, periodoID)
-				if err != nil {
-					log.Printf("Error eliminando historial %d: %v", r.HistorialID, err)
-				}
+			resHistorial, err := tx.Exec(`
+				DELETE FROM historial_academico
+				WHERE id = $1 AND id_estudiante = $2 AND id_periodo = $3
+			`, r.HistorialID, estudianteID, periodoID)
+			if err != nil {
+				log.Printf("Error eliminando historial %d: %v", r.HistorialID, err)
+				http.Error(w, "Error aplicando retiros de la solicitud", http.StatusInternalServerError)
+				return
+			}
+			affectedHistorial, _ := resHistorial.RowsAffected()
+			if affectedHistorial == 0 {
+				http.Error(w, "La solicitud contiene retiros inválidos o ya aplicados.", http.StatusConflict)
+				return
 			}
 		}
 
-		// Aplicar adiciones
 		var agregar []struct {
-			GrupoID          int    `json:"grupo_id"`
-			AsignaturaID     int    `json:"asignatura_id"`
-			GrupoCodigo      string `json:"grupo_codigo"`
-			AsignaturaCodigo string `json:"asignatura_codigo"`
-			AsignaturaNombre string `json:"asignatura_nombre"`
-			Creditos         int    `json:"creditos"`
+			GrupoID      int `json:"grupo_id"`
+			AsignaturaID int `json:"asignatura_id"`
 		}
-		if err := json.Unmarshal(gruposAgregar, &agregar); err == nil && len(agregar) > 0 {
-			for _, a := range agregar {
-				// Verificar cupo disponible
-				var cupoDisponible int
-				err := tx.QueryRow(`SELECT cupo_disponible FROM grupo WHERE id = $1`, a.GrupoID).Scan(&cupoDisponible)
-				if err != nil {
-					log.Printf("Error verificando cupo grupo %d: %v", a.GrupoID, err)
-					continue
-				}
+		if err := json.Unmarshal(gruposAgregar, &agregar); err != nil {
+			http.Error(w, "Formato inválido en grupos a agregar", http.StatusBadRequest)
+			return
+		}
+		for _, a := range agregar {
+			var yaMatriculado int
+			err := tx.QueryRow(`
+				SELECT COUNT(*)
+				FROM historial_academico
+				WHERE id_estudiante = $1 AND id_asignatura = $2 AND id_periodo = $3 AND estado = 'matriculada'
+			`, estudianteID, a.AsignaturaID, periodoID).Scan(&yaMatriculado)
+			if err != nil {
+				log.Printf("Error verificando matrícula previa de asignatura %d: %v", a.AsignaturaID, err)
+				http.Error(w, "Error aplicando adiciones de la solicitud", http.StatusInternalServerError)
+				return
+			}
+			if yaMatriculado > 0 {
+				http.Error(w, "La solicitud incluye una asignatura ya matriculada.", http.StatusConflict)
+				return
+			}
 
-				if cupoDisponible <= 0 {
-					log.Printf("Grupo %d sin cupo disponible", a.GrupoID)
-					continue
+			var nuevoCupo int
+			err = tx.QueryRow(`
+				UPDATE grupo
+				SET cupo_disponible = cupo_disponible - 1
+				WHERE id = $1 AND cupo_disponible > 0
+				RETURNING cupo_disponible
+			`, a.GrupoID).Scan(&nuevoCupo)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					http.Error(w, "Uno de los grupos de la solicitud ya no tiene cupos disponibles.", http.StatusConflict)
+					return
 				}
+				log.Printf("Error reduciendo cupo grupo %d: %v", a.GrupoID, err)
+				http.Error(w, "Error aplicando adiciones de la solicitud", http.StatusInternalServerError)
+				return
+			}
 
-				// Reducir cupo
-				_, err = tx.Exec(`
-					UPDATE grupo
-					SET cupo_disponible = cupo_disponible - 1
-					WHERE id = $1
-				`, a.GrupoID)
-				if err != nil {
-					log.Printf("Error reduciendo cupo grupo %d: %v", a.GrupoID, err)
-					continue
-				}
-
-				// Insertar en historial académico
-				_, err = tx.Exec(`
-					INSERT INTO historial_academico (id_estudiante, id_asignatura, id_periodo, grupo_id, estado)
-					VALUES ($1, $2, $3, $4, 'matriculada')
-					ON CONFLICT DO NOTHING
-				`, estudianteID, a.AsignaturaID, periodoID, a.GrupoID)
-				if err != nil {
-					log.Printf("Error insertando historial para grupo %d: %v", a.GrupoID, err)
-				}
+			_, err = tx.Exec(`
+				INSERT INTO historial_academico (id_estudiante, id_asignatura, id_periodo, grupo_id, estado)
+				VALUES ($1, $2, $3, $4, 'matriculada')
+			`, estudianteID, a.AsignaturaID, periodoID, a.GrupoID)
+			if err != nil {
+				log.Printf("Error insertando historial para grupo %d: %v", a.GrupoID, err)
+				http.Error(w, "Error aplicando adiciones de la solicitud", http.StatusInternalServerError)
+				return
 			}
 		}
 
-		// Actualizar solicitud y confirmar transacción
-		_, err = tx.Exec(`
-			UPDATE solicitud_modificacion 
+		resUpdate, err := tx.Exec(`
+			UPDATE solicitud_modificacion
 			SET estado = $1, observacion = $2, revisado_por = $3, fecha_revision = NOW()
-			WHERE id = $4
+			WHERE id = $4 AND estado = 'pendiente'
 		`, payload.Estado, payload.Observacion, jefeID, solicitudID)
 		if err != nil {
 			log.Printf("Error actualizando solicitud: %v", err)
 			http.Error(w, "Error actualizando solicitud", http.StatusInternalServerError)
+			return
+		}
+		affectedUpdate, _ := resUpdate.RowsAffected()
+		if affectedUpdate == 0 {
+			http.Error(w, "La solicitud ya fue procesada por otro usuario", http.StatusConflict)
 			return
 		}
 
@@ -3135,17 +3222,35 @@ func (h *MatriculaHandler) ValidarSolicitudModificacion(w http.ResponseWriter, r
 			return
 		}
 	} else {
-		// Solo actualizar estado si se rechaza
-		_, err = h.db.Exec(`
-			UPDATE solicitud_modificacion 
+		// Rechazo: solo cambia estado, sin tocar cupos/matrícula.
+		res, err := h.db.Exec(`
+			UPDATE solicitud_modificacion
 			SET estado = $1, observacion = $2, revisado_por = $3, fecha_revision = NOW()
-			WHERE id = $4
-		`, payload.Estado, payload.Observacion, jefeID, solicitudID)
+			WHERE id = $4 AND programa_id = $5 AND estado = 'pendiente'
+		`, payload.Estado, payload.Observacion, jefeID, solicitudID, claims.ProgramaID)
 		if err != nil {
 			log.Printf("Error actualizando solicitud: %v", err)
 			http.Error(w, "Error actualizando solicitud", http.StatusInternalServerError)
 			return
 		}
+		affected, _ := res.RowsAffected()
+		if affected == 0 {
+			http.Error(w, "La solicitud no está pendiente o no pertenece a tu programa", http.StatusConflict)
+			return
+		}
+	}
+
+	h.emitModificacionesEvent(programaID, "solicitud_actualizada", map[string]interface{}{
+		"action":        "validada",
+		"solicitud_id":  solicitudID,
+		"estudiante_id": estudianteID,
+		"estado":        payload.Estado,
+		"revisado_por":  jefeID,
+	})
+	if payload.Estado == "aprobada" {
+		h.emitModificacionesEvent(programaID, "cupos_actualizados", map[string]interface{}{
+			"source": "validar_solicitud",
+		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")

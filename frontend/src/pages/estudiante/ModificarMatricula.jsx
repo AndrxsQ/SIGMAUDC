@@ -78,6 +78,33 @@ const ModificarMatricula = () => {
     validarYcargar();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = matriculaService.subscribeModificacionesEvents({
+      onMessage: async (event) => {
+        if (event?.event_type !== "solicitud_actualizada" && event?.event_type !== "cupos_actualizados") {
+          return;
+        }
+        await cargarSolicitudes();
+        try {
+          const datos = await matriculaService.getModificacionesData();
+          setMateriasMatriculadas(datos.materias_matriculadas || []);
+          setAsignaturas(datos.asignaturas_disponibles || []);
+          setResumen({
+            periodo: datos.periodo,
+            creditos: datos.creditos,
+            estadoEstudiante: datos.estado_estudiante,
+          });
+          actualizarHorarioDesdeMatriculadas(datos.materias_matriculadas || []);
+        } catch (error) {
+          // Silenciar para no interrumpir la UX si el stream notifica un cambio no aplicable.
+          console.log("No se pudo refrescar datos de modificaciones tras evento:", error?.message || error);
+        }
+      },
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const validarYcargar = async () => {
     try {
       setLoading(true);
@@ -159,9 +186,9 @@ const ModificarMatricula = () => {
       const pendiente = solicitudes.find(s => s.estado === 'pendiente');
       setSolicitudPendiente(pendiente || null);
       
-      // Historial (últimas 5 no pendientes)
+      // Historial completo de solicitudes procesadas (no pendientes)
       setHistorialSolicitudes(
-        solicitudes.filter(s => s.estado !== 'pendiente').slice(0, 5)
+        solicitudes.filter(s => s.estado !== 'pendiente')
       );
     } catch (error) {
       // Silenciar el error si el endpoint no existe aún
@@ -468,16 +495,16 @@ const ModificarMatricula = () => {
               No puedes enviar otra hasta que sea procesada.
             </p>
             <div style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
-              <strong>Enviada:</strong> {new Date(solicitudPendiente.fecha_creacion).toLocaleString('es-ES')}
+              <strong>Enviada:</strong> {new Date(solicitudPendiente.fecha_solicitud).toLocaleString('es-ES')}
             </div>
           </div>
         )}
 
-        {/* Última solicitud procesada */}
+        {/* Historial de solicitudes procesadas */}
         {historialSolicitudes.length > 0 && (
           <div style={{ marginTop: '0.5rem' }}>
-            <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Última solicitud:</p>
-            {historialSolicitudes.slice(0, 1).map((sol) => (
+            <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Solicitudes procesadas:</p>
+            {historialSolicitudes.map((sol) => (
               <div 
                 key={sol.id} 
                 className={`solicitud-card ${sol.estado}`}
@@ -757,7 +784,7 @@ const ModificarMatricula = () => {
                     <strong style={{ color: '#856404' }}>Solicitud Pendiente</strong>
                   </div>
                   <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: '#856404' }}>
-                    Enviada: {new Date(solicitudPendiente.fecha_creacion).toLocaleString('es-ES')}
+                    Enviada: {new Date(solicitudPendiente.fecha_solicitud).toLocaleString('es-ES')}
                   </p>
                 </div>
               )}
@@ -843,10 +870,10 @@ const ModificarMatricula = () => {
               )}
             </div>
 
-            {/* Historial de última solicitud */}
+            {/* Historial de solicitudes procesadas */}
             {historialSolicitudes.length > 0 && (
               <div style={{ marginBottom: '1rem' }}>
-                {historialSolicitudes.slice(0, 1).map((sol) => (
+                {historialSolicitudes.map((sol) => (
                   <div 
                     key={sol.id} 
                     style={{
@@ -862,7 +889,7 @@ const ModificarMatricula = () => {
                       ) : (
                         <FaTimesCircle style={{ color: '#dc3545' }} />
                       )}
-                      <strong>Última solicitud: {sol.estado === 'aprobada' ? 'Aprobada' : 'Rechazada'}</strong>
+                      <strong>Solicitud {sol.id}: {sol.estado === 'aprobada' ? 'Aprobada' : 'Rechazada'}</strong>
                     </div>
                     {sol.estado === 'rechazada' && sol.observacion && (
                       <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
@@ -978,7 +1005,10 @@ const ModificarMatricula = () => {
                           {asignatura.grupos.map((grupo) => {
                             const estaSeleccionado = gruposSeleccionados.has(grupo.id);
                             const tieneConflicto = conflictos.has(grupo.id);
-                            const sinCupo = grupo.cupo_disponible <= 0;
+                            const cupoMaximo = Math.max(grupo.cupo_max || 0, 0);
+                            const cupoDisponibleReal = Math.max(grupo.cupo_disponible || 0, 0);
+                            const cupoDisponibleSeguro = Math.min(cupoDisponibleReal, cupoMaximo);
+                            const sinCupo = cupoDisponibleSeguro <= 0;
 
                             return (
                               <div
@@ -996,9 +1026,12 @@ const ModificarMatricula = () => {
                                   <div className="grupo-content">
                                     <div className="grupo-header">
                                       <span className="grupo-codigo">{grupo.codigo}</span>
-                                      <span className="grupo-cupo">
-                                        {grupo.cupo_disponible}/{grupo.cupo_max} cupos
+                                      <span className={`grupo-cupo-pill ${sinCupo ? 'agotado' : cupoDisponibleSeguro <= 3 ? 'pocos' : 'ok'}`}>
+                                        {cupoDisponibleSeguro} disponibles de {cupoMaximo}
                                       </span>
+                                    </div>
+                                    <div className="grupo-cupo-meta">
+                                      Ocupación: {Math.max(cupoMaximo - cupoDisponibleSeguro, 0)} de {cupoMaximo}
                                     </div>
                                     {grupo.programa_nombre && (
                                       <div className="grupo-programa" style={{ fontSize: '0.85em', color: '#4ECDC4', fontWeight: 'bold', marginBottom: '4px' }}>

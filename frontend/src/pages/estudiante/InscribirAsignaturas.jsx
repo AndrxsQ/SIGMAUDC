@@ -79,6 +79,54 @@ const InscribirAsignaturas = () => {
     validarYcargar();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = matriculaService.subscribeModificacionesEvents({
+      onMessage: async (event) => {
+        if (event?.event_type !== "cupos_actualizados" && event?.event_type !== "solicitud_actualizada") {
+          return;
+        }
+        try {
+          const asignaturasData = await matriculaService.getAsignaturasDisponibles();
+          const payload = Array.isArray(asignaturasData)
+            ? { asignaturas: asignaturasData }
+            : asignaturasData || {};
+          const nuevasAsignaturas = payload.asignaturas || [];
+          setAsignaturas(nuevasAsignaturas);
+          setMensajes(payload.mensajes || []);
+          if (payload.periodo || payload.creditos || payload.estado_estudiante) {
+            setResumen({
+              periodo: payload.periodo,
+              creditos: payload.creditos,
+              estadoEstudiante: payload.estado_estudiante,
+              obligatoriasSinGrupo: payload.obligatorias_sin_grupo || [],
+            });
+          }
+
+          // Conservar selección vigente solo si los grupos siguen existiendo.
+          const gruposDisponibles = new Set(
+            nuevasAsignaturas.flatMap((a) => (a.grupos || []).map((g) => g.id))
+          );
+          setGruposSeleccionados((prev) => {
+            const next = new Set(Array.from(prev).filter((gid) => gruposDisponibles.has(gid)));
+            // Recalcular créditos con la selección conservada.
+            let nuevosCreditos = 0;
+            nuevasAsignaturas.forEach((a) => {
+              if (a.grupos?.some((g) => next.has(g.id))) {
+                nuevosCreditos += a.creditos || 0;
+              }
+            });
+            setCreditosSeleccionados(nuevosCreditos);
+            return next;
+          });
+        } catch (error) {
+          console.log("No se pudo actualizar oferta/cupos en tiempo real:", error?.message || error);
+        }
+      },
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const validarYcargar = async () => {
     try {
       setLoading(true);
@@ -593,6 +641,10 @@ const InscribirAsignaturas = () => {
         <div className="asignaturas-column">
           <div className="asignaturas-card">
             <h2>Asignaturas Disponibles</h2>
+          <div className="inscribir-info">
+            En esta etapa solo se muestran materias de tu semestre actual y semestres anteriores.
+            Las materias de semestres superiores se solicitan desde Modificaciones.
+          </div>
           {resumen && (
             <div className="inscribir-resumen">
               <div className="resumen-card">
@@ -806,7 +858,10 @@ const InscribirAsignaturas = () => {
                           {asignatura.grupos.map((grupo) => {
                             const estaSeleccionado = gruposSeleccionados.has(grupo.id);
                             const tieneConflicto = conflictos.has(grupo.id);
-                            const sinCupo = grupo.cupo_disponible <= 0;
+                            const cupoMaximo = Math.max(grupo.cupo_max || 0, 0);
+                            const cupoDisponibleReal = Math.max(grupo.cupo_disponible || 0, 0);
+                            const cupoDisponibleSeguro = Math.min(cupoDisponibleReal, cupoMaximo);
+                            const sinCupo = cupoDisponibleSeguro <= 0;
                             const esObligatorio = asignatura.obligatoria_repeticion;
 
                             return (
@@ -825,9 +880,12 @@ const InscribirAsignaturas = () => {
                                   <div className="grupo-content">
                                     <div className="grupo-header">
                                       <span className="grupo-codigo">{grupo.codigo}</span>
-                                      <span className="grupo-cupo">
-                                        {grupo.cupo_disponible}/{grupo.cupo_max} cupos
+                                      <span className={`grupo-cupo-pill ${cupoDisponibleSeguro <= 0 ? 'agotado' : cupoDisponibleSeguro <= 3 ? 'pocos' : 'ok'}`}>
+                                        {cupoDisponibleSeguro} disponibles de {cupoMaximo}
                                       </span>
+                                    </div>
+                                    <div className="grupo-cupo-meta">
+                                      Ocupación: {Math.max(cupoMaximo - cupoDisponibleSeguro, 0)} de {cupoMaximo}
                                     </div>
                                     <div className="grupo-docente">{grupo.docente}</div>
                                     <div className="grupo-horario">

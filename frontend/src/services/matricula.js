@@ -1,5 +1,7 @@
 import api from './auth';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export const matriculaService = {
   // Validar si el estudiante puede inscribir (plazo activo y documentos aprobados)
   async validarInscripcion() {
@@ -139,6 +141,38 @@ export const matriculaService = {
       observacion,
     });
     return response.data;
+  },
+
+  // Suscripción SSE para cambios de solicitudes/cupos (sin polling)
+  subscribeModificacionesEvents({ onMessage, onError } = {}) {
+    const token = localStorage.getItem('token');
+    if (!API_URL || !token || typeof window === 'undefined' || typeof window.EventSource === 'undefined') {
+      return () => {};
+    }
+
+    const url = `${API_URL}/api/matricula/modificaciones/stream?token=${encodeURIComponent(token)}`;
+    const eventSource = new EventSource(url);
+
+    eventSource.addEventListener('modificaciones', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (typeof onMessage === 'function') {
+          onMessage(data);
+        }
+      } catch (err) {
+        console.error('Error parseando evento de modificaciones:', err);
+      }
+    });
+
+    eventSource.onerror = (err) => {
+      if (typeof onError === 'function') {
+        onError(err);
+      }
+    };
+
+    return () => {
+      eventSource.close();
+    };
   },
 };
 

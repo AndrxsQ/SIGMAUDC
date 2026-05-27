@@ -18,19 +18,23 @@ func JWTAuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				http.Error(w, "Authorization header required", http.StatusUnauthorized)
-				return
+			tokenString := ""
+			if authHeader != "" {
+				// Extraer el token del header "Bearer <token>"
+				parts := strings.Split(authHeader, " ")
+				if len(parts) != 2 || parts[0] != "Bearer" {
+					http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
+					return
+				}
+				tokenString = parts[1]
+			} else {
+				// Fallback para canales SSE/EventSource (no soporta header Authorization nativo)
+				tokenString = strings.TrimSpace(r.URL.Query().Get("token"))
+				if tokenString == "" {
+					http.Error(w, "Authorization header required", http.StatusUnauthorized)
+					return
+				}
 			}
-
-			// Extraer el token del header "Bearer <token>"
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || parts[0] != "Bearer" {
-				http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
-				return
-			}
-
-			tokenString := parts[1]
 
 			// Parsear y validar el token
 			claims := &models.JWTClaims{}
@@ -48,7 +52,7 @@ func JWTAuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 			}
 
 			// Validar que los claims no estén vacíos
-			if claims == nil || claims.Sub == 0 {
+			if claims.Sub == 0 {
 				http.Error(w, "Invalid token claims", http.StatusUnauthorized)
 				return
 			}
@@ -68,4 +72,3 @@ func GetClaimsFromContext(ctx context.Context) (*models.JWTClaims, bool) {
 	}
 	return claims, ok
 }
-

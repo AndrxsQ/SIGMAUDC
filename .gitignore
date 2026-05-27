@@ -7,7 +7,7 @@
 frontend/.env
 frontend/.env.local
 frontend/.env.*.local
-
+*.sql
 # Go
 *.exe
 *.exe~

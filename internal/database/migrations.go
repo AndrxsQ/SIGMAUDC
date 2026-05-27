@@ -237,6 +237,29 @@ func RunMigrations(db *sql.DB) error {
 			END IF;
 		END $$;
 		`,
+		`
+		CREATE UNIQUE INDEX IF NOT EXISTS solicitud_modificacion_pendiente_unica_idx
+		ON solicitud_modificacion (estudiante_id, periodo_id)
+		WHERE estado = 'pendiente'
+		`,
+		`
+		UPDATE grupo
+		SET cupo_disponible = LEAST(GREATEST(cupo_disponible, 0), cupo_max)
+		WHERE cupo_disponible < 0 OR cupo_disponible > cupo_max
+		`,
+		`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint
+				WHERE conname = 'grupo_cupo_no_supera_max_check'
+				AND conrelid = 'grupo'::regclass
+			) THEN
+				ALTER TABLE grupo
+				ADD CONSTRAINT grupo_cupo_no_supera_max_check CHECK (cupo_disponible <= cupo_max);
+			END IF;
+		END $$;
+		`,
 	}
 
 	for _, stmt := range statements {
