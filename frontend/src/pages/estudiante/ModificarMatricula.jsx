@@ -74,6 +74,47 @@ const ModificarMatricula = () => {
   // Horas del día (7am - 10pm)
   const horas = Array.from({ length: 16 }, (_, i) => 7 + i);
 
+  const normalizeAsignaturasConCupo = (asignaturasRaw = []) => {
+    return (asignaturasRaw || []).map((asignatura) => {
+      const gruposConCupo = (asignatura.grupos || [])
+        .map((grupo) => {
+          const cupoMaximo = Math.max(Number(grupo.cupo_max || 0), 0);
+          const cupoDisponible = Math.min(Math.max(Number(grupo.cupo_disponible || 0), 0), cupoMaximo);
+          return {
+            ...grupo,
+            cupo_max: cupoMaximo,
+            cupo_disponible: cupoDisponible,
+          };
+        })
+        .filter((grupo) => grupo.cupo_disponible > 0);
+
+      return {
+        ...asignatura,
+        grupos: gruposConCupo,
+      };
+    });
+  };
+
+  const reconciliarSeleccionConOferta = (asignaturasOferta = []) => {
+    const gruposDisponibles = new Set(
+      asignaturasOferta.flatMap((a) => (a.grupos || []).map((g) => g.id))
+    );
+
+    setGruposSeleccionados((prev) => {
+      const next = new Set(Array.from(prev).filter((gid) => gruposDisponibles.has(gid)));
+      let nuevosCreditos = 0;
+      asignaturasOferta.forEach((a) => {
+        if (a.grupos?.some((g) => next.has(g.id))) {
+          nuevosCreditos += a.creditos || 0;
+        }
+      });
+      setCreditosSeleccionados(nuevosCreditos);
+      return next;
+    });
+
+    setConflictos((prev) => new Set(Array.from(prev).filter((gid) => gruposDisponibles.has(gid))));
+  };
+
   useEffect(() => {
     validarYcargar();
   }, []);
@@ -88,7 +129,9 @@ const ModificarMatricula = () => {
         try {
           const datos = await matriculaService.getModificacionesData();
           setMateriasMatriculadas(datos.materias_matriculadas || []);
-          setAsignaturas(datos.asignaturas_disponibles || []);
+          const ofertaNormalizada = normalizeAsignaturasConCupo(datos.asignaturas_disponibles || []);
+          setAsignaturas(ofertaNormalizada);
+          reconciliarSeleccionConOferta(ofertaNormalizada);
           setResumen({
             periodo: datos.periodo,
             creditos: datos.creditos,
@@ -138,7 +181,9 @@ const ModificarMatricula = () => {
         }
         
         setMateriasMatriculadas(datos.materias_matriculadas || []);
-        setAsignaturas(datos.asignaturas_disponibles || []);
+        const ofertaNormalizada = normalizeAsignaturasConCupo(datos.asignaturas_disponibles || []);
+        setAsignaturas(ofertaNormalizada);
+        reconciliarSeleccionConOferta(ofertaNormalizada);
         setResumen({
           periodo: datos.periodo,
           creditos: datos.creditos,

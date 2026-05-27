@@ -75,6 +75,27 @@ const InscribirAsignaturas = () => {
   // Horas del día (7am - 10pm)
   const horas = Array.from({ length: 16 }, (_, i) => 7 + i);
 
+  const normalizeAsignaturasConCupo = (asignaturasRaw = []) => {
+    return (asignaturasRaw || []).map((asignatura) => {
+      const gruposConCupo = (asignatura.grupos || [])
+        .map((grupo) => {
+          const cupoMaximo = Math.max(Number(grupo.cupo_max || 0), 0);
+          const cupoDisponible = Math.min(Math.max(Number(grupo.cupo_disponible || 0), 0), cupoMaximo);
+          return {
+            ...grupo,
+            cupo_max: cupoMaximo,
+            cupo_disponible: cupoDisponible,
+          };
+        })
+        .filter((grupo) => grupo.cupo_disponible > 0);
+
+      return {
+        ...asignatura,
+        grupos: gruposConCupo,
+      };
+    });
+  };
+
   useEffect(() => {
     validarYcargar();
   }, []);
@@ -90,7 +111,7 @@ const InscribirAsignaturas = () => {
           const payload = Array.isArray(asignaturasData)
             ? { asignaturas: asignaturasData }
             : asignaturasData || {};
-          const nuevasAsignaturas = payload.asignaturas || [];
+          const nuevasAsignaturas = normalizeAsignaturasConCupo(payload.asignaturas || []);
           setAsignaturas(nuevasAsignaturas);
           setMensajes(payload.mensajes || []);
           if (payload.periodo || payload.creditos || payload.estado_estudiante) {
@@ -153,7 +174,7 @@ const InscribirAsignaturas = () => {
         const payload = Array.isArray(asignaturasData)
           ? { asignaturas: asignaturasData }
           : asignaturasData || {};
-        const nuevasAsignaturas = payload.asignaturas || [];
+        const nuevasAsignaturas = normalizeAsignaturasConCupo(payload.asignaturas || []);
         setAsignaturas(nuevasAsignaturas);
         const obligatoriosPreselected = new Set();
         let creditosIniciales = 0;
