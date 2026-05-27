@@ -79,6 +79,15 @@ const Plazos = () => {
       setTimeout(() => setError(""), 3000);
       return;
     }
+    const item = PLAZO_ITEMS.find((entry) => entry.key === tipoPlazo);
+    const estadoActual = !!plazos[tipoPlazo];
+    const accion = estadoActual ? "desactivar" : "activar";
+    const confirmado = window.confirm(
+      `¿Confirmas ${accion} el plazo de "${item?.label || tipoPlazo}" para el periodo ${formatPeriodo(activePeriodo)}?`
+    );
+    if (!confirmado) {
+      return;
+    }
     try {
       setError("");
       setUpdatingKey(tipoPlazo);
