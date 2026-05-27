@@ -53,6 +53,7 @@ const Plazos = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [updatingKey, setUpdatingKey] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   useEffect(() => {
     loadActivePlazos();
@@ -73,7 +74,7 @@ const Plazos = () => {
     }
   };
 
-  const handleTogglePlazo = async (tipoPlazo) => {
+  const openToggleConfirmDialog = (tipoPlazo) => {
     if (!activePeriodo || !plazos) {
       setError("No hay un periodo activo para gestionar plazos.");
       setTimeout(() => setError(""), 3000);
@@ -81,20 +82,25 @@ const Plazos = () => {
     }
     const item = PLAZO_ITEMS.find((entry) => entry.key === tipoPlazo);
     const estadoActual = !!plazos[tipoPlazo];
-    const accion = estadoActual ? "desactivar" : "activar";
-    const confirmado = window.confirm(
-      `¿Confirmas ${accion} el plazo de "${item?.label || tipoPlazo}" para el periodo ${formatPeriodo(activePeriodo)}?`
-    );
-    if (!confirmado) {
-      return;
-    }
+    const nuevoEstado = !estadoActual;
+    setConfirmDialog({
+      tipoPlazo,
+      label: item?.label || tipoPlazo,
+      nuevoEstado,
+    });
+  };
+
+  const handleTogglePlazo = async () => {
+    if (!confirmDialog || !activePeriodo || !plazos) return;
+    const { tipoPlazo, label, nuevoEstado } = confirmDialog;
     try {
       setError("");
       setUpdatingKey(tipoPlazo);
+      setConfirmDialog(null);
       await plazosService.updatePlazos(activePeriodo.id, {
-        [tipoPlazo]: !plazos[tipoPlazo],
+        [tipoPlazo]: nuevoEstado,
       });
-      setSuccess("Plazos actualizados exitosamente");
+      setSuccess(`Plazo de ${label} ${nuevoEstado ? "activado" : "desactivado"} exitosamente.`);
       await loadActivePlazos();
       setTimeout(() => setSuccess(""), 2500);
     } catch (err) {
@@ -227,7 +233,7 @@ const Plazos = () => {
                       </div>
                       <button
                         className={`plazo-toggle ${isActive ? "active" : ""}`}
-                        onClick={() => handleTogglePlazo(item.key)}
+                        onClick={() => openToggleConfirmDialog(item.key)}
                         disabled={updatingKey === item.key}
                       >
                         <span className="toggle-slider"></span>
@@ -239,6 +245,57 @@ const Plazos = () => {
             </div>
           )}
         </section>
+      )}
+
+      {confirmDialog && (
+        <div className="modal-overlay" role="presentation">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2>Confirmar cambio de plazo</h2>
+              <button
+                className="modal-close"
+                onClick={() => setConfirmDialog(null)}
+                aria-label="Cerrar confirmación"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="modal-form">
+              <div className="form-group">
+                <label>Resumen</label>
+                <p style={{ margin: 0, color: "#1d1d1f", lineHeight: 1.6 }}>
+                  Estás a punto de <strong>{confirmDialog.nuevoEstado ? "activar" : "desactivar"}</strong> el plazo de{" "}
+                  <strong>{confirmDialog.label}</strong> para el periodo{" "}
+                  <strong>{formatPeriodo(activePeriodo)}</strong>.
+                </p>
+              </div>
+              <div className="form-group">
+                <p style={{ margin: 0, color: "#86868b", lineHeight: 1.5 }}>
+                  Este cambio impacta inmediatamente a los estudiantes de tu programa.
+                </p>
+              </div>
+              <div className="modal-actions">
+                <button
+                  className="btn-secondary"
+                  onClick={() => setConfirmDialog(null)}
+                  disabled={!!updatingKey}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={handleTogglePlazo}
+                  disabled={!!updatingKey}
+                >
+                  Sí, {confirmDialog.nuevoEstado ? "activar" : "desactivar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
