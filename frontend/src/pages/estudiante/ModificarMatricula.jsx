@@ -225,7 +225,11 @@ const ModificarMatricula = () => {
   const cargarSolicitudes = async () => {
     try {
       const response = await matriculaService.getSolicitudesModificacion();
-      const solicitudes = response.solicitudes || [];
+      const solicitudes = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.solicitudes)
+          ? response.solicitudes
+          : [];
       
       // Buscar solicitud pendiente
       const pendiente = solicitudes.find(s => s.estado === 'pendiente');
@@ -521,68 +525,64 @@ const ModificarMatricula = () => {
     if (!solicitudPendiente && historialSolicitudes.length === 0) return null;
 
     return (
-      <div className="solicitudes-section" style={{ marginBottom: '1.5rem' }}>
+      <section className="solicitudes-section">
         {/* Solicitud pendiente */}
         {solicitudPendiente && (
-          <div className="solicitud-card pendiente" style={{
-            padding: '1rem',
-            backgroundColor: '#fff3cd',
-            border: '1px solid #ffc107',
-            borderRadius: '8px',
-            marginBottom: '1rem'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <FaClock style={{ color: '#856404' }} />
-              <strong style={{ color: '#856404' }}>Solicitud Pendiente</strong>
+          <article className="solicitud-status-card pendiente">
+            <div className="solicitud-status-header">
+              <span className="solicitud-status-icon warning">
+                <FaClock />
+              </span>
+              <div>
+                <p className="solicitud-status-title">Solicitud pendiente</p>
+                <p className="solicitud-status-subtitle">
+                  Enviada: {new Date(solicitudPendiente.fecha_solicitud).toLocaleString('es-ES')}
+                </p>
+              </div>
             </div>
-            <p style={{ margin: 0, fontSize: '0.9rem', color: '#856404' }}>
+            <p className="solicitud-status-text">
               Tienes una solicitud de modificación pendiente de revisión.
               No puedes enviar otra hasta que sea procesada.
             </p>
-            <div style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
-              <strong>Enviada:</strong> {new Date(solicitudPendiente.fecha_solicitud).toLocaleString('es-ES')}
-            </div>
-          </div>
+          </article>
         )}
 
         {/* Historial de solicitudes procesadas */}
         {historialSolicitudes.length > 0 && (
-          <div style={{ marginTop: '0.5rem' }}>
-            <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Solicitudes procesadas:</p>
+          <div className="solicitudes-historial">
+            <div className="solicitudes-historial-header">
+              <h3>Historial de solicitudes</h3>
+              <span>{historialSolicitudes.length} registradas</span>
+            </div>
             {historialSolicitudes.map((sol) => (
-              <div 
-                key={sol.id} 
-                className={`solicitud-card ${sol.estado}`}
-                style={{
-                  padding: '0.75rem',
-                  backgroundColor: sol.estado === 'aprobada' ? '#d4edda' : '#f8d7da',
-                  border: `1px solid ${sol.estado === 'aprobada' ? '#28a745' : '#dc3545'}`,
-                  borderRadius: '8px',
-                }}
+              <article
+                key={sol.id}
+                className={`solicitud-history-card ${sol.estado === 'aprobada' ? 'aprobada' : 'rechazada'}`}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {sol.estado === 'aprobada' ? (
-                    <FaCheckCircle style={{ color: '#28a745' }} />
-                  ) : (
-                    <FaTimesCircle style={{ color: '#dc3545' }} />
-                  )}
-                  <strong style={{ color: sol.estado === 'aprobada' ? '#155724' : '#721c24' }}>
-                    {sol.estado === 'aprobada' ? 'Aprobada' : 'Rechazada'}
+                <div className="solicitud-history-header">
+                  <span className={`solicitud-status-icon ${sol.estado === 'aprobada' ? 'success' : 'danger'}`}>
+                    {sol.estado === 'aprobada' ? <FaCheckCircle /> : <FaTimesCircle />}
+                  </span>
+                  <strong className="solicitud-history-title">
+                    Solicitud #{sol.id} · {sol.estado === 'aprobada' ? 'Aprobada' : 'Rechazada'}
                   </strong>
-                  <span style={{ fontSize: '0.85rem', marginLeft: 'auto' }}>
-                    {new Date(sol.fecha_revision).toLocaleString('es-ES')}
+                  <span className="solicitud-history-date">
+                    {new Date(sol.fecha_revision || sol.fecha_solicitud).toLocaleString('es-ES')}
                   </span>
                 </div>
-                {sol.estado === 'rechazada' && sol.observacion && (
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#721c24' }}>
-                    <strong>Observación:</strong> {sol.observacion}
+                {sol.estado === 'rechazada' && (
+                  <div className="solicitud-reason-box">
+                    <p className="solicitud-reason-label">Motivo del rechazo</p>
+                    <p className="solicitud-reason-text">
+                      {sol.observacion || "No se registró observación por parte de jefatura."}
+                    </p>
                   </div>
                 )}
-              </div>
+              </article>
             ))}
           </div>
         )}
-      </div>
+      </section>
     );
   };
 
@@ -914,37 +914,6 @@ const ModificarMatricula = () => {
                 </div>
               )}
             </div>
-
-            {/* Historial de solicitudes procesadas */}
-            {historialSolicitudes.length > 0 && (
-              <div style={{ marginBottom: '1rem' }}>
-                {historialSolicitudes.map((sol) => (
-                  <div 
-                    key={sol.id} 
-                    style={{
-                      padding: '0.75rem',
-                      backgroundColor: sol.estado === 'aprobada' ? '#d4edda' : '#f8d7da',
-                      border: `1px solid ${sol.estado === 'aprobada' ? '#28a745' : '#dc3545'}`,
-                      borderRadius: '8px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      {sol.estado === 'aprobada' ? (
-                        <FaCheckCircle style={{ color: '#28a745' }} />
-                      ) : (
-                        <FaTimesCircle style={{ color: '#dc3545' }} />
-                      )}
-                      <strong>Solicitud {sol.id}: {sol.estado === 'aprobada' ? 'Aprobada' : 'Rechazada'}</strong>
-                    </div>
-                    {sol.estado === 'rechazada' && sol.observacion && (
-                      <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
-                        <strong>Motivo:</strong> {sol.observacion}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
 
             <h2>Materias Matriculadas</h2>
             <div className="asignaturas-list">
